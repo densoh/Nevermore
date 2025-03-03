@@ -772,6 +772,7 @@ func (c *Character) Tick() {
 	} else {
 		c.Heal(int(math.Ceil(float64(c.GetStat("con")) * config.ConHealRegenMod)))
 		c.RestoreMana(int(math.Ceil(float64(c.GetStat("pie")) * config.PieRegenMod)))
+	}
 
 	// Loop the currently applied effects, drop them if needed, or execute their functions as necessary
 	for name, effect := range c.Effects {
@@ -786,7 +787,6 @@ func (c *Character) Tick() {
 			continue
 		}
 	}
-
 }
 
 // Look Drop out the description of this character
