@@ -437,10 +437,10 @@ func (m *Mob) Tick() {
 					if utils.Roll(10, 1, 0) <= penalty {
 						attackStyleRoll := utils.Roll(10, 1, 0)
 						if attackStyleRoll <= config.MobVital {
-							multiplier = 2
+							multiplier = 2 - (float64(target.GetStat("dex")) / 100)
 							vitalStrike = true
 						} else if attackStyleRoll <= config.MobCritical {
-							multiplier = 4
+							multiplier = 4 - (float64(target.GetStat("dex")) / 50)
 							criticalStrike = true
 						} else if attackStyleRoll <= config.MobDouble {
 							multiplier = 2

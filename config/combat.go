@@ -141,7 +141,7 @@ var (
 	ConHealRegenMod   = .10
 	ConMonkArmor      = 2 // 2 Armor Extra Per Con
 	ConFallDamageMod  = 1
-	ConArmorMod       = .01
+	ConArmorMod       = .005
 
 	HitPerDex        = 1
 	MissPerDex       = 1
@@ -165,7 +165,7 @@ var (
 
 	ArmorReduction         = .007
 	ArmorReductionPoints   = 10
-	ArmorReductionConstant = 1200
+	ArmorReductionConstant = 1100
 
 	MobArmorReduction = .5
 

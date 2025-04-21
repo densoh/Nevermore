@@ -941,14 +941,16 @@ func (c *Character) ReceiveDamage(damage int) (int, int, int) {
 		damage -= int(math.Ceil(float64(damage) * config.InertialDamageIgnore))
 	}
 	stamDamage, vitalDamage := 0, 0
-	resist := int(math.Ceil(float64(damage) * ((float64(c.GetStat("armor")) / float64(config.ArmorReductionPoints)) * config.ArmorReduction)))
+	mitigation := float64(config.ArmorReductionConstant) / (float64(config.ArmorReductionConstant) + float64(c.GetStat("armor")))
+
+	finalDamage := int(math.Ceil(float64(damage) * mitigation))
+	resist := damage - finalDamage
 	msg := c.Equipment.DamageRandomArmor()
 	if msg != "" {
 		if _, err := c.Write([]byte(text.Info + msg + "\n" + text.Reset)); err != nil {
 			log.Println("Error writing to player: ", err)
 		}
 	}
-	finalDamage := damage - resist
 	if finalDamage < 0 {
 		finalDamage = 0
 	}
@@ -1001,9 +1003,10 @@ func (c *Character) ReceiveVitalDamage(damage int) (int, int) {
 			log.Println("Error writing to player: ", err)
 		}
 	}
-	resist := int(math.Ceil(float64(damage) * ((float64(c.GetStat("armor")) / float64(config.ArmorReductionPoints)) * config.ArmorReduction)))
+	mitigation := float64(config.ArmorReductionConstant) / (float64(config.ArmorReductionConstant) + float64(c.GetStat("armor")))
 
-	finalDamage := damage - resist
+	finalDamage := int(math.Ceil(float64(damage) * mitigation))
+	resist := damage - finalDamage
 	if finalDamage < 0 {
 		finalDamage = 0
 	}
