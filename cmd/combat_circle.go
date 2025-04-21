@@ -1,18 +1,17 @@
 package cmd
 
 import (
-	"strconv"
-
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/utils"
+	"strconv"
 )
 
 func init() {
 	addHandler(circle{},
 		"Usage:  circle target # \n\n Try to circle a mob to apply a short duration stun and generate threat",
-		permissions.Fighter|permissions.Barbarian|permissions.Paladin,
+		permissions.Fighter|permissions.Barbarian,
 		"circle", "cir")
 }
 
@@ -81,7 +80,7 @@ func (circle) process(s *state) {
 		}
 
 		// Check for a miss
-		if utils.Roll(100, 1, 0) <= DetermineMissChance(s, whatMob) {
+		if utils.Roll(100, 1, 0) <= DetermineMissChance(s, whatMob.Level-s.actor.Tier) {
 			s.msg.Actor.SendBad("You missed!!")
 			s.actor.SetTimer("combat_circle", config.CircleTimer)
 			s.actor.SetTimer("combat", config.CombatCooldown)

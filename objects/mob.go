@@ -407,8 +407,6 @@ func (m *Mob) Tick() {
 			// Calculate Vital/Crit/Double
 			multiplier := float64(1)
 			vitalStrike := false
-			mobCriticalMultiplier := config.MobCriticalMultiplier
-			mobVitalMultiplier := config.MobVitalMultiplier
 			criticalStrike := false
 			doubleDamage := false
 			penalty := 1
@@ -439,10 +437,10 @@ func (m *Mob) Tick() {
 					if utils.Roll(10, 1, 0) <= penalty {
 						attackStyleRoll := utils.Roll(10, 1, 0)
 						if attackStyleRoll <= config.MobVital {
-							multiplier = mobVitalMultiplier - (float64(target.Con.Current-config.BaselineStatValue) * 0.01)
+							multiplier = 2
 							vitalStrike = true
 						} else if attackStyleRoll <= config.MobCritical {
-							multiplier = float64(mobCriticalMultiplier) - (float64(target.Con.Current-config.BaselineStatValue) * 0.01)
+							multiplier = 4
 							criticalStrike = true
 						} else if attackStyleRoll <= config.MobDouble {
 							multiplier = 2
@@ -561,10 +559,10 @@ func (m *Mob) Tick() {
 						if utils.Roll(10, 1, 0) <= penalty {
 							attackStyleRoll := utils.Roll(10, 1, 0)
 							if attackStyleRoll <= config.MobVital {
-								multiplier = mobVitalMultiplier - (float64(target.Con.Current-config.BaselineStatValue) * 0.01)
+								multiplier = 2
 								vitalStrike = true
 							} else if attackStyleRoll <= config.MobCritical {
-								multiplier = float64(mobCriticalMultiplier) - (float64(target.Con.Current-config.BaselineStatValue) * 0.01)
+								multiplier = 4
 								criticalStrike = true
 							} else if attackStyleRoll <= config.MobDouble {
 								multiplier = 2
@@ -721,7 +719,11 @@ func (m *Mob) CheckForExtraAttack(target *Character) {
 			if _, err := target.Write([]byte(text.Red + m.Name + " tries to spread disease on to you!" + "\n" + text.Reset)); err != nil {
 				log.Println("Error writing to player:", err)
 			}
-			Effects["disease"](m, target, m.Level)
+			magnitude := m.Level
+			if magnitude < 4 {
+				magnitude = 4
+			}
+			Effects["disease"](m, target, magnitude)
 			return
 		}
 	}
@@ -729,6 +731,10 @@ func (m *Mob) CheckForExtraAttack(target *Character) {
 		if utils.Roll(100, 1, 0) > 50 {
 			if _, err := target.Write([]byte(text.Red + m.Name + " injects you with venom!" + "\n" + text.Reset)); err != nil {
 				log.Println("Error writing to player:", err)
+			}
+			magnitude := m.Level
+			if magnitude < 4 {
+				magnitude = 4
 			}
 			Effects["poison"](m, target, m.Level)
 			return
@@ -956,15 +962,15 @@ func (m *Mob) CalculateInventory() {
 }
 
 func (m *Mob) ReturnState() string {
-	stamStatus := "healthy"
+	stamStatus := text.Green + "healthy" + text.Info
 	if m.Stam.Current < (m.Stam.Max - int(.90*float32(m.Stam.Max))) {
-		stamStatus = "near death"
+		stamStatus = text.BrightRed + "near death" + text.Info
 	} else if m.Stam.Current < (m.Stam.Max - int(.75*float32(m.Stam.Max))) {
-		stamStatus = "badly injured"
+		stamStatus = text.Red + "badly injured" + text.Info
 	} else if m.Stam.Current < (m.Stam.Max - int(.5*float32(m.Stam.Max))) {
-		stamStatus = "injured"
+		stamStatus = text.DarkYellow + "injured" + text.Info
 	} else if m.Stam.Current < (m.Stam.Max - int(.25*float32(m.Stam.Max))) {
-		stamStatus = "slightly injured"
+		stamStatus = text.DarkGreen + "slightly injured" + text.Info
 	}
 	return " looks " + stamStatus
 }
