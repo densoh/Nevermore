@@ -8,12 +8,13 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"math"
 )
 
 func init() {
 	addHandler(cast{},
 		"Usage:  cast spell_name target # \n\n Attempts to cast a known spell from your spellbook",
-		permissions.Mage|permissions.Bard|permissions.Cleric|permissions.Ranger|permissions.Paladin|permissions.Thief|permissions.Monk|permissions.Gamemaster|permissions.Dungeonmaster|permissions.Builder,
+		permissions.Mage|permissions.Bard|permissions.Cleric|permissions.Ranger|permissions.Paladin|permissions.Thief|permissions.Monk|permissions.Gamemaster|permissions.Dungeonmaster|permissions.Builder|permissions.Barbarian|permissions.Fighter,
 		"cast", "ca", "c")
 }
 
@@ -65,7 +66,9 @@ func (cast) process(s *state) {
 	}
 
 	if s.actor.GetStat("int") < config.IntMajorPenalty {
-		if utils.Roll(100, 1, 0) <= config.FizzleSave {
+		var fizzlePenalty = int(math.Min(float64(config.FizzleSave * ((config.IntMajorPenalty - s.actor.GetStat("int")))), float64(75)))
+		var roll = utils.Roll(100, 1, 0)
+		if roll <= fizzlePenalty   {
 			s.msg.Actor.SendBad("You attempt to cast the spell, but it fizzles out.")
 			s.actor.Mana.Current -= cost
 			s.actor.SetTimer("combat", 8)

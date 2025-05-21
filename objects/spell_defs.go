@@ -18,7 +18,7 @@ var Spells = map[string]Spell{
 		Chant:       "Thy energies return!",
 		Magnitude:   1,
 		Effect:      "heal-stam",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 1, "ranger": 1, "bard": 1, "thief": 1, "monk": 1},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 1, "ranger": 1, "bard": 1, "thief": 1, "monk": 1, "barbarian": 1, "fighter": 1},
 	},
 	"mend": {
 		Name:        "mend",
@@ -351,7 +351,7 @@ var Spells = map[string]Spell{
 		Chant:       "Venom be purged from thy body.",
 		Magnitude:   1,
 		Effect:      "curepoison",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 1, "ranger": 1, "bard": 1, "thief": 1, "monk": 1},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 1, "ranger": 1, "bard": 1, "thief": 1, "monk": 1, "fighter": 1, "barbarian": 1},
 	},
 	"bless": {
 		Name:        "bless",
