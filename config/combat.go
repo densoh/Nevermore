@@ -158,7 +158,7 @@ var (
 	IntEvalDivInt          = 3  //Divide int by this number to get eval
 	BaseEvals              = 1
 	BaseBroads             = 5
-	FizzleSave             = 50
+	FizzleSave             = 25 // chance to fizzle per int below 9
 
 	PieRegenMod = .4 // Regen Mana per tick
 	PieHealMod  = .7 // Per point
