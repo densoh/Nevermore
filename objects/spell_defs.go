@@ -27,7 +27,7 @@ var Spells = map[string]Spell{
 		Chant:       "Ease thy pain, knit thy flesh.",
 		Magnitude:   1,
 		Effect:      "heal-vit",
-		Classes:     map[string]int{"cleric": 3, "mage": 4, "paladin": 3, "ranger": 4, "bard": 3, "thief": 4, "monk": 5},
+		Classes:     map[string]int{"cleric": 3, "mage": 4, "paladin": 3, "ranger": 4, "bard": 3, "thief": 4, "monk": 5, "fighter": 5, "barbarian": 6},
 	},
 	"heal": {
 		Name:        "heal",

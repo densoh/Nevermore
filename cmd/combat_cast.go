@@ -71,7 +71,6 @@ func (cast) process(s *state) {
 		if roll <= fizzlePenalty   {
 			s.msg.Actor.SendBad("You attempt to cast the spell, but it fizzles out.")
 			s.actor.Mana.Current -= cost
-			s.actor.SetTimer("combat", 8)
 			s.actor.SetTimer("cast", 8)
 			return
 		}
