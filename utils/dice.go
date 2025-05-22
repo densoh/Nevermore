@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var DieSeed = rand.NewSource(CryptoRandSecure(math.MaxInt))
+var DieSeed = rand.NewSource(CryptoRandSecure(math.MaxInt64))
 var generator = rand.New(DieSeed)
 var LastUpdate = time.Now().Unix()
 
@@ -41,7 +41,7 @@ func DiceRoll(dieSides int, numDice int, mod int, drop int, total bool) []int {
 	rolls := make([]int, numDice)
 
 	if time.Now().Unix()-LastUpdate >= 600 {
-		DieSeed = rand.NewSource(CryptoRandSecure(math.MaxInt))
+		DieSeed = rand.NewSource(CryptoRandSecure(math.MaxInt64))
 		generator = rand.New(DieSeed)
 		LastUpdate = time.Now().Unix()
 	}
