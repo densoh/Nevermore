@@ -1052,7 +1052,7 @@ func (c *Character) ReceiveMagicDamage(damage int, element string) (int, int, in
 			if _, err := c.Write([]byte(text.Info + "Your magically quickened reflexes allow you to lessen the effect of the magic!\n" + text.Reset)); err != nil {
 				log.Println("Error writing to player: ", err)
 			}
-			resisting = math.Ceil(float64(c.GetStat("dex")) * config.DodgeDamagePerDex)
+			resisting = float64(c.GetStat("dex")) * config.DodgeDamagePerDex
 		}
 	}
 
