@@ -5,6 +5,7 @@ import (
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"log"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -32,7 +33,7 @@ You sense the following enchantments bound to your lifeforce:
 	var spellEffects []string
 	for k := range s.actor.Effects {
 		if _, ok := objects.Spells[k]; ok {
-			spellEffects = append(spellEffects, k)
+			spellEffects = append(spellEffects, k+"("+strconv.Itoa(int(s.actor.Effects[k].TimeRemaining()))+"s)")
 		}
 	}
 
