@@ -69,7 +69,7 @@ var (
 	ReflectDamageFromMob = .15 // Percentage of damage reflected from mob
 
 	DodgeDamagePerDex     = .01
-	FullDodgeChancePerDex = .01
+	FullDodgeChancePerDex = 1.0
 
 	PeekCD                      = 8
 	StealCD                     = 8

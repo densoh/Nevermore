@@ -41,6 +41,11 @@ func (roll) process(s *state) {
 		return
 	}
 
+	if rollSides < 1 || rollDice < 1 {
+		s.msg.Actor.SendInfo("You give yourself a headache trying to imagine a die with negative sides.")
+		return
+	}
+
 	dVal := utils.Roll(rollSides, rollDice, 0)
 
 	s.msg.Actor.SendGood("You rolled: " + strconv.Itoa(dVal))
