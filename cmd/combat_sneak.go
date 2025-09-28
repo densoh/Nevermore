@@ -56,6 +56,7 @@ func (sneak) process(s *state) {
 			exitName = strings.Join(s.words, " ")
 		} else {
 			s.msg.Actor.SendBad("Sneak where?")
+			return
 		}
 	}
 
