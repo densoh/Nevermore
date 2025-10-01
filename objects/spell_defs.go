@@ -724,4 +724,13 @@ var MobSupportSpells = []string{
 	"resist-earth",
 	"inertial-barrier",
 	"reflection",
+	"vigor",
+	"detraumatize",
+	"renewal",
+}
+
+var MobHealingSpells = []string{
+	"vigor",
+	"detraumatize",
+	"renewal",
 }

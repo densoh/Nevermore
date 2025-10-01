@@ -186,11 +186,13 @@ func (m *Mob) StartTicking() {
 		}
 	}
 	m.MobTicker = time.NewTicker(time.Duration(8-tickModifier) * time.Second)
+	/* This allows a mob to cast beneficial spells on itself on load, but it also means that any mob with a heal in its spell list will heal on load, which is not desired.
 	for _, spell := range m.Spells {
 		if utils.StringIn(spell, MobSupportSpells) {
 			Cast(m, m, spell, 0)
 		}
 	}
+	*/
 	// Execute Immediately - Do not wrap locks, this is called from an existing lock
 	go func() {
 		Rooms[m.ParentId].LockRoom(m.Name+"MobInitTick", false)
@@ -361,34 +363,55 @@ func (m *Mob) Tick() {
 				}
 			}
 
-			if m.CurrentTarget != "" && m.ChanceCast > 0 {
-				// Try to cast a spell first
+			// Attempt beneficial spells regardless of having a target
+			if m.ChanceCast > 0 && len(m.Spells) > 0 {
 				log.Println("Trying to cast a spell")
-				// Select a random person on the threat table
-				var target *Character
-				for target == nil && len(Rooms[m.ParentId].Chars.MobList(m)) > 0 {
-					target = Rooms[m.ParentId].Chars.MobSearch(utils.RandMapKeySelection(m.ThreatTable), m)
-				}
-				if target != nil {
-					spellSelected := false
-					selectSpell := ""
-					if utils.Roll(100, 1, 0) <= m.ChanceCast {
-						log.Println("Successful Roll, Selecting a spell")
-						for range m.Spells {
-							selectSpell = m.Spells[rand.Intn(len(m.Spells))]
-							if selectSpell != "" {
-								if utils.StringIn(selectSpell, OffensiveSpells) {
-									if m.Mana.Current > Spells[selectSpell].Cost {
-										spellSelected = true
+				if utils.Roll(100, 1, 0) <= m.ChanceCast {
+					spellIndices := rand.Perm(len(m.Spells)) // Shuffle spell list
+					for _, idx := range spellIndices {
+						selectSpell := m.Spells[idx]
+						if selectSpell == "" {
+							continue
+						}
+						spellInstance, ok := Spells[selectSpell]
+						if !ok || m.Mana.Current < spellInstance.Cost {
+							continue
+						}
+						if utils.StringIn(selectSpell, MobSupportSpells) {
+							var mobTargets []*Mob
+							for _, mob := range Rooms[m.ParentId].Mobs.Contents {
+								// Healing spells: only target mobs not at full health
+								//log.Println("current health:", mob.Stam.Current, "max health:", mob.Stam.Max)
+								if utils.StringIn(selectSpell, MobHealingSpells) {
+									if !mob.CheckFlag(spellInstance.Effect) && mob.Stam.Current < mob.Stam.Max {
+										mobTargets = append(mobTargets, mob)
+									}
+								} else {
+									// Non-healing beneficial spells
+									if !mob.CheckFlag(spellInstance.Effect) {
+										mobTargets = append(mobTargets, mob)
 									}
 								}
 							}
-						}
-
-						if spellSelected {
-							spellInstance, ok := Spells[selectSpell]
-							if !ok {
-								spellSelected = false
+							if len(mobTargets) == 0 {
+								continue // Try next spell
+							}
+							targetMob := mobTargets[rand.Intn(len(mobTargets))]
+							Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + targetMob.Name + ".\n")
+							m.Mana.Subtract(spellInstance.Cost)
+							result := Cast(m, targetMob, spellInstance.Effect, spellInstance.Magnitude)
+							if strings.Contains(result, "$SCRIPT") {
+								m.MobScript(result)
+							}
+							break // Spell cast, exit loop
+						} else if utils.StringIn(selectSpell, OffensiveSpells) && m.CurrentTarget != "" {
+							// Offensive spell: find a character target
+							var target *Character
+							for target == nil && len(Rooms[m.ParentId].Chars.MobList(m)) > 0 {
+								target = Rooms[m.ParentId].Chars.MobSearch(utils.RandMapKeySelection(m.ThreatTable), m)
+							}
+							if target == nil {
+								continue // Try next spell
 							}
 							Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + target.Name + "\n")
 							target.RunHook("attacked")
@@ -398,7 +421,7 @@ func (m *Mob) Tick() {
 								m.MobScript(result)
 							}
 							target.DeathCheck("was slain by a " + m.Name + ".")
-							return
+							return //Offensive spell cast, end turn
 						}
 					}
 				}
@@ -1034,6 +1057,7 @@ func (m *Mob) ApplyEffect(effectName string, length string, interval int, magnit
 
 func (m *Mob) RemoveEffect(effectName string) {
 	delete(m.Effects, effectName)
+	m.FlagOff(effectName, "")
 }
 
 func (m *Mob) ApplyHook(hook string, hookName string, executions int, length string, interval int, effect func(), effectOff func()) {
@@ -1207,11 +1231,10 @@ func (m *Mob) ReceiveMagicDamage(damage int, element string) (int, int, int) {
 		if m.CheckFlag("resist-water") {
 			resisting += .25
 		}
+		/*if resisting > 0 {
+			resisting = (float64(m.Int.Current) / 30) * resisting
+		}*/
 	}
-	/*if resisting > 0 {
-		resisting = (float64(m.Int.Current) / 30) * resisting
-	}*/
-
 	if m.CheckFlag("resist-magic") {
 		resisting += .10
 	}
@@ -1228,10 +1251,12 @@ func (m *Mob) ReceiveVitalDamage(damage int) (int, int) {
 func (m *Mob) Heal(damage int) (int, int) {
 	m.Stam.Add(damage)
 	return damage, 0
+
 }
 
 func (m *Mob) HealStam(damage int) {
 	m.Stam.Add(damage)
+	return
 }
 
 func (m *Mob) HealVital(damage int) {
