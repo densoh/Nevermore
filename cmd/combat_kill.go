@@ -286,6 +286,13 @@ func DeathCheck(s *state, m *objects.Mob) {
 		} else {
 			experienceAwarded = m.Experience / 10
 		}
+
+		for flag, modifier := range config.XP_Modifiers {
+			if m.CheckFlag(flag) {
+				experienceAwarded += int(float64(m.Experience) * modifier)
+			}
+		}
+
 		for _, member := range s.where.Chars.Contents {
 			buildActorString := ""
 			charClean := s.where.Chars.SearchAll(member.Name)

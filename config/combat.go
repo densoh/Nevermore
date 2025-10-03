@@ -231,7 +231,7 @@ var Parry = []int{
 func RollParry(skill int) bool {
 	if skill > 0 {
 		dRoll := utils.Roll(100, 1, 0)
-		if dRoll <= Parry[skill-1] {
+		if dRoll <= Parry[skill] {
 			return true
 		}
 	}
@@ -366,4 +366,19 @@ func BreatheDamage(level int) int {
 	default:
 		return 8
 	}
+}
+
+var XP_Modifiers = map[string]float64{
+	"poisons":       .03,
+	"fast_moving":   .03,
+	"block_exit":    .06,
+	"follows":       .06,
+	"no_stun":       .03,
+	"diseases":      .03,
+	"spits_acid":    .03,
+	"blinds":        .06,
+	"no_steal":      .03,
+	"ranged_attack": .03,
+	"invisible":     .03,
+	"steals":        .06,
 }
