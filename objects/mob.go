@@ -738,7 +738,7 @@ func (m *Mob) DeathCheck(target *Character) bool {
 func (m *Mob) CheckForExtraAttack(target *Character) {
 
 	if m.Flags["blinds"] {
-		if utils.Roll(100, 1, 0) > 80 {
+		if utils.Roll(100, 1, 0) > 90 {
 			if _, err := target.Write([]byte(text.Red + m.Name + " blinds you!" + "\n" + text.Reset)); err != nil {
 				log.Println("Error writing to player:", err)
 			}

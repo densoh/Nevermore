@@ -124,7 +124,7 @@ func berserk(caller interface{}, target interface{}, magnitude int) string {
 func blind(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
-		target.ApplyEffect("blind", "300", 0, 0,
+		target.ApplyEffect("blind", "30", 0, 0,
 			func(triggers int) {
 				target.FlagOnAndMsg("blind", "blind", text.Red+"You've been blinded!!!!\n")
 			},

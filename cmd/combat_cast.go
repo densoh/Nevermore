@@ -68,7 +68,7 @@ func (cast) process(s *state) {
 	}
 
 	if s.actor.GetStat("int") < config.IntMajorPenalty {
-		var fizzlePenalty = int(math.Min(float64(config.FizzleSave*(config.IntMajorPenalty-s.actor.GetStat("int"))), float64(75)))
+		var fizzlePenalty = int(math.Min(float64(config.FizzleSave * (config.IntMajorPenalty - s.actor.GetStat("int"))), float64(75)))
 		var roll = utils.Roll(100, 1, 0)
 		if roll <= fizzlePenalty {
 			s.msg.Actor.SendBad("You attempt to cast the spell, but it fizzles out.")
