@@ -186,11 +186,13 @@ func (m *Mob) StartTicking() {
 		}
 	}
 	m.MobTicker = time.NewTicker(time.Duration(8-tickModifier) * time.Second)
+	/* This allows a mob to cast beneficial spells on itself on load, but it also means that any mob with a heal in its spell list will heal on load, which is not desired.
 	for _, spell := range m.Spells {
 		if utils.StringIn(spell, MobSupportSpells) {
 			Cast(m, m, spell, 0)
 		}
 	}
+	*/
 	// Execute Immediately - Do not wrap locks, this is called from an existing lock
 	go func() {
 		Rooms[m.ParentId].LockRoom(m.Name+"MobInitTick", false)
@@ -361,34 +363,55 @@ func (m *Mob) Tick() {
 				}
 			}
 
-			if m.CurrentTarget != "" && m.ChanceCast > 0 {
-				// Try to cast a spell first
+			// Attempt beneficial spells regardless of having a target
+			if m.ChanceCast > 0 && len(m.Spells) > 0 {
 				log.Println("Trying to cast a spell")
-				// Select a random person on the threat table
-				var target *Character
-				for target == nil && len(Rooms[m.ParentId].Chars.MobList(m)) > 0 {
-					target = Rooms[m.ParentId].Chars.MobSearch(utils.RandMapKeySelection(m.ThreatTable), m)
-				}
-				if target != nil {
-					spellSelected := false
-					selectSpell := ""
-					if utils.Roll(100, 1, 0) <= m.ChanceCast {
-						log.Println("Successful Roll, Selecting a spell")
-						for range m.Spells {
-							selectSpell = m.Spells[rand.Intn(len(m.Spells))]
-							if selectSpell != "" {
-								if utils.StringIn(selectSpell, OffensiveSpells) {
-									if m.Mana.Current > Spells[selectSpell].Cost {
-										spellSelected = true
+				if utils.Roll(100, 1, 0) <= m.ChanceCast {
+					spellIndices := rand.Perm(len(m.Spells)) // Shuffle spell list
+					for _, idx := range spellIndices {
+						selectSpell := m.Spells[idx]
+						if selectSpell == "" {
+							continue
+						}
+						spellInstance, ok := Spells[selectSpell]
+						if !ok || m.Mana.Current < spellInstance.Cost {
+							continue
+						}
+						if utils.StringIn(selectSpell, MobSupportSpells) {
+							var mobTargets []*Mob
+							for _, mob := range Rooms[m.ParentId].Mobs.Contents {
+								// Healing spells: only target mobs not at full health
+								//log.Println("current health:", mob.Stam.Current, "max health:", mob.Stam.Max)
+								if utils.StringIn(selectSpell, MobHealingSpells) {
+									if !mob.CheckFlag(spellInstance.Effect) && mob.Stam.Current < mob.Stam.Max {
+										mobTargets = append(mobTargets, mob)
+									}
+								} else {
+									// Non-healing beneficial spells
+									if !mob.CheckFlag(spellInstance.Effect) {
+										mobTargets = append(mobTargets, mob)
 									}
 								}
 							}
-						}
-
-						if spellSelected {
-							spellInstance, ok := Spells[selectSpell]
-							if !ok {
-								spellSelected = false
+							if len(mobTargets) == 0 {
+								continue // Try next spell
+							}
+							targetMob := mobTargets[rand.Intn(len(mobTargets))]
+							Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + targetMob.Name + ".\n")
+							m.Mana.Subtract(spellInstance.Cost)
+							result := Cast(m, targetMob, spellInstance.Effect, spellInstance.Magnitude)
+							if strings.Contains(result, "$SCRIPT") {
+								m.MobScript(result)
+							}
+							break // Spell cast, exit loop
+						} else if utils.StringIn(selectSpell, OffensiveSpells) && m.CurrentTarget != "" {
+							// Offensive spell: find a character target
+							var target *Character
+							for target == nil && len(Rooms[m.ParentId].Chars.MobList(m)) > 0 {
+								target = Rooms[m.ParentId].Chars.MobSearch(utils.RandMapKeySelection(m.ThreatTable), m)
+							}
+							if target == nil {
+								continue // Try next spell
 							}
 							Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + target.Name + "\n")
 							target.RunHook("attacked")
@@ -398,7 +421,7 @@ func (m *Mob) Tick() {
 								m.MobScript(result)
 							}
 							target.DeathCheck("was slain by a " + m.Name + ".")
-							return
+							return //Offensive spell cast, end turn
 						}
 					}
 				}
@@ -414,86 +437,94 @@ func (m *Mob) Tick() {
 			if m.CurrentTarget != "" && m.Flags["ranged_attack"] &&
 				(math.Abs(float64(m.Placement-Rooms[m.ParentId].Chars.MobSearch(m.CurrentTarget, m).Placement)) >= 1) {
 				target := Rooms[m.ParentId].Chars.MobSearch(m.CurrentTarget, m)
-				missChance := 0
-				lvlDiff := target.Tier - m.Level
-				if lvlDiff >= 1 {
-					missChance += lvlDiff * config.MissPerLevel
-				}
-				missChance += target.GetStat("dex") * config.MissPerDex
-				if utils.Roll(100, 1, 0) <= missChance {
-					if _, err := target.Write([]byte(text.Green + m.Name + " missed you!!" + "\n" + text.Reset)); err != nil {
+				if target.Class == 0 && target.Equipment.Main != nil && config.RollParry(config.WeaponLevel(target.Skills[target.Equipment.Main.ItemType].Value, target.Class)) {
+					if _, err := target.Write([]byte(text.Green + "You deflect the attack from " + m.Name + "\n" + text.Reset)); err != nil {
 						log.Println("Error writing to player:", err)
 					}
-					data.StoreCombatMetric("range-miss", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
+					data.StoreCombatMetric("range-parry", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
 					return
-				}
-				// If we made it here, default out and do a range hit.
-				stamDamage := 0
-				vitDamage := 0
-				resisted := 0
-				reflectDamage := 0
-				actualDamage := m.InflictDamage()
-				if !m.Flags["no_specials"] {
-					if utils.Roll(10, 1, 0) <= penalty {
-						attackStyleRoll := utils.Roll(10, 1, 0)
-						if attackStyleRoll <= config.MobVital {
-							multiplier = 2 - (float64(target.GetStat("dex")) / 100)
-							vitalStrike = true
-						} else if attackStyleRoll <= config.MobCritical {
-							multiplier = 4 - (float64(target.GetStat("dex")) / 50)
-							criticalStrike = true
-						} else if attackStyleRoll <= config.MobDouble {
-							multiplier = 2
-							doubleDamage = true
+				} else {
+					missChance := 0
+					lvlDiff := target.Tier - m.Level
+					if lvlDiff >= 1 {
+						missChance += lvlDiff * config.MissPerLevel
+					}
+					missChance += target.GetStat("dex") * config.MissPerDex
+					if utils.Roll(100, 1, 0) <= missChance {
+						if _, err := target.Write([]byte(text.Green + m.Name + " missed you!!" + "\n" + text.Reset)); err != nil {
+							log.Println("Error writing to player:", err)
+						}
+						data.StoreCombatMetric("range-miss", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
+						return
+					}
+					// If we made it here, default out and do a range hit.
+					stamDamage := 0
+					vitDamage := 0
+					resisted := 0
+					reflectDamage := 0
+					actualDamage := m.InflictDamage()
+					if !m.Flags["no_specials"] {
+						if utils.Roll(10, 1, 0) <= penalty {
+							attackStyleRoll := utils.Roll(10, 1, 0)
+							if attackStyleRoll <= config.MobVital {
+								multiplier = 2 - (float64(target.GetStat("dex")) / 100)
+								vitalStrike = true
+							} else if attackStyleRoll <= config.MobCritical {
+								multiplier = 4 - (float64(target.GetStat("dex")) / 50)
+								criticalStrike = true
+							} else if attackStyleRoll <= config.MobDouble {
+								multiplier = 2
+								doubleDamage = true
+							}
 						}
 					}
-				}
-				if vitalStrike {
-					vitDamage, resisted = target.ReceiveVitalDamage(int(math.Ceil(float64(actualDamage) * multiplier)))
-					data.StoreCombatMetric("range_vital", 0, 1, int(math.Ceil(float64(actualDamage)*multiplier)), resisted, vitDamage, 1, m.MobId, m.Level, 0, target.CharId)
-					if _, err := target.Write([]byte(text.Red + "Vital Strike!!!\n" + text.Reset)); err != nil {
-						log.Println("Error writing to player:", err)
+					if vitalStrike {
+						vitDamage, resisted = target.ReceiveVitalDamage(int(math.Ceil(float64(actualDamage) * multiplier)))
+						data.StoreCombatMetric("range_vital", 0, 1, int(math.Ceil(float64(actualDamage)*multiplier)), resisted, vitDamage, 1, m.MobId, m.Level, 0, target.CharId)
+						if _, err := target.Write([]byte(text.Red + "Vital Strike!!!\n" + text.Reset)); err != nil {
+							log.Println("Error writing to player:", err)
+						}
+					} else {
+						stamDamage, vitDamage, resisted = target.ReceiveDamage(int(math.Ceil(float64(actualDamage) * multiplier)))
+						data.StoreCombatMetric("range", 0, 1, int(math.Ceil(float64(actualDamage)*multiplier)), resisted, vitDamage, 1, m.MobId, m.Level, 0, target.CharId)
 					}
-				} else {
-					stamDamage, vitDamage, resisted = target.ReceiveDamage(int(math.Ceil(float64(actualDamage) * multiplier)))
-					data.StoreCombatMetric("range", 0, 1, int(math.Ceil(float64(actualDamage)*multiplier)), resisted, vitDamage, 1, m.MobId, m.Level, 0, target.CharId)
-				}
 
-				buildString := ""
-				if stamDamage != 0 {
-					buildString += strconv.Itoa(stamDamage) + " stamina"
-				}
-				if stamDamage != 0 && vitDamage != 0 {
-					buildString += " and "
-				}
-				if vitDamage != 0 {
-					buildString += strconv.Itoa(vitDamage) + " vitality"
-				}
-				if criticalStrike {
-					if _, err := target.Write([]byte(text.Red + "Critical Strike!!!\n" + text.Reset)); err != nil {
+					buildString := ""
+					if stamDamage != 0 {
+						buildString += strconv.Itoa(stamDamage) + " stamina"
+					}
+					if stamDamage != 0 && vitDamage != 0 {
+						buildString += " and "
+					}
+					if vitDamage != 0 {
+						buildString += strconv.Itoa(vitDamage) + " vitality"
+					}
+					if criticalStrike {
+						if _, err := target.Write([]byte(text.Red + "Critical Strike!!!\n" + text.Reset)); err != nil {
+							log.Println("Error writing to player:", err)
+						}
+					}
+					if doubleDamage {
+						if _, err := target.Write([]byte(text.Red + "Double Damage!!!\n" + text.Reset)); err != nil {
+							log.Println("Error writing to player:", err)
+						}
+					}
+					if _, err := target.Write([]byte(text.Red + "Thwwip!! " + m.Name + " attacks you for " + buildString + " points of damage!" + "\n" + text.Reset)); err != nil {
 						log.Println("Error writing to player:", err)
 					}
-				}
-				if doubleDamage {
-					if _, err := target.Write([]byte(text.Red + "Double Damage!!!\n" + text.Reset)); err != nil {
-						log.Println("Error writing to player:", err)
+					if target.CheckFlag("reflection") {
+						reflectDamage = int(float64(actualDamage) * (float64(target.GetStat("int")) * config.ReflectDamagePerInt))
+						mobFin, _, mobResisted := m.ReceiveDamage(reflectDamage)
+						data.StoreCombatMetric("range_player_reflect", 0, 1, reflectDamage, mobResisted, mobFin, 0, target.CharId, target.Tier, 1, m.MobId)
+						if _, err := target.Write([]byte(text.Cyan + "You reflect " + strconv.Itoa(reflectDamage) + " damage back to " + m.Name + "!\n" + text.Reset)); err != nil {
+							log.Println("Error writing to player:", err)
+						}
+						m.DeathCheck(target)
 					}
+					target.RunHook("attacked")
+					target.DeathCheck("was slain by a " + m.Name + ".")
+					return
 				}
-				if _, err := target.Write([]byte(text.Red + "Thwwip!! " + m.Name + " attacks you for " + buildString + " points of damage!" + "\n" + text.Reset)); err != nil {
-					log.Println("Error writing to player:", err)
-				}
-				if target.CheckFlag("reflection") {
-					reflectDamage = int(float64(actualDamage) * (float64(target.GetStat("int")) * config.ReflectDamagePerInt))
-					mobFin, _, mobResisted := m.ReceiveDamage(reflectDamage)
-					data.StoreCombatMetric("range_player_reflect", 0, 1, reflectDamage, mobResisted, mobFin, 0, target.CharId, target.Tier, 1, m.MobId)
-					if _, err := target.Write([]byte(text.Cyan + "You reflect " + strconv.Itoa(reflectDamage) + " damage back to " + m.Name + "!\n" + text.Reset)); err != nil {
-						log.Println("Error writing to player:", err)
-					}
-					m.DeathCheck(target)
-				}
-				target.RunHook("attacked")
-				target.DeathCheck("was slain by a " + m.Name + ".")
-				return
 			}
 
 			if (m.CurrentTarget != "" && !m.CheckFlag("immobile") &&
@@ -513,29 +544,15 @@ func (m *Mob) Tick() {
 				// Next to attack
 			} else if m.CurrentTarget != "" &&
 				m.Placement == Rooms[m.ParentId].Chars.MobSearch(m.CurrentTarget, m).Placement {
-				// Check to see if the mob misses:
 				// Am I against a fighter, and they succeed in a parry roll?
 				target := Rooms[m.ParentId].Chars.MobSearch(m.CurrentTarget, m)
-				missChance := 0
-				lvlDiff := target.Tier - m.Level
-				if lvlDiff >= 1 {
-					missChance += lvlDiff * config.MissPerLevel
-				}
-				missChance += target.GetStat("dex") * config.HitPerDex
-				if utils.Roll(100, 1, 0) <= missChance {
-					if _, err := target.Write([]byte(text.Green + m.Name + " missed you!!" + "\n" + text.Reset)); err != nil {
-						log.Println("Error writing to player:", err)
-					}
-					data.StoreCombatMetric("melee-miss", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
-					return
-				}
-				target.RunHook("attacked")
-				m.CheckForExtraAttack(target)
 				if target.Class == 0 && target.Equipment.Main != nil && config.RollParry(config.WeaponLevel(target.Skills[target.Equipment.Main.ItemType].Value, target.Class)) {
 					if target.Tier >= config.SpecialAbilityTier {
 						// It's a riposte
+						target.RunHook("attacked")
 						actualDamage, _, resisted := m.ReceiveDamage(int(math.Ceil(float64(target.InflictDamage()))))
 						data.StoreCombatMetric("melee_player_riposte", 0, 1, actualDamage+resisted, resisted, actualDamage, 0, target.CharId, target.Tier, 1, m.MobId)
+						target.AdvanceSkillExp(int((float64(actualDamage) / float64(m.Stam.Max) * float64(m.Experience)) * config.Classes[config.AvailableClasses[target.Class]].WeaponAdvancement))
 						if _, err := target.Write([]byte(text.Green + "You parry and riposte the attack from " + m.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + "\n" + text.Reset)); err != nil {
 							log.Println("Error writing to player:", err)
 						}
@@ -550,6 +567,22 @@ func (m *Mob) Tick() {
 						m.Stun(config.ParryStuns * 8)
 					}
 				} else {
+					// Check to see if the mob misses:
+					missChance := 0
+					lvlDiff := target.Tier - m.Level
+					if lvlDiff >= 1 {
+						missChance += lvlDiff * config.MissPerLevel
+					}
+					missChance += target.GetStat("dex") * config.HitPerDex
+					if utils.Roll(100, 1, 0) <= missChance {
+						if _, err := target.Write([]byte(text.Green + m.Name + " missed you!!" + "\n" + text.Reset)); err != nil {
+							log.Println("Error writing to player:", err)
+						}
+						data.StoreCombatMetric("melee-miss", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
+						return
+					}
+					target.RunHook("attacked")
+					m.CheckForExtraAttack(target)
 					stamDamage := 0
 					vitDamage := 0
 					resisted := 0
@@ -705,7 +738,7 @@ func (m *Mob) DeathCheck(target *Character) bool {
 func (m *Mob) CheckForExtraAttack(target *Character) {
 
 	if m.Flags["blinds"] {
-		if utils.Roll(100, 1, 0) > 80 {
+		if utils.Roll(100, 1, 0) > 90 {
 			if _, err := target.Write([]byte(text.Red + m.Name + " blinds you!" + "\n" + text.Reset)); err != nil {
 				log.Println("Error writing to player:", err)
 			}
@@ -1034,6 +1067,7 @@ func (m *Mob) ApplyEffect(effectName string, length string, interval int, magnit
 
 func (m *Mob) RemoveEffect(effectName string) {
 	delete(m.Effects, effectName)
+	m.FlagOff(effectName, "")
 }
 
 func (m *Mob) ApplyHook(hook string, hookName string, executions int, length string, interval int, effect func(), effectOff func()) {
@@ -1207,11 +1241,10 @@ func (m *Mob) ReceiveMagicDamage(damage int, element string) (int, int, int) {
 		if m.CheckFlag("resist-water") {
 			resisting += .25
 		}
+		/*if resisting > 0 {
+			resisting = (float64(m.Int.Current) / 30) * resisting
+		}*/
 	}
-	/*if resisting > 0 {
-		resisting = (float64(m.Int.Current) / 30) * resisting
-	}*/
-
 	if m.CheckFlag("resist-magic") {
 		resisting += .10
 	}
@@ -1228,10 +1261,12 @@ func (m *Mob) ReceiveVitalDamage(damage int) (int, int) {
 func (m *Mob) Heal(damage int) (int, int) {
 	m.Stam.Add(damage)
 	return damage, 0
+
 }
 
 func (m *Mob) HealStam(damage int) {
 	m.Stam.Add(damage)
+	return
 }
 
 func (m *Mob) HealVital(damage int) {

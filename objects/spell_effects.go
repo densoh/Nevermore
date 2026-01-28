@@ -124,7 +124,7 @@ func berserk(caller interface{}, target interface{}, magnitude int) string {
 func blind(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
-		target.ApplyEffect("blind", "300", 0, 0,
+		target.ApplyEffect("blind", "30", 0, 0,
 			func(triggers int) {
 				target.FlagOnAndMsg("blind", "blind", text.Red+"You've been blinded!!!!\n")
 			},
@@ -311,6 +311,17 @@ func healstam(caller interface{}, target interface{}, magnitude int) string {
 			return "You heal " + target.Name + " for " + strconv.Itoa(damage) + " stamina"
 		}
 		return ""
+	case *Mob:
+		log.Println("Mob casting healstam")
+		switch target := target.(type) {
+		case *Mob:
+			damage := 0
+			damage = int((float64(caller.Pie.Current) * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
+			log.Println(caller.Name + " is healing " + target.Name + " for " + strconv.Itoa(damage))
+			target.Heal(damage)
+			return "The " + caller.Name + " heals for " + strconv.Itoa(damage) + " stamina."
+		}
+		return ""
 	}
 	return ""
 }
@@ -406,6 +417,15 @@ func heal(caller interface{}, target interface{}, magnitude int) string {
 			return "You heal " + target.Name + " for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality."
 		}
 		return ""
+	case *Mob:
+		log.Println("Mob casting heal")
+		switch target := target.(type) {
+		case *Mob:
+			damage = int((float64(damage) + (float64(caller.Pie.Current) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))))
+			log.Println(caller.Name + " is healing " + target.Name + " for " + strconv.Itoa(damage))
+			stamDam, vitDam := target.Heal(damage)
+			return "The " + caller.Name + " heals for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality."
+		}
 	}
 	return ""
 }
@@ -1030,7 +1050,7 @@ func resistearth(caller interface{}, target interface{}, magnitude int) string {
 			})
 		return ""
 	case *Mob:
-		target.ApplyEffect("resist-water", strconv.Itoa(duration), 0, 0,
+		target.ApplyEffect("resist-earth", strconv.Itoa(duration), 0, 0,
 			func(triggers int) {
 				target.FlagOn("resist-earth", "resistearth_spell")
 			},
