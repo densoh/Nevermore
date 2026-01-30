@@ -24,15 +24,15 @@ jobs:
             shopt -s expand_aliases
             export GOPATH=/opt/mud
             source ~/.bashrc
-            cd /opt/mud/src/github.com/ArcCS/Nevermore/server
+            cd /opt/mud/src/github.com/ArcCS/Nevermore
             git pull
-            /usr/local/go/bin/go build -o server
-            mv server /opt/game/
+            /usr/local/go/bin/go build -o /opt/game/server ./server/server.go
+            /usr/bin/systemctl restart supervisord
 
-      - name: Call REST endpoint
-        uses: fjogeleit/http-request-action@master
-        with:
-          url: ${{ secrets.REST_CLEAN_SHUTDOWN }}
-          method: 'POST'
-          data: '{"token":"${{ secrets.REST_SHUTDOWN_TOKEN }}"}'
-          contentType: 'application/json'
+      # - name: Call REST endpoint
+      #   uses: fjogeleit/http-request-action@master
+      #   with:
+      #     url: ${{ secrets.REST_CLEAN_SHUTDOWN }}
+      #     method: 'POST'
+      #     data: '{"token":"${{ secrets.REST_SHUTDOWN_TOKEN }}"}'
+      #     contentType: 'application/json'
