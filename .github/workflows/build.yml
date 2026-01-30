@@ -21,7 +21,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           script: |
-            whoami
+            id -u
             shopt -s expand_aliases
             export GOPATH=/opt/mud
             source ~/.bashrc
