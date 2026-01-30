@@ -28,7 +28,7 @@ jobs:
             cd /opt/mud/src/github.com/ArcCS/Nevermore
             git pull
             /usr/local/go/bin/go build -o /opt/game/server ./server/server.go
-            /usr/bin/systemctl restart supervisord
+            sudo /usr/bin/systemctl restart supervisord
 
       # - name: Call REST endpoint
       #   uses: fjogeleit/http-request-action@master
