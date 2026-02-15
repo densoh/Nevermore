@@ -296,7 +296,7 @@ func DeathCheck(s *state, m *objects.Mob) {
 
 		// Check for elemental damage in the room and add bonus experience
 		if s.where.Flags["earth"] || s.where.Flags["fire"] || s.where.Flags["water"] || s.where.Flags["air"] {
-			experienceAwarded = int(float64(experienceAwarded) * 1.1) // 10% bonus for elemental rooms
+			experienceAwarded = int(float64(experienceAwarded) * 1.06) // 6% bonus for elemental rooms
 		}
 
 		for _, member := range s.where.Chars.Contents {
