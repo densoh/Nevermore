@@ -1,16 +1,17 @@
 package cmd
 
 import (
+	"log"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/text"
 	"github.com/ArcCS/Nevermore/utils"
 	"github.com/jinzhu/copier"
-	"log"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func init() {
@@ -40,6 +41,7 @@ func (scriptDeath) process(s *state) {
 		objects.ActiveCharacters.MessageAll("### An otherworldly bell sounds once, the note echoing in your soul", config.BroadcastChannel)
 		objects.ActiveCharacters.MessageAll(deathString, config.BroadcastChannel)
 
+		harshdeath := false
 		if s.actor.Tier > config.FreeDeathTier {
 
 			// End the bards song before processing their death
@@ -77,6 +79,28 @@ func (scriptDeath) process(s *state) {
 					}
 				}
 			}
+			// Gold cost of death
+			deathcost := 0
+			deathcost = config.HealingHandCost[s.actor.Tier]
+			if s.actor.Gold.CanSubtract(deathcost) {
+				s.actor.Gold.SubIfCan(deathcost)
+				s.msg.Actor.Send(text.Green + "The healing hand takes " + strconv.Itoa(deathcost) + " gold marks from your pockets as payment for the resurrection.\n\n" + text.Reset)
+			} else {
+				paid := 0
+				paid = s.actor.Gold.Value
+				s.actor.Gold.Value = 0
+				rem := deathcost - paid
+				if s.actor.BankGold.CanSubtract(rem) {
+					s.actor.BankGold.SubIfCan(rem)
+					s.msg.Actor.Send(text.Green + "The healing hand takes " + strconv.Itoa(paid) + " from your pockets and " + strconv.Itoa(rem) + " from your bank account as payment for the resurrection.\n\n" + text.Reset)
+					paid += rem
+				} else {
+					s.msg.Actor.Send(text.Green + "You could not cover the cost of the healing hand and results in a more painful resurrection. (20% xp loss) \n\n" + text.Reset)
+					log.Println(s.actor.Name + " has died with 20% loss due to insufficient funds.")
+					harshdeath = true
+				}
+			}
+
 			if s.actor.Gold.Value > 0 {
 				newGold := objects.Item{}
 				if err := copier.CopyWithOption(&newGold, objects.Items[3456], copier.Option{DeepCopy: true}); err != nil {
@@ -87,6 +111,7 @@ func (scriptDeath) process(s *state) {
 				newItem.Storage.Add(&newGold)
 				s.actor.Gold.Value = 0
 			}
+
 			s.msg.Observers.SendBad("The lifeless body of " + s.actor.Name + " falls to the ground.\n\n")
 			s.where.Items.Add(&newItem)
 		} else {
@@ -113,19 +138,16 @@ func (scriptDeath) process(s *state) {
 		}
 		// Determine the death penalty
 		if s.actor.Tier > config.FreeDeathTier {
-			deathRoll := utils.Roll(100, 1, 0)
-			switch {
-			case config.QuestMode == true || deathRoll <= 30: // Light Passage
+			xpLoss := 0.10
+			if harshdeath {
+				xpLoss = 0.20
+			} else {
 				s.msg.Actor.Send(text.Green + "You've pass through this death with minimal effects. (10% xp loss) \n\n" + text.Reset)
 				log.Println(s.actor.Name + " has died with 10% loss.")
-				s.actor.Experience.SubMax(int(float64(totalExpNeeded)*.15), finalMin)
-				break
-			case deathRoll <= 100: // Medium Passage
-				s.msg.Actor.Send(text.Green + "The death did not come easy. (30% xp loss)\n\n" + text.Reset)
-				log.Println(s.actor.Name + " has died with 30% loss.")
-				s.actor.Experience.SubMax(int(float64(totalExpNeeded)*.30), finalMin)
-				break
 			}
+			s.actor.Experience.SubMax(int(float64(totalExpNeeded)*xpLoss), finalMin)
+		} else {
+			s.msg.Actor.Send(text.Green + "The healing hand is able to restore you completely and you suffer no experience loss.\n\n" + text.Reset)
 		}
 
 		s.actor.DeathInProgress = false
@@ -136,6 +158,8 @@ func (scriptDeath) process(s *state) {
 
 		objects.ActiveCharacters.MessageAll("### An otherworldly bell attempts to ring but is abruptly muffled.", config.BroadcastChannel)
 		objects.ActiveCharacters.MessageAll(deathString, config.BroadcastChannel)
+
+		// lag death carries no cost or penalty
 
 		s.actor.DeathInProgress = false
 
