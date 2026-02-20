@@ -727,6 +727,7 @@ var MobSupportSpells = []string{
 	"vigor",
 	"detraumatize",
 	"renewal",
+	"attraction",
 }
 
 var MobHealingSpells = []string{
