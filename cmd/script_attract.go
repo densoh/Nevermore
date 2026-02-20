@@ -19,6 +19,6 @@ type attract cmd
 
 func (attract) process(s *state) {
 
-	s.where.Encounter()
+	s.where.AttractionEncounter()
 
 }

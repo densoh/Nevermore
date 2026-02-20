@@ -176,6 +176,7 @@ var (
 		4: .5,
 		5: .45,
 	}
+	AttractionChance = 80
 )
 
 func MaxWeight(str int) int {

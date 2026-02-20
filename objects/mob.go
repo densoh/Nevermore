@@ -363,65 +363,67 @@ func (m *Mob) Tick() {
 				}
 			}
 
-			// Attempt beneficial spells regardless of having a target
-			if m.ChanceCast > 0 && len(m.Spells) > 0 {
-				log.Println("Trying to cast a spell")
-				if utils.Roll(100, 1, 0) <= m.ChanceCast {
-					spellIndices := rand.Perm(len(m.Spells)) // Shuffle spell list
-					for _, idx := range spellIndices {
-						selectSpell := m.Spells[idx]
-						if selectSpell == "" {
-							continue
-						}
-						spellInstance, ok := Spells[selectSpell]
-						if !ok || m.Mana.Current < spellInstance.Cost {
-							continue
-						}
-						if utils.StringIn(selectSpell, MobSupportSpells) {
-							var mobTargets []*Mob
-							for _, mob := range Rooms[m.ParentId].Mobs.Contents {
-								// Healing spells: only target mobs not at full health
-								//log.Println("current health:", mob.Stam.Current, "max health:", mob.Stam.Max)
-								if utils.StringIn(selectSpell, MobHealingSpells) {
-									if !mob.CheckFlag(spellInstance.Effect) && mob.Stam.Current < mob.Stam.Max {
-										mobTargets = append(mobTargets, mob)
-									}
-								} else {
-									// Non-healing beneficial spells
-									if !mob.CheckFlag(spellInstance.Effect) {
-										mobTargets = append(mobTargets, mob)
+			// only hostile mobs or mobs with a current target will try to cast
+			if m.CheckFlag("hostile") || m.CurrentTarget != "" {
+				if m.ChanceCast > 0 && len(m.Spells) > 0 {
+					log.Println("Trying to cast a spell")
+					if utils.Roll(100, 1, 0) <= m.ChanceCast {
+						spellIndices := rand.Perm(len(m.Spells)) // Shuffle spell list
+						for _, idx := range spellIndices {
+							selectSpell := m.Spells[idx]
+							if selectSpell == "" {
+								continue
+							}
+							spellInstance, ok := Spells[selectSpell]
+							if !ok || m.Mana.Current < spellInstance.Cost {
+								continue
+							}
+							if utils.StringIn(selectSpell, MobSupportSpells) {
+								var mobTargets []*Mob
+								for _, mob := range Rooms[m.ParentId].Mobs.Contents {
+									// Healing spells: only target mobs not at full health
+									//log.Println("current health:", mob.Stam.Current, "max health:", mob.Stam.Max)
+									if utils.StringIn(selectSpell, MobHealingSpells) {
+										if !mob.CheckFlag(spellInstance.Effect) && mob.Stam.Current < mob.Stam.Max {
+											mobTargets = append(mobTargets, mob)
+										}
+									} else {
+										// Non-healing beneficial spells
+										if !mob.CheckFlag(spellInstance.Effect) {
+											mobTargets = append(mobTargets, mob)
+										}
 									}
 								}
+								if len(mobTargets) == 0 {
+									continue // Try next spell
+								}
+								targetMob := mobTargets[rand.Intn(len(mobTargets))]
+								Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + targetMob.Name + ".\n")
+								m.Mana.Subtract(spellInstance.Cost)
+								result := Cast(m, targetMob, spellInstance.Effect, spellInstance.Magnitude)
+								if strings.Contains(result, "$SCRIPT") {
+									m.MobScript(result)
+								}
+								break // Spell cast, exit loop
+							} else if utils.StringIn(selectSpell, OffensiveSpells) && m.CurrentTarget != "" {
+								// Offensive spell: find a character target
+								var target *Character
+								for target == nil && len(Rooms[m.ParentId].Chars.MobList(m)) > 0 {
+									target = Rooms[m.ParentId].Chars.MobSearch(utils.RandMapKeySelection(m.ThreatTable), m)
+								}
+								if target == nil {
+									continue // Try next spell
+								}
+								Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + target.Name + "\n")
+								target.RunHook("attacked")
+								m.Mana.Subtract(spellInstance.Cost)
+								result := Cast(m, target, spellInstance.Effect, spellInstance.Magnitude)
+								if strings.Contains(result, "$SCRIPT") {
+									m.MobScript(result)
+								}
+								target.DeathCheck("was slain by a " + m.Name + ".")
+								return //Offensive spell cast, end turn
 							}
-							if len(mobTargets) == 0 {
-								continue // Try next spell
-							}
-							targetMob := mobTargets[rand.Intn(len(mobTargets))]
-							Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + targetMob.Name + ".\n")
-							m.Mana.Subtract(spellInstance.Cost)
-							result := Cast(m, targetMob, spellInstance.Effect, spellInstance.Magnitude)
-							if strings.Contains(result, "$SCRIPT") {
-								m.MobScript(result)
-							}
-							break // Spell cast, exit loop
-						} else if utils.StringIn(selectSpell, OffensiveSpells) && m.CurrentTarget != "" {
-							// Offensive spell: find a character target
-							var target *Character
-							for target == nil && len(Rooms[m.ParentId].Chars.MobList(m)) > 0 {
-								target = Rooms[m.ParentId].Chars.MobSearch(utils.RandMapKeySelection(m.ThreatTable), m)
-							}
-							if target == nil {
-								continue // Try next spell
-							}
-							Rooms[m.ParentId].MessageAll(m.Name + " casts a " + spellInstance.Name + " spell on " + target.Name + "\n")
-							target.RunHook("attacked")
-							m.Mana.Subtract(spellInstance.Cost)
-							result := Cast(m, target, spellInstance.Effect, spellInstance.Magnitude)
-							if strings.Contains(result, "$SCRIPT") {
-								m.MobScript(result)
-							}
-							target.DeathCheck("was slain by a " + m.Name + ".")
-							return //Offensive spell cast, end turn
 						}
 					}
 				}

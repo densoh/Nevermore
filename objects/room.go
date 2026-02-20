@@ -1,12 +1,6 @@
 package objects
 
 import (
-	"github.com/ArcCS/Nevermore/config"
-	"github.com/ArcCS/Nevermore/data"
-	"github.com/ArcCS/Nevermore/permissions"
-	"github.com/ArcCS/Nevermore/text"
-	"github.com/ArcCS/Nevermore/utils"
-	"github.com/jinzhu/copier"
 	"log"
 	"math"
 	"sort"
@@ -14,6 +8,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ArcCS/Nevermore/config"
+	"github.com/ArcCS/Nevermore/data"
+	"github.com/ArcCS/Nevermore/permissions"
+	"github.com/ArcCS/Nevermore/text"
+	"github.com/ArcCS/Nevermore/utils"
+	"github.com/jinzhu/copier"
 )
 
 // Room contains the map of fields for a room in nexus
@@ -331,6 +332,44 @@ func (r *Room) Encounter() {
 			}
 		}
 	}
+}
+
+func (r *Room) AttractionEncounter() {
+	// Get all valid mobs from the encounter table
+	if len(r.Mobs.Contents) > 10 {
+		r.MessageAll(text.Cyan + "The Room is too crowded for anything else")
+		return
+	}
+
+	validMobs := make([]int, 0)
+	for mob := range r.EncounterTable {
+		if (DayTime && !Mobs[mob].Flags["night_only"]) || (!DayTime && !Mobs[mob].Flags["day_only"]) {
+			validMobs = append(validMobs, mob)
+		}
+	}
+
+	// If no valid mobs, return early
+	if len(validMobs) == 0 {
+		return
+	}
+
+	// Pick a random mob from valid mobs
+	randomIndex := utils.Roll(len(validMobs), 1, 0) - 1
+	mob := validMobs[randomIndex]
+
+	// Create and add the mob to the room
+	newMob := Mob{}
+	if err := copier.CopyWithOption(&newMob, Mobs[mob], copier.Option{DeepCopy: true}); err != nil {
+		log.Println("Error copying mob during attraction encounter: ", err)
+		return
+	}
+	if newMob.Placement <= 0 {
+		newMob.Placement = 5
+	} else if newMob.Placement >= 6 {
+		newMob.Placement = utils.Roll(5, 1, 0)
+	}
+	r.Mobs.Add(&newMob, false)
+	newMob.StartTicking()
 }
 
 func (r *Room) ElementalDamage() {

@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"strconv"
+
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/data"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/text"
-	"strconv"
 )
 
 func init() {
@@ -33,8 +34,8 @@ func (slam) process(s *state) {
 		return
 	}
 
-	if s.actor.Tier < config.SpecialAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.SpecialAbilityTier) + " to use this skill.")
+	if s.actor.Tier < config.MinorAbilityTier {
+		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MinorAbilityTier) + " to use this skill.")
 		return
 	}
 

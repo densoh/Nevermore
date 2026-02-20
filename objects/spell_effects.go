@@ -1,11 +1,12 @@
 package objects
 
 import (
-	"github.com/ArcCS/Nevermore/data"
 	"log"
 	"math"
 	"math/rand"
 	"strconv"
+
+	"github.com/ArcCS/Nevermore/data"
 
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/text"
@@ -47,55 +48,7 @@ var (
 	RecallRoom = "77"
 )
 
-var Effects = map[string]func(caller interface{}, target interface{}, magnitude int) string{
-	"poison":           poison,
-	"disease":          disease,
-	"blind":            blind,
-	"berserk":          berserk,
-	"haste":            haste,
-	"pray":             pray,
-	"heal-stam":        healstam,
-	"heal-vit":         healvit,
-	"restore":          restore,
-	"heal":             heal,
-	"heal-all":         healall,
-	"fire-damage":      firedamage,
-	"earth-damage":     earthdamage,
-	"air-damage":       airdamage,
-	"water-damage":     waterdamage,
-	"light":            light,
-	"curepoison":       curepoison,
-	"bless":            bless,
-	"protection":       protection,
-	"invisibility":     invisibility,
-	"detect-invisible": detectInvisible,
-	"teleport":         teleport,
-	"stun":             stun,
-	"recall":           recall,
-	"summon":           summon,
-	"wizard-walk":      wizardwalk,
-	"levitate":         levitate,
-	"resist-fire":      resistfire,
-	"resist-magic":     resistmagic,
-	//"remove-curse":     removecurse,
-	"resist-air":       resistair,
-	"resist-water":     resistwater,
-	"resist-earth":     resistearth,
-	"remove-disease":   removedisease,
-	"remove-blindness": cureblindness,
-	//"polymorph":        polymorph,
-	"attraction":       attraction,
-	"inertial-barrier": inertialbarrier,
-	"surge":            surge,
-	"resist-poison":    resistpoison,
-	"resilient-aura":   resilientaura,
-	"resist-disease":   resistdisease,
-	"disrupt-magic":    disruptmagic,
-	"reflection":       reflection,
-	"dodge":            dodge,
-	"resist-acid":      resistacid,
-	//"embolden":         embolden,
-}
+var Effects map[string]func(caller interface{}, target interface{}, magnitude int) string
 
 func Cast(caller interface{}, target interface{}, spell string, magnitude int) string {
 	return Effects[spell](caller, target, magnitude)
@@ -909,7 +862,7 @@ func levitate(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func resistfire(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -939,7 +892,7 @@ func resistfire(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func resistmagic(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -970,7 +923,7 @@ func resistmagic(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func resistair(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1001,7 +954,7 @@ func resistair(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func resistwater(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1032,7 +985,7 @@ func resistwater(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func resistearth(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1150,7 +1103,7 @@ func surge(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func resistpoison(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1172,7 +1125,7 @@ func resistpoison(caller interface{}, target interface{}, magnitude int) string 
 }
 
 func resilientaura(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1194,7 +1147,7 @@ func resilientaura(caller interface{}, target interface{}, magnitude int) string
 }
 
 func resistdisease(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1216,7 +1169,7 @@ func resistdisease(caller interface{}, target interface{}, magnitude int) string
 }
 
 func reflection(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1247,7 +1200,7 @@ func reflection(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func dodge(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1269,7 +1222,7 @@ func dodge(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func resistacid(caller interface{}, target interface{}, magnitude int) string {
-	duration := 30
+	duration := 300
 	switch caller := caller.(type) {
 	case *Character:
 		duration += config.IntSpellEffectDuration * caller.Int.Current
@@ -1358,10 +1311,71 @@ func disruptmagic(caller interface{}, target interface{}, magnitude int) string 
 func attraction(caller interface{}, target interface{}, magnitude int) string {
 	switch caller := caller.(type) {
 	case *Character:
-		go Script(caller, "$ATTRACT")
-		return text.Cyan + "Light coalesces into a vaguely sprite shape and darts around the area creating as much commotion as possible, then fades away.\n"
+
+		if utils.Roll(100, 1, 0) <= config.AttractionChance {
+			go Script(caller, "$ATTRACT")
+			return text.Cyan + "Light coalesces into a vaguely sprite shape and darts around the area creating as much commotion as possible, then fades away.\n"
+		} else {
+			return text.Cyan + "Light begins to coalesce but collapses back into itself in a small puff of smoke.\n"
+		}
+	case *Mob:
+		Rooms[caller.ParentId].MessageAll(text.Cyan + "The " + caller.Name + " calls out for reinforcements.\n")
+		Rooms[caller.ParentId].AttractionEncounter()
+		return ""
 	}
 	return ""
+}
+
+func init() {
+	Effects = map[string]func(caller interface{}, target interface{}, magnitude int) string{
+		"poison":           poison,
+		"disease":          disease,
+		"blind":            blind,
+		"berserk":          berserk,
+		"haste":            haste,
+		"pray":             pray,
+		"heal-stam":        healstam,
+		"heal-vit":         healvit,
+		"restore":          restore,
+		"heal":             heal,
+		"heal-all":         healall,
+		"fire-damage":      firedamage,
+		"earth-damage":     earthdamage,
+		"air-damage":       airdamage,
+		"water-damage":     waterdamage,
+		"light":            light,
+		"curepoison":       curepoison,
+		"bless":            bless,
+		"protection":       protection,
+		"invisibility":     invisibility,
+		"detect-invisible": detectInvisible,
+		"teleport":         teleport,
+		"stun":             stun,
+		"recall":           recall,
+		"summon":           summon,
+		"wizard-walk":      wizardwalk,
+		"levitate":         levitate,
+		"resist-fire":      resistfire,
+		"resist-magic":     resistmagic,
+		//"remove-curse":     removecurse,
+		"resist-air":       resistair,
+		"resist-water":     resistwater,
+		"resist-earth":     resistearth,
+		"remove-disease":   removedisease,
+		"remove-blindness": cureblindness,
+		//"polymorph":        polymorph,
+		"attraction":       attraction,
+		"inertial-barrier": inertialbarrier,
+		"surge":            surge,
+		"resist-poison":    resistpoison,
+		"resilient-aura":   resilientaura,
+		"resist-disease":   resistdisease,
+		"disrupt-magic":    disruptmagic,
+		"reflection":       reflection,
+		"dodge":            dodge,
+		"resist-acid":      resistacid,
+		//"embolden":         embolden,
+	}
 }
 
 /*
