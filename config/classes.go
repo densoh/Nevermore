@@ -87,6 +87,7 @@ var Classes = map[string]classDef{
 		WeaponAdvancement: .4,
 	},
 	"fighter": {
+		Desc:              "The fighter is a master of the fighting arts. As the fighter advances he will achieve great proficiency in the use of weapons. The greater proficiency in weapon use is, the less chances fighter has to shatter weapon when he/she does a critical strike, vital strike. Compared to all other classes fighters gain weapon proficiency much faster than any other class. The fighter is able to bash and circle opponents like a barbarian.",
 		Skills:            "Hamstring, Circle",
 		Stats:             "Strength , Dexterity",
 		Armor:             "Light, Medium, Heavy",
