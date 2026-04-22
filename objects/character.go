@@ -13,6 +13,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -101,6 +102,7 @@ type Character struct {
 	Rerolls         int
 	Disconnect      func()
 	Pose            string
+	claimed         int32
 }
 
 func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Character, bool) {
@@ -211,6 +213,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 			int(charData["rerolls"].(int64)),
 			disconnect,
 			"",
+			0,
 		}
 
 		for _, spellN := range strings.Split(charData["spells"].(string), ",") {
@@ -365,13 +368,27 @@ func (c *Character) Unload() {
 	close(c.MsgBuffer)
 }
 
-func (c *Character) PrepareUnload() {
+func (c *Character) IsClaimed() bool {
+	return atomic.LoadInt32(&c.claimed) == 1
+}
+
+func (c *Character) ClearClaim() {
+	atomic.StoreInt32(&c.claimed, 0)
+}
+
+// PrepareUnload saves and removes the character from the world. Returns false
+// if the character was claimed by a reconnecting session and should not be
+// destroyed.
+func (c *Character) PrepareUnload() bool {
 	c.Save()
 	c.Unfollow()
 	c.LoseParty()
 	c.PurgeEffects()
-	ActiveCharacters.Remove(c)
+	if !ActiveCharacters.Remove(c) {
+		return false
+	}
 	Rooms[c.ParentId].Chars.Remove(c)
+	return true
 }
 
 func (c *Character) ToggleFlag(flagName string, provider string) {

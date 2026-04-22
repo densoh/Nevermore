@@ -47,9 +47,16 @@ func (c *characterStats) Add(character *Character, address string) {
 	c.Unlock()
 }
 
-// Remove Pass character as a pointer, compare and remove
-func (c *characterStats) Remove(character *Character) {
+// Remove removes the character from the active list. Returns false without
+// removing if the character has been claimed by a reconnecting session.
+func (c *characterStats) Remove(character *Character) bool {
 	c.Lock()
+	if character.claimed != 0 {
+		c.Unlock()
+		log.Println("Skipping removal of claimed character:", character.Name)
+		return false
+	}
+
 	if character.Flags["invisible"] || character.Permission.HasAnyFlags(permissions.God, permissions.Builder, permissions.Gamemaster, permissions.Dungeonmaster) {
 		c.MessageGMExcept("###:"+character.Name+" departs the realm.", character)
 	} else {
@@ -74,6 +81,21 @@ func (c *characterStats) Remove(character *Character) {
 
 	c.Unlock()
 	log.Println("Completed Character removal from stats containers")
+	return true
+}
+
+// FindAndClaim finds the character by name and atomically marks it as claimed,
+// preventing concurrent connection cleanup from destroying the session.
+func (c *characterStats) FindAndClaim(name string) *Character {
+	c.Lock()
+	defer c.Unlock()
+	for _, p := range c.list {
+		if strings.ToLower(p.Name) == strings.ToLower(name) {
+			p.claimed = 1
+			return p
+		}
+	}
+	return nil
 }
 
 func (c *characterStats) Find(name string) *Character {
