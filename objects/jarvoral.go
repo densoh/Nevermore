@@ -2,10 +2,11 @@ package objects
 
 import (
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 // Variables used for command line parameters
@@ -15,6 +16,7 @@ var (
 )
 
 func StartJarvoral() {
+	fmt.println("starting jarvoral")
 	// Create a new Discord session using the provided bot token.
 	if os.Getenv("DISCORDTOKEN") == "" {
 		fmt.Println("No Discord Token found")
