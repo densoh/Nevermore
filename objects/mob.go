@@ -824,88 +824,72 @@ func (m *Mob) PickTarget() {
 	}
 }
 
-func (m *Mob) Follow(params []string) {
-	// Am I still the most mad at the guy who left?  I could have gotten bored with that...
-	m.IsThinking = true
-	if params[0] == m.CurrentTarget && !m.IsStunned {
-		log.Println("I'm gonna try to follow")
-		// I am, lets process that -> First we need to step up in the world to find that character
-		targetChar := ActiveCharacters.Find(params[0])
-		if targetChar != nil {
-			curChance := config.MobFollow - ((targetChar.Tier - m.Level) * config.MobFollowPerLevel)
-			if curChance > 85 {
-				curChance = 85
-			}
-			if utils.Roll(100, 1, 0) <= curChance {
-				log.Println("I'm gonna follow")
-				neededLocks := make([]int, 2)
-				neededLocks[0] = m.ParentId
-				neededLocks[1] = targetChar.ParentId
-				ready := false
-				previousRoom := m.ParentId
-				tempName := utils.RandString(10)
-				for !ready {
-					ready = true
-					for _, l := range neededLocks {
-						if Rooms[l].LockPriority == "" {
-							Rooms[l].LockPriority = tempName
-						} else if Rooms[l].LockPriority != tempName {
-							ready = false
-						}
-					}
-					if !ready {
-						for _, l := range neededLocks {
-							if Rooms[l].LockPriority == tempName {
-								Rooms[l].LockPriority = ""
-							}
-						}
-						r := rand.Intn(50)
-						t, _ := time.ParseDuration(string(rune(r)) + "ms")
-						time.Sleep(t)
-					}
-				}
-				Rooms[m.ParentId].MessageAll(m.Name + " follows " + targetChar.Name + "\n\n")
-				Rooms[m.ParentId].LockRoom(m.Name+":follow:exitR-"+strconv.Itoa(previousRoom)+":"+targetChar.Name, false)
-				Rooms[targetChar.ParentId].LockRoom(m.Name+":follow:enterR-"+strconv.Itoa(targetChar.ParentId)+":"+targetChar.Name, false)
-				if _, err := targetChar.Write([]byte(text.Bad + m.Name + " follows you." + text.Reset + "\n")); err != nil {
-					log.Println("Error writing to player:", err)
-				}
-				Rooms[m.ParentId].Mobs.Remove(m)
-				Rooms[targetChar.ParentId].Mobs.AddWithMessage(m, m.Name+" follows "+targetChar.Name+" into the area.", false)
-				if utils.Roll(100, 1, 0) <= config.MobFollowVital {
-					vitDamage, resisted := targetChar.ReceiveVitalDamage(int(math.Ceil(float64(m.InflictDamage() * config.MobFollMult))))
-					data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, m.MobId, m.Level, 0, targetChar.CharId)
-
-					if vitDamage == 0 {
-						if _, err := targetChar.Write([]byte(text.Red + m.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)); err != nil {
-							log.Println("Error writing to player:", err)
-						}
-					} else {
-						if _, err := targetChar.Write([]byte(text.Red + "Vital Strike!!!!\n" + text.Reset)); err != nil {
-							log.Println("Error writing to player:", err)
-						}
-						if _, err := targetChar.Write([]byte(text.Red + m.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)); err != nil {
-							log.Println("Error writing to player:", err)
-						}
-					}
-					targetChar.DeathCheck("was slain by a " + m.Name + ".")
-				}
-				Rooms[previousRoom].UnlockRoom(m.Name+":follow:exitR-"+strconv.Itoa(previousRoom)+":"+targetChar.Name, false)
-				Rooms[targetChar.ParentId].UnlockRoom(m.Name+":follow:enterR-"+strconv.Itoa(targetChar.ParentId)+":"+targetChar.Name, false)
-				for _, l := range neededLocks {
-					Rooms[l].LockPriority = ""
-				}
-
-				go func() {
-					time.Sleep(1 * time.Second)
-					m.StartTicking()
-				}()
-				m.Placement = 3
-				m.CurrentTarget = targetChar.Name
-			}
-		}
+// MobsAllowedIn reports whether a mob may be relocated into this room. The
+// resurrection room, the entry room and the OOC lounge have to stay clear: a
+// player arriving there has just died, just logged in, or is out of character,
+// and none of them can be expected to deal with a mob that chased them in.
+func MobsAllowedIn(r *Room) bool {
+	switch r.RoomId {
+	case config.HealingHand, config.StartingRoom, config.OocRoom:
+		return false
 	}
-	m.IsThinking = false
+	return r.Flags["active"]
+}
+
+// FollowChar relocates a hunting mob from one room into another behind the
+// character it is chasing, and reports whether it moved.
+//
+// The caller must already hold the locks on both rooms. That is the point of
+// the signature: this is called from the character's own move, which holds
+// them, so nothing is locked here. The old version ran on the mob's goroutine
+// with nothing held, spun for lock priority on two rooms, and had to unload the
+// mob to move it - Mobs.Remove stops the ticker and closes MobCommands, so what
+// arrived was a rebuilt mob with an empty threat table, a recalculated
+// inventory and a closed channel that any later send would panic on. This moves
+// the same mob and leaves its goroutines alone; they pick up the new ParentId
+// on the next tick.
+//
+// The destination is passed in rather than looked up from the character, so a
+// mob can only ever arrive in the room on the other side of the exit the
+// character used. A mob can no longer end up wherever the character happens to
+// be by the time it gets around to chasing them - the healing hand, most of
+// all, which is where they are if they died on the way out.
+func (m *Mob) FollowChar(target *Character, from *Room, to *Room) bool {
+	if m.ParentId != from.RoomId || !MobsAllowedIn(to) {
+		return false
+	}
+
+	if !m.CheckFlag("follows") || m.CheckFlag("curious_canticle") || m.CheckFlag("run_away") {
+		return false
+	}
+
+	// Permanent mobs belong to their room - they survive a room clear, are the
+	// ones Jsonify writes back out, and are restarted in place by RestartPerms.
+	// One that wandered off behind a player would be saved into the wrong room
+	// and leave a hole in the one it was built for.
+	if m.CheckFlag("permanent") {
+		return false
+	}
+
+	// Still angry at this one in particular, and in any shape to give chase?
+	if m.CurrentTarget != target.Name || m.IsStunned || m.MobStunned > 0 || m.Stam.Current <= 0 {
+		return false
+	}
+
+	curChance := config.MobFollow - ((target.Tier - m.Level) * config.MobFollowPerLevel)
+	if curChance > 85 {
+		curChance = 85
+	}
+	if utils.Roll(100, 1, 0) > curChance {
+		return false
+	}
+
+	from.MessageAll(m.Name + " follows " + target.Name + "\n\n")
+	from.Mobs.Release(m)
+	// Add sets ParentId to the new room for us.
+	to.Mobs.AddWithMessage(m, m.Name+" follows "+target.Name+" into the area.", false)
+	m.Placement = 3
+	return true
 }
 
 func (m *Mob) Flee(params []string) {
@@ -925,12 +909,16 @@ func (m *Mob) ProcessCommand(cmdStr string, params []string) {
 		"attack":   nil,
 		"cast":     nil,
 		"move":     nil,
-		"follow":   m.Follow,
 		"pickup":   nil,
 		"teleport": nil,
 		"flee":     m.Flee,
 	}
-	StateCommands[cmdStr](params)
+	// Following is no longer driven from here - it is done inline by the move
+	// that triggers it, see Mob.FollowChar. Everything else in this map is a
+	// placeholder, so check before calling rather than panicking on a nil.
+	if command, ok := StateCommands[cmdStr]; ok && command != nil {
+		command(params)
+	}
 }
 
 func (m *Mob) MobScript(inputStr string) {

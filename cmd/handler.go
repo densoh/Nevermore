@@ -32,7 +32,7 @@ type helpTextStruct struct {
 var handlers = map[string]handler{}
 var handlerPermission = map[string]permissions.Permissions{}
 var helpText = map[string]helpTextStruct{}
-var oocCommands = []string{"SAY", "QUIT", "HELP", "WHO", "LOOK", "IC", "$POOF", "AFK", "GO", "ACT"}
+var oocCommands = []string{"SAY", "QUIT", "HELP", "WHO", "LOOK", "IC", "$POOF", "$DEATH", "AFK", "GO", "ACT"}
 var excludeFromLogs = []string{"SAYTO", "SAY", "TELL", "OSAY", "SEND", "R", "REPLY", "REP", "PARTYTELL", "PTELL", "K", "KILL"}
 var reverseLookup = map[string]string{}
 var emotes = []string{"ACT", "BLINK", "BLUSH", "BOW", "BURP", "CACKLE", "CHEER", "CHUCKLE", "CLAP", "CONFUSED", "COUGH", "CROSSARMS", "CROSSFINGERS", "CRY",
@@ -73,6 +73,16 @@ func dispatchHandler(s *state) {
 
 		if !s.scripting {
 			objects.LastActivity[s.actor.Name] = time.Now()
+		}
+
+		// $DEATH runs on its own goroutine, so anything the player already had
+		// queued up would otherwise execute alongside it and fight over their
+		// location - a queued movement completing after the death moves them
+		// back out of the healing hand. Drop their input until the death script
+		// has finished relocating them.
+		if s.actor.DeathInProgress && !s.scripting && s.cmd != "QUIT" {
+			s.msg.Actor.SendBad("You are in no condition to do that.")
+			return
 		}
 
 		if s.where.RoomId == config.OocRoom &&

@@ -53,7 +53,7 @@ var (
 	MobVital       = 3
 	MobCritical    = 4
 	MobDouble      = 10
-	MobFollowVital = 35
+	MobFollowVital = 40
 	MobFollMult    = 3
 
 	BindCost   = 75000

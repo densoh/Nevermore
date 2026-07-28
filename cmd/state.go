@@ -147,6 +147,34 @@ func (s *state) sync() (inSync bool) {
 	s.LockAll()
 	defer s.UnlockAll()
 
+	// All locks are dropped between passes, so another goroutine - the actor's
+	// own death script, a mob teleport, a DM shift - can relocate the actor
+	// while this command is still collecting locks. Every handler works from
+	// the where captured by newState, which is now stale, so running the
+	// command would apply it to the room the actor has already left: a move
+	// would walk them out of the room they left rather than the one they are
+	// in, and the Chars.Remove of that stale room finds nothing, leaving them
+	// listed in two rooms at once. Abandon the command instead.
+	//
+	// $DEATH is the one handler that must run wherever the actor ended up: it
+	// is what clears DeathInProgress and resurrects them, and DeathCheck never
+	// re-arms once that flag is set. Abandoning it would leave a corpse walking
+	// around on 0 vitality that can never die again. Re-point where at the room
+	// they are really in, take that room's lock, and run it there.
+	if s.where.RoomId != s.actor.ParentId {
+		if room, ok := objects.Rooms[s.actor.ParentId]; ok && s.cmd == "$DEATH" {
+			s.where = room
+			if !utils.IntIn(room.RoomId, s.rLocks) {
+				s.AddLocks(room.RoomId)
+				return false
+			}
+		} else {
+			s.msg.Allocate(s.rLocks)
+			s.messenger()
+			return true
+		}
+	}
+
 	s.msg.Allocate(s.rLocks)
 	l := s.TotalLocks()
 
