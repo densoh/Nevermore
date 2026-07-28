@@ -45,6 +45,23 @@ func (i *MobInventory) AddWithMessage(o *Mob, message string, silent bool) {
 	}
 }
 
+// Release removes the mob from the contents without unloading it, for a mob
+// that is leaving this room but staying in play. Remove stops the ticker and
+// closes MobCommands, which is right when the mob is done, but for one that is
+// only changing rooms it destroys the goroutines that are still running it.
+//
+// The room must be locked by the caller.
+func (i *MobInventory) Release(o *Mob) {
+	for c, p := range i.Contents {
+		if p == o {
+			copy(i.Contents[c:], i.Contents[c+1:])
+			i.Contents[len(i.Contents)-1] = nil
+			i.Contents = i.Contents[:len(i.Contents)-1]
+			break
+		}
+	}
+}
+
 // Remove Pass mob as a pointer, compare and remove
 func (i *MobInventory) Remove(o *Mob) {
 	go func() {

@@ -23,6 +23,18 @@ func init() {
 
 type scriptDeath cmd
 
+// charInRoom reports whether this exact character is already listed in the
+// room. CharInventory.Add appends unconditionally, so without this a character
+// relocated twice ends up in the room's list twice.
+func charInRoom(r *objects.Room, c *objects.Character) bool {
+	for _, other := range r.Chars.Contents {
+		if other == c {
+			return true
+		}
+	}
+	return false
+}
+
 func (scriptDeath) process(s *state) {
 
 	healingHand := objects.Rooms[config.HealingHand]
@@ -119,9 +131,15 @@ func (scriptDeath) process(s *state) {
 		}
 
 		s.where.Chars.Remove(s.actor)
-		healingHand.Chars.Add(s.actor)
+		if !charInRoom(healingHand, s.actor) {
+			healingHand.Chars.Add(s.actor)
+		}
 		s.actor.Placement = 3
 		s.actor.ParentId = healingHand.RoomId
+		// The actor has moved, so where has to follow them - see the note on the
+		// state struct. The LOOK below is dispatched through this same state and
+		// would otherwise consult the command stack of the room they died in.
+		s.where = healingHand
 
 		s.actor.RemoveEffect("blind")
 		s.actor.RemoveEffect("poison")
@@ -161,21 +179,25 @@ func (scriptDeath) process(s *state) {
 
 		// lag death carries no cost or penalty
 
-		s.actor.DeathInProgress = false
-
-		go func() {
-			log.Println("Lag Death: Clean Room")
-			s.where.Chars.Remove(s.actor)
+		// This has to happen inline: both rooms are locked by this state, and a
+		// goroutine would run after they are released, shuffling the character
+		// between rooms with nothing held and racing whatever ran next.
+		log.Println("Lag Death: Clean Room")
+		s.where.Chars.Remove(s.actor)
+		if !charInRoom(healingHand, s.actor) {
 			healingHand.Chars.Add(s.actor)
-			s.actor.RemoveEffect("blind")
-			s.actor.RemoveEffect("poison")
-			s.actor.RemoveEffect("disease")
-			s.actor.Stam.Current = s.actor.Stam.Max
-			s.actor.Vit.Current = s.actor.Vit.Max
-			s.actor.Mana.Current = s.actor.Mana.Max
-			s.actor.Placement = 3
-			s.actor.ParentId = healingHand.RoomId
-		}()
+		}
+		s.actor.RemoveEffect("blind")
+		s.actor.RemoveEffect("poison")
+		s.actor.RemoveEffect("disease")
+		s.actor.Stam.Current = s.actor.Stam.Max
+		s.actor.Vit.Current = s.actor.Vit.Max
+		s.actor.Mana.Current = s.actor.Mana.Max
+		s.actor.Placement = 3
+		s.actor.ParentId = healingHand.RoomId
+		s.where = healingHand
+
+		s.actor.DeathInProgress = false
 	}
 
 }

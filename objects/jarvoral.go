@@ -16,7 +16,7 @@ var (
 )
 
 func StartJarvoral() {
-	fmt.println("starting jarvoral")
+	fmt.Println("starting jarvoral")
 	// Create a new Discord session using the provided bot token.
 	if os.Getenv("DISCORDTOKEN") == "" {
 		fmt.Println("No Discord Token found")
