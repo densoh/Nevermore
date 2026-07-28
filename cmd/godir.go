@@ -123,6 +123,7 @@ func (godir) process(s *state) {
 					// them later would have it move itself with nothing locked,
 					// after the actor may have moved on or died. FollowChar makes
 					// its own roll and refuses rooms mobs have no business in.
+					// MOB-CHASE-SWITCH: delete this loop to stop mobs following the actor between rooms.
 					for _, mob := range chasers {
 						mob.FollowChar(s.actor, from, to)
 					}
@@ -161,6 +162,7 @@ func (godir) process(s *state) {
 							s.msg.Observers[to.RoomId].SendInfo(follChar.Name, " just arrived.")
 						}
 
+						// MOB-CHASE-SWITCH: delete this loop to stop mobs following party followers between rooms.
 						for _, mob := range follChasers {
 							mob.FollowChar(follChar, from, to)
 						}
