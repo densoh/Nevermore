@@ -28,12 +28,23 @@ type Equipment struct {
 	Main *Item
 	Off  *Item
 
+	// Prepared holds a ranger's quickdraw weapon.  It is carried at their side rather
+	// than wielded, so it lends no armor and no light, but it is out of the inventory
+	// and cannot be dropped, tossed, sold, given or stored away while it sits here.
+	Prepared *Item
+	// Drawn is the weapon a quickdraw or swap put in the main hand.  Tracked so that
+	// breaking it also releases the weapon prepared alongside it.
+	Drawn *Item
+
 	FlagOn            func(flagName string, provider string)
 	FlagOff           func(flagName string, provider string)
 	CanEquip          func(item *Item) (bool, string)
 	ReturnToInventory func(item *Item)
 }
 
+// GetWeight totals what is worn and wielded.  A prepared weapon is carried rather
+// than worn, so it is left out of this the same way a packed weapon is, and counted
+// against the character's carrying weight instead.
 func (e *Equipment) GetWeight() (total int) {
 	for _, item := range e.List() {
 		total += item.GetWeight()
@@ -41,6 +52,15 @@ func (e *Equipment) GetWeight() (total int) {
 	return total
 }
 
+// GetPreparedWeight returns the weight of a weapon prepared at the character's side.
+func (e *Equipment) GetPreparedWeight() int {
+	if e.Prepared == (*Item)(nil) {
+		return 0
+	}
+	return e.Prepared.GetWeight()
+}
+
+// List returns what is worn and wielded, which does not include a prepared weapon.
 func (e *Equipment) List() []*Item {
 	equipList := make([]*Item, 0)
 
@@ -114,6 +134,9 @@ func (e *Equipment) GetText(ref string) string {
 	}
 	if ref == "off" && e.Off != (*Item)(nil) {
 		return e.Off.DisplayName()
+	}
+	if ref == "prepared" && e.Prepared != (*Item)(nil) {
+		return e.Prepared.DisplayName()
 	}
 	return ""
 }
@@ -261,8 +284,10 @@ func (e *Equipment) DamageRandomArmor() (retString string) {
 		} else if damageItem == "main" {
 			e.Main.MaxUses -= 1
 			if e.Main.MaxUses <= 0 {
+				broken := e.Main
 				retString = "Your " + e.Main.DisplayName() + " falls apart."
 				e.UnequipSpecific("main")
+				retString += e.ReleaseOnBreak(broken)
 				return
 			}
 			return ""
@@ -277,9 +302,10 @@ func (e *Equipment) DamageWeapon(whichHand string, damage int) string {
 	if whichHand == "main" {
 		e.Main.MaxUses -= damage
 		if e.Main.MaxUses <= 0 {
-			e.ReturnToInventory(e.Main)
+			broken := e.Main
+			e.ReturnToInventory(broken)
 			e.Main = (*Item)(nil)
-			return "Your weapon breaks!"
+			return "Your weapon breaks!" + e.ReleaseOnBreak(broken)
 		}
 	} else if whichHand == "off" {
 		e.Off.MaxUses -= damage
@@ -292,10 +318,74 @@ func (e *Equipment) DamageWeapon(whichHand string, damage int) string {
 	return ""
 }
 
+// Prepare sets a weapon aside for a quickdraw.  Any existing pairing is replaced,
+// and the weapon it displaces, if any, is handed back for the inventory.
+func (e *Equipment) Prepare(item *Item) (released *Item) {
+	released = e.Prepared
+	e.Prepared = item
+	e.Drawn = (*Item)(nil)
+	return released
+}
+
+// Unprepare clears the quickdraw pairing and hands the weapon back for the inventory.
+func (e *Equipment) Unprepare() (released *Item) {
+	released = e.Prepared
+	e.Prepared = (*Item)(nil)
+	e.Drawn = (*Item)(nil)
+	return released
+}
+
+// SwapPrepared trades the prepared weapon for whatever is in the main hand.  The
+// weapon leaving the hand takes over the prepared slot so the pair can be traded
+// back, and the weapon now wielded is marked as drawn.
+// It returns nothing at all if the draw could not be made, leaving the equipment as
+// it found it.
+func (e *Equipment) SwapPrepared(charClass int) (drawn *Item, stowed *Item) {
+	drawn, stowed = e.Prepared, e.Main
+	if drawn == (*Item)(nil) {
+		return (*Item)(nil), (*Item)(nil)
+	}
+	if stowed != (*Item)(nil) {
+		e.UnequipSpecific("main")
+	}
+	// Clear the slot before equipping so nothing can hold the weapon twice.
+	e.Prepared = (*Item)(nil)
+	if !e.Equip(drawn, charClass) {
+		if stowed != (*Item)(nil) {
+			e.Equip(stowed, charClass)
+		}
+		e.Prepared = drawn
+		return (*Item)(nil), (*Item)(nil)
+	}
+	e.Prepared = stowed
+	e.Drawn = drawn
+	return drawn, stowed
+}
+
+// ReleaseOnBreak drops the quickdraw pairing when the weapon that just broke is the
+// one a quickdraw or swap drew, handing the weapon prepared alongside it back to the
+// inventory.  It returns a message to append to the breakage notice, if any.
+func (e *Equipment) ReleaseOnBreak(broken *Item) string {
+	if e.Drawn == (*Item)(nil) || e.Drawn != broken {
+		return ""
+	}
+	stowed := e.Unprepare()
+	if stowed == (*Item)(nil) {
+		return ""
+	}
+	e.ReturnToInventory(stowed)
+	return "  You stow a " + stowed.DisplayName() + " back in your pack, it is no longer ready at your side."
+}
+
 // Search the ItemInventory to return a specific instance of something
 func (e *Equipment) Search(alias string, nameNum int) *Item {
 	passes := 1
-	for _, c := range e.List() {
+	searchList := e.List()
+	// A prepared weapon is still on the character, so it can be looked at and evaluated.
+	if e.Prepared != (*Item)(nil) {
+		searchList = append(searchList, e.Prepared)
+	}
+	for _, c := range searchList {
 		if strings.Contains(strings.ToLower(c.Name), strings.ToLower(alias)) {
 			if passes == nameNum {
 				return c
@@ -777,6 +867,10 @@ func (e *Equipment) UnequipAll() (items []*Item) {
 			e.FlagOff("light", "off")
 		}
 		e.Off = (*Item)(nil)
+	}
+	// A prepared weapon was never wielded, so it carries no light or armor to clear.
+	if e.Prepared != (*Item)(nil) {
+		items = append(items, e.Unprepare())
 	}
 
 	e.Armor = 0

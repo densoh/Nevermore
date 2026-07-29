@@ -29,6 +29,7 @@ func (equipment) process(s *state) {
 		" {{if .Neck}}\n{{.SubPronoun}} {{.Isare}} wearing a {{.Neck}} around {{.PosPronoun}} neck.{{end}}" +
 		" {{if .Main}}\n{{.SubPronoun}} {{.Isare}} holding a {{.Main}} in {{.PosPronoun}} main hand.{{end}}" +
 		" {{if .Offhand}}\n{{.SubPronoun}} {{.Isare}} holding a {{.Offhand}} in {{.PosPronoun}} off hand.{{end}}" +
+		" {{if .Prepared}}\n{{.SubPronoun}} {{.HasHave}} a {{.Prepared}} ready at {{.PosPronoun}} side.{{end}}" +
 		" {{if .Arms}}\n{{.SubPronoun}} {{.Isare}} wearing some {{.Arms}} on {{.PosPronoun}} arms.{{end}}" +
 		" {{if .Finger1}}\n{{.SubPronoun}} {{.HasHave}} a {{.Finger1}} on {{.PosPronoun}} finger.{{end}}" +
 		" {{if .Finger2}}\n{{.SubPronoun}} {{.HasHave}} a {{.Finger2}} on {{.PosPronoun}} finger.{{end}}" +
@@ -47,6 +48,7 @@ func (equipment) process(s *state) {
 		Neck       string
 		Main       string
 		Offhand    string
+		Prepared   string
 		Arms       string
 		Finger1    string
 		Finger2    string
@@ -63,6 +65,7 @@ func (equipment) process(s *state) {
 		s.actor.Equipment.GetText("neck"),
 		s.actor.Equipment.GetText("main"),
 		s.actor.Equipment.GetText("off"),
+		s.actor.Equipment.GetText("prepared"),
 		s.actor.Equipment.GetText("arms"),
 		s.actor.Equipment.GetText("ring1"),
 		s.actor.Equipment.GetText("ring2"),

@@ -60,6 +60,11 @@ func (scriptDeath) process(s *state) {
 			if s.actor.CheckFlag("singing") {
 				s.actor.RemoveEffect("sing")
 			}
+			// A weapon prepared at their side goes back in the pack first, so that it
+			// dies with the rest of their inventory rather than with their equipment.
+			if stowed := s.actor.Equipment.Unprepare(); stowed != (*objects.Item)(nil) {
+				s.actor.Inventory.Add(stowed)
+			}
 			equipment := s.actor.Equipment.UnequipAll()
 
 			var tempStore []*objects.Item

@@ -123,9 +123,26 @@ func (godir) process(s *state) {
 					// them later would have it move itself with nothing locked,
 					// after the actor may have moved on or died. FollowChar makes
 					// its own roll and refuses rooms mobs have no business in.
+					// Only a mob that actually arrives gets a swing, and only the
+					// first one to land it does - a chased character pays for the
+					// exit once, however big the pack behind them.
 					// MOB-CHASE-SWITCH: delete this loop to stop mobs following the actor between rooms.
+					vitalSpent := false
 					for _, mob := range chasers {
-						mob.FollowChar(s.actor, from, to)
+						if !mob.FollowChar(s.actor, from, to) {
+							continue
+						}
+						if vitalSpent {
+							continue
+						}
+						landed, died := followVital(actorMover(s), mob)
+						vitalSpent = landed
+						if died {
+							// The death script has them now, so there is no one
+							// left here to lead the party or be shown the room.
+							s.ok = true
+							return
+						}
 					}
 
 					// Do not invoke player state, just move them within this state
@@ -163,8 +180,19 @@ func (godir) process(s *state) {
 						}
 
 						// MOB-CHASE-SWITCH: delete this loop to stop mobs following party followers between rooms.
+						follVitalSpent := false
 						for _, mob := range follChasers {
-							mob.FollowChar(follChar, from, to)
+							if !mob.FollowChar(follChar, from, to) {
+								continue
+							}
+							if follVitalSpent {
+								continue
+							}
+							landed, died := followVital(followerMover(follChar), mob)
+							follVitalSpent = landed
+							if died {
+								break
+							}
 						}
 					}
 
@@ -237,9 +265,9 @@ func writeTo(char *objects.Character, msg string) {
 
 // canMove runs every per-character check for walking through toE and reports
 // whether the character may go, the evade timer their exit earned them, and
-// the mobs entitled to give chase once they are gone. Some of the checks bite:
-// a failed levitate roll and a mob's parting strike both damage the character
-// before refusing, and either can kill them.
+// the mobs entitled to give chase once they are gone. One of the checks bites:
+// a failed levitate roll damages the character before refusing, and can kill
+// them.
 //
 // Nothing here ends the command or touches the state. The caller decides what
 // a refusal means - the actor stops walking, a follower is simply left behind -
@@ -336,7 +364,9 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 		}
 	}
 
-	// No one blocked, so check who follows - and who gets a parting shot.
+	// No one blocked, so work out who is entitled to give chase. Only the
+	// entitlement is decided here - whether each one actually comes along is
+	// FollowChar's roll, and the parting strike hangs off that, not off this.
 	for _, mob := range from.Mobs.Contents {
 		if _, inList := mob.ThreatTable[char.Name]; !inList {
 			continue
@@ -350,25 +380,37 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 
 		evasive = 4
 		chasers = append(chasers, mob)
-		if utils.Roll(100, 1, 0) <= config.MobFollowVital-(char.GetStat("dex")/2) {
-			vitDamage, resisted := char.ReceiveVitalDamage(int(math.Ceil(float64(mob.InflictDamage() * config.MobFollMult))))
-			data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, mob.MobId, mob.Level, 0, char.CharId)
-
-			if vitDamage == 0 {
-				m.info(text.Red + mob.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)
-			} else {
-				m.bad(text.Red + "Vital Strike!!!!\n" + text.Reset)
-				m.bad(text.Red + mob.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)
-			}
-			// Whoever took the hit is the one to death check.
-			if char.DeathCheckBool("was slain by a " + mob.Name + ".") {
-				return false, 0, nil
-			}
-			break
-		}
 	}
 
 	return true, evasive, chasers
+}
+
+// followVital rolls the parting strike a mob earns for chasing a character
+// through an exit, and reports whether it landed and whether it killed them.
+//
+// This is only ever called for a mob that has already followed. The strike is
+// the mob catching up with them on the other side, so one that lost its follow
+// roll - or was never in any shape to give chase - has nothing to swing at. It
+// lands in the destination room, after the move, for the same reason.
+func followVital(m mover, mob *objects.Mob) (landed bool, died bool) {
+	char := m.char
+
+	if utils.Roll(100, 1, 0) > config.MobFollowVital-(char.GetStat("dex")/2) {
+		return false, false
+	}
+
+	vitDamage, resisted := char.ReceiveVitalDamage(int(math.Ceil(float64(mob.InflictDamage() * config.MobFollMult))))
+	data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, mob.MobId, mob.Level, 0, char.CharId)
+
+	if vitDamage == 0 {
+		m.info(text.Red + mob.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)
+	} else {
+		m.bad(text.Red + "Vital Strike!!!!\n" + text.Reset)
+		m.bad(text.Red + mob.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)
+	}
+
+	// Whoever took the hit is the one to death check.
+	return true, char.DeathCheckBool("was slain by a " + mob.Name + ".")
 }
 
 // takeFallDamage applies the damage for a failed levitate roll and returns the
