@@ -280,7 +280,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 
 // GetCurrentWeight returns the current carrying weight of the character.
 func (c *Character) GetCurrentWeight() int {
-	return c.Inventory.GetTotalWeight() + c.Equipment.GetWeight()
+	return c.Inventory.GetTotalWeight() + c.Equipment.GetWeight() + c.Equipment.GetPreparedWeight()
 }
 
 // SuppressWrites Used when erroring a character out, or when we don't want to put anything on the write buffer
@@ -627,7 +627,8 @@ func (c *Character) Save() {
 	charData["vitmax"] = c.Vit.Max
 	charData["stammax"] = c.Stam.Max
 	charData["equipment"] = c.Equipment.Jsonify()
-	charData["inventory"] = c.Inventory.Jsonify()
+	// A prepared weapon saves with the inventory, quickdraw pairings don't survive a logout.
+	charData["inventory"] = c.Inventory.JsonifyWith(c.Equipment.Prepared)
 	charData["effects"] = c.SerialSaveEffects()
 	charData["timers"] = c.SerialSaveTimers()
 	charData["lastrefresh"] = c.LastRefresh.Format(time.RFC3339)
@@ -762,6 +763,9 @@ func (c *Character) ReturnState() string {
 	if c.CheckFlag("blind") {
 		effectStatus = effectStatus + " and " + text.LightRed + "blinded" + text.Info
 	}
+	if state := DrunkState(c.DrunkLevel()); state != "" {
+		effectStatus = effectStatus + " and " + text.LightYellow + state + text.Info
+	}
 
 	if c.Stam.Current == c.Stam.Max && c.Vit.Current == c.Vit.Max && effectStatus == "" {
 		return " appears untouched"
@@ -865,6 +869,14 @@ func (c *Character) CanEquip(item *Item) (bool, string) {
 	}
 
 	return true, ""
+}
+
+// DrunkLevel returns the character's current drunk number, 0 if sober
+func (c *Character) DrunkLevel() int {
+	if effectInstance, ok := c.Effects["drunk"]; ok {
+		return effectInstance.magnitude
+	}
+	return 0
 }
 
 func (c *Character) HasEffect(effectName string) bool {

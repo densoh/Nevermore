@@ -185,6 +185,66 @@ func disease(caller interface{}, target interface{}, magnitude int) string {
 	return ""
 }
 
+// DrunkState returns the description for a drunk level, or "" if sober enough to feel nothing
+func DrunkState(level int) string {
+	switch {
+	case level >= 100:
+		return "like a hot mess, absolutely smashed"
+	case level >= 80:
+		return "drunk"
+	case level >= 40:
+		return "tipsy"
+	case level >= 20:
+		return "slightly buzzed"
+	}
+	return ""
+}
+
+func drunk(caller interface{}, target interface{}, magnitude int) string {
+	switch target := target.(type) {
+	case *Character:
+		if magnitude <= 0 {
+			return ""
+		}
+		newLevel := magnitude
+		if effectInstance, ok := target.Effects["drunk"]; ok {
+			effectInstance.magnitude += magnitude
+			newLevel = effectInstance.magnitude
+		}
+		// Length is a fallback; the effect releases itself when the drunk level sobers to 0
+		target.ApplyEffect("drunk", strconv.Itoa(((newLevel/5)+2)*8), 8, newLevel,
+			func(triggers int) {
+				if triggers == 0 {
+					return
+				}
+				effectInstance, ok := target.Effects["drunk"]
+				if !ok {
+					return
+				}
+				effectInstance.magnitude -= 5 + target.GetStat("con")/2
+				if effectInstance.magnitude <= 0 {
+					target.RemoveEffect("drunk")
+				}
+			},
+			func() {
+				target.FlagOff("drunk", "drunk")
+				if _, err := target.Write([]byte(text.Cyan + "You've sobered up.\n")); err != nil {
+					log.Println("Error writing to player:", err)
+				}
+			})
+		target.FlagOn("drunk", "drunk")
+		if state := DrunkState(newLevel); state != "" {
+			if _, err := target.Write([]byte(text.Info + "You feel " + state + ".\n")); err != nil {
+				log.Println("Error writing to player:", err)
+			}
+		}
+		return ""
+	case *Mob:
+		return ""
+	}
+	return ""
+}
+
 func haste(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
@@ -1330,6 +1390,7 @@ func init() {
 	Effects = map[string]func(caller interface{}, target interface{}, magnitude int) string{
 		"poison":           poison,
 		"disease":          disease,
+		"drunk":            drunk,
 		"blind":            blind,
 		"berserk":          berserk,
 		"haste":            haste,

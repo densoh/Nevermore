@@ -155,15 +155,27 @@ func (i *ItemInventory) ListItems() []*Item {
 }
 
 func (i *ItemInventory) Jsonify() string {
-	itemList := make([]map[string]interface{}, 0)
+	return i.JsonifyWith()
+}
 
-	switch len(i.Contents) {
-	case 0:
-		return "[]"
-	}
+// JsonifyWith serializes the inventory along with any extra items that belong with
+// it.  A ranger's prepared weapon rides in an equipment slot while they play, but is
+// saved here so it comes back as an ordinary carried item on their next login.
+func (i *ItemInventory) JsonifyWith(extra ...*Item) string {
+	itemList := make([]map[string]interface{}, 0)
 
 	for _, o := range i.Contents {
 		itemList = append(itemList, ReturnItemInstanceProps(o))
+	}
+
+	for _, o := range extra {
+		if o != (*Item)(nil) {
+			itemList = append(itemList, ReturnItemInstanceProps(o))
+		}
+	}
+
+	if len(itemList) == 0 {
+		return "[]"
 	}
 
 	data, err := json.Marshal(itemList)

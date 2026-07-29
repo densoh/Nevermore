@@ -27,6 +27,12 @@ func (inventory) process(s *state) {
 	} else {
 		s.msg.Actor.Send("  ", s.actor.Inventory.ReducedList())
 	}
+
+	// A prepared weapon rides at their side rather than in the pack, so call it out.
+	if prepared := s.actor.Equipment.GetText("prepared"); prepared != "" {
+		s.msg.Actor.SendInfo("You have a " + prepared + " ready at your side.")
+	}
+
 	s.ok = true
 	return
 }

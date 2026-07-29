@@ -152,6 +152,9 @@ func (use) process(s *state) {
 					} else if msg != "" {
 						s.msg.Participant.SendGood(msg)
 					}
+					if what.ItemType == 17 {
+						objects.Effects["drunk"](whatChar, whatChar, what.Adjustment)
+					}
 					what.MaxUses -= 1
 					if what.MaxUses <= 0 {
 						s.msg.Actor.SendBad("Your " + what.Name + " disintegrates.")
@@ -172,6 +175,9 @@ func (use) process(s *state) {
 					go Script(s.actor, strings.Replace(msg, "$CRIPT ", "", 1))
 				} else {
 					s.msg.Actor.SendGood(msg)
+				}
+				if what.ItemType == 17 {
+					objects.Effects["drunk"](s.actor, s.actor, what.Adjustment)
 				}
 				what.MaxUses -= 1
 				if what.MaxUses <= 0 {
