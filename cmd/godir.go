@@ -167,253 +167,21 @@ func (godir) process(s *state) {
 
 						moveChar(follChar, from, to, follEvasive)
 
-					evasiveMan := 0
-					// Check if anyone blocks.
-					for _, mob := range s.where.Mobs.Contents {
-						// Check if a mob blocks.
-						if _, inList := mob.ThreatTable[s.actor.Name]; inList {
-							if mob.CheckFlag("block_exit") && mob.Placement == s.actor.Placement && mob.MobStunned == 0 && !mob.CheckFlag("run_away") {
-								evasiveMan = 2
-								curChance := config.MobBlock - ((s.actor.Tier - mob.Level) * config.MobBlockPerLevel)
-								if curChance > 85 {
-									curChance = 85
-								}
-								if utils.Roll(100, 1, 0) <= curChance {
-									s.msg.Actor.SendBad(mob.Name + " blocks your way.")
-									s.actor.SetTimer("global", 8)
-									return
-								}
-								break
-							}
-						}
-					}
-					for _, mob := range s.where.Mobs.Contents {
-						// No one blocked, so check if anyone follows.
-						if _, inList := mob.ThreatTable[s.actor.Name]; inList {
-							if mob.CurrentTarget == s.actor.Name {
-								// Now check if they follow.
-								if mob.CheckFlag("follows") && !mob.CheckFlag("curious_canticle") {
-									evasiveMan = 4
-									if utils.Roll(100, 1, 0) <= config.MobFollowVital {
-										vitDamage, resisted := s.actor.ReceiveVitalDamage(int(math.Ceil(float64(mob.InflictDamage() * config.MobFollMult))))
-										data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, mob.MobId, mob.Level, 0, s.actor.CharId)
-
-										if vitDamage == 0 {
-											s.msg.Actor.SendInfo(text.Red + mob.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)
-										} else {
-											s.msg.Actor.SendBad(text.Red + "Vital Strike!!!!\n" + text.Reset)
-											s.msg.Actor.SendBad(text.Red + mob.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)
-										}
-										deathCheck := s.actor.DeathCheckBool("was slain by a " + mob.Name + ".")
-										if deathCheck {
-											return
-										}
-										break
-									}
-								}
-							}
+						if follChar.CheckFlag("blind") {
+							writeTo(follChar, text.Bad+"You can't see anything!")
+						} else {
+							writeTo(follChar, to.Look(follChar))
 						}
 
-					/*
-						// Character has been removed, invoke any follows for them.  this should be fine as the mob should take over locks
-						for _, mob := range followList {
-							mobProc := mob
-							go func() { mobProc.MobCommands <- "follow " + s.actor.Name }()
+						// Broadcast leaving and arrival notifications
+						if follChar.Flags["invisible"] == false {
+							s.msg.Observers[from.RoomId].SendInfo("You see ", follChar.Name, " follow "+s.actor.Name+" to the ", strings.ToLower(toE.Name), ".")
+							s.msg.Observers[to.RoomId].SendInfo(follChar.Name, " just arrived.")
 						}
-					*/
 
-					// Do not invoke player state, just move them within this state lock
-					if len(s.actor.PartyFollowers) > 0 {
-						for _, peo := range s.actor.PartyFollowers {
-							follChar := s.where.Chars.SearchAll(peo)
-							endFollProc := false
-							if follChar != nil {
-								// Check some timers
-								if !follChar.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
-									ready, msg := follChar.TimerReady("evade")
-									if !ready {
-										if _, err := follChar.Write([]byte(text.Bad + msg)); err != nil {
-											log.Println("Error writing to player: ", err)
-										}
-										break
-									}
-
-									if s.actor.Stam.Current <= 0 {
-										if _, err := follChar.Write([]byte(text.Bad + "You are far too tired to follow.")); err != nil {
-											log.Println("Error writing to player: ", err)
-										}
-										break
-									}
-
-									follChar.RunHook("move")
-
-									evasiveMan = 0
-
-									if !objects.Rooms[toE.ToId].Flags["active"] {
-										if _, err := follChar.Write([]byte(text.Bad + "Go where?")); err != nil {
-											log.Println("Error writing to player: ", err)
-										}
-										break
-									}
-
-									if toE.Flags["invisible"] && !follChar.CheckFlag("detect-invisible") {
-										if _, err := follChar.Write([]byte(text.Bad + "Go where?")); err != nil {
-											log.Println("Error writing to player: ", err)
-										}
-										break
-									}
-
-									if toE.Flags["placement_dependent"] && follChar.Placement != toE.Placement {
-										if _, err := follChar.Write([]byte(text.Bad + "You must be next to the exit to use it.")); err != nil {
-											log.Println("Error writing to player: ", err)
-										}
-										break
-									}
-
-									if follChar.Equipment.GetWeight() > follChar.MaxWeight() {
-										if _, err := follChar.Write([]byte(text.Bad + "You are carrying too much to move.")); err != nil {
-											log.Println("Error writing to player: ", err)
-										}
-										break
-									}
-
-									if objects.Rooms[toE.ToId].Crowded() {
-										if _, err := follChar.Write([]byte("That area is crowded.")); err != nil {
-											log.Println("Error writing to player: ", err)
-										}
-										s.ok = true
-										return
-									}
-
-									hasRope := false
-									if follChar.Equipment.Off != (*objects.Item)(nil) {
-										if follChar.Equipment.Off.ItemId == 1463 {
-											hasRope = true
-										}
-									}
-
-									if toE.Flags["levitate"] && !follChar.CheckFlag("levitate") && !hasRope {
-										chanceToPass := follChar.GetStat("dex")/45 + 10
-										if utils.Roll(100, 1, 0) >= chanceToPass {
-											fallDamageStam := int(config.FallDamage*float64(follChar.Stam.Max)) -
-												(config.ConFallDamageMod * follChar.GetStat("con")) -
-												(config.DexFallDamageMod * follChar.GetStat("dex"))
-											fallDamageVit := int(config.FallDamage*float64(follChar.Stam.Max)) -
-												(config.ConFallDamageMod * follChar.GetStat("con")) -
-												(config.DexFallDamageMod * follChar.GetStat("dex"))
-											totStam, totVit := 0, 0
-											if fallDamageStam > 0 {
-												totStam, totVit = follChar.ReceiveDamageNoArmor(fallDamageStam)
-											}
-											if fallDamageVit > 0 {
-												totVit += follChar.ReceiveVitalDamageNoArmor(fallDamageVit)
-											}
-											buildStr := ""
-											if totStam <= 0 && totVit <= 0 {
-												buildStr = "You take no damage in the fall."
-											} else {
-												if totStam >= 1 {
-													buildStr += "You take " + strconv.Itoa(totStam) + " points of stamina"
-												}
-												if totVit >= 1 {
-													if totStam >= 1 {
-														buildStr += " and "
-													}
-													buildStr += strconv.Itoa(totVit) + " points of vitality"
-												}
-												buildStr += " damage in the fall."
-											}
-											if _, err := follChar.Write([]byte(text.Bad + "You fall while trying to go that way! " + buildStr)); err != nil {
-												log.Println("Error writing to player: ", err)
-											}
-											go follChar.DeathCheck("fell to their death.")
-											break
-										}
-									}
-
-									// Check if anyone blocks.
-									for _, mob := range s.where.Mobs.Contents {
-										// Check if a mob blocks.
-										if _, inList := mob.ThreatTable[follChar.Name]; inList {
-											if mob.CheckFlag("block_exit") && mob.Placement == follChar.Placement && mob.MobStunned == 0 && !mob.CheckFlag("run_away") {
-												evasiveMan = 2
-												curChance := config.MobBlock - ((follChar.Tier - mob.Level) * config.MobBlockPerLevel)
-												if curChance > 85 {
-													curChance = 85
-												}
-												if utils.Roll(100, 1, 0) <= curChance {
-													if _, err := follChar.Write([]byte(mob.Name + " blocks you from following." + "\n")); err != nil {
-														log.Println("Error writing to player: ", err)
-													}
-													follChar.SetTimer("global", 8)
-
-												}
-												endFollProc = true
-												break
-											}
-										}
-									}
-									for _, mob := range s.where.Mobs.Contents {
-										// Check if a follows
-										if _, inList := mob.ThreatTable[follChar.Name]; inList {
-											if mob.CurrentTarget == follChar.Name {
-												// Now check if they follow.
-												if mob.CheckFlag("follows") && !mob.CheckFlag("curious_canticle") {
-													evasiveMan = 4
-													if utils.Roll(100, 1, 0) <= config.MobFollowVital {
-														vitDamage, resisted := follChar.ReceiveVitalDamage(int(math.Ceil(float64(mob.InflictDamage() * config.MobFollMult))))
-														data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, mob.MobId, mob.Level, 0, follChar.CharId)
-
-														if vitDamage == 0 {
-															if _, err := follChar.Write([]byte(text.Red + mob.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)); err != nil {
-																log.Println("Error writing to player: ", err)
-															}
-
-														} else {
-															if _, err := follChar.Write([]byte(text.Red + "Vital Strike!!!!\n" + text.Reset)); err != nil {
-																log.Println("Error writing to player: ", err)
-															}
-															if _, err := follChar.Write([]byte(text.Red + mob.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)); err != nil {
-																log.Println("Error writing to player: ", err)
-															}
-														}
-														deathCheck := s.actor.DeathCheckBool("was slain by a " + mob.Name + ".")
-														if deathCheck {
-															endFollProc = true
-														}
-														break
-													}
-												}
-											}
-										}
-									}
-									if endFollProc {
-										continue
-									}
-								}
-								from.Chars.Remove(follChar)
-								// If they were evasive, add a global timer
-								follChar.SetTimer("evade", evasiveMan)
-								to.Chars.Add(follChar)
-								follChar.Victim = nil
-								follChar.Placement = 3
-								follChar.ParentId = toE.ToId
-
-								if s.actor.CheckFlag("blind") {
-									s.msg.Actor.SendBad("You can't see anything!")
-									return
-								} else {
-									if _, err := follChar.Write([]byte(objects.Rooms[to.RoomId].Look(follChar))); err != nil {
-										log.Println("Error writing to player: ", err)
-									}
-								}
-
-								// Broadcast leaving and arrival notifications
-								if follChar.Flags["invisible"] == false {
-									s.msg.Observers[from.RoomId].SendInfo("You see ", follChar.Name, " follow "+s.actor.Name+" to the ", strings.ToLower(toE.Name), ".")
-									s.msg.Observers[to.RoomId].SendInfo(follChar.Name, " just arrived.")
-								}
-							}
+						// MOB-CHASE-SWITCH: delete this loop to stop mobs following party followers between rooms.
+						for _, mob := range follChasers {
+							mob.FollowChar(follChar, from, to)
 						}
 					}
 
@@ -601,6 +369,22 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 
 		evasive = 4
 		chasers = append(chasers, mob)
+		if utils.Roll(100, 1, 0) <= config.MobFollowVital-(char.GetStat("dex")/2) {
+			vitDamage, resisted := char.ReceiveVitalDamage(int(math.Ceil(float64(mob.InflictDamage() * config.MobFollMult))))
+			data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, mob.MobId, mob.Level, 0, char.CharId)
+
+			if vitDamage == 0 {
+				m.info(text.Red + mob.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)
+			} else {
+				m.bad(text.Red + "Vital Strike!!!!\n" + text.Reset)
+				m.bad(text.Red + mob.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)
+			}
+			// Whoever took the hit is the one to death check.
+			if char.DeathCheckBool("was slain by a " + mob.Name + ".") {
+				return false, 0, nil
+			}
+			break
+		}
 	}
 
 	return true, evasive, chasers
