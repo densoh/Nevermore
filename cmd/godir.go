@@ -180,8 +180,19 @@ func (godir) process(s *state) {
 						}
 
 						// MOB-CHASE-SWITCH: delete this loop to stop mobs following party followers between rooms.
+						follVitalSpent := false
 						for _, mob := range follChasers {
-							mob.FollowChar(follChar, from, to)
+							if !mob.FollowChar(follChar, from, to) {
+								continue
+							}
+							if follVitalSpent {
+								continue
+							}
+							landed, died := followVital(followerMover(follChar), mob)
+							follVitalSpent = landed
+							if died {
+								break
+							}
 						}
 					}
 
@@ -369,22 +380,6 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 
 		evasive = 4
 		chasers = append(chasers, mob)
-		if utils.Roll(100, 1, 0) <= config.MobFollowVital-(char.GetStat("dex")/2) {
-			vitDamage, resisted := char.ReceiveVitalDamage(int(math.Ceil(float64(mob.InflictDamage() * config.MobFollMult))))
-			data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, mob.MobId, mob.Level, 0, char.CharId)
-
-			if vitDamage == 0 {
-				m.info(text.Red + mob.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)
-			} else {
-				m.bad(text.Red + "Vital Strike!!!!\n" + text.Reset)
-				m.bad(text.Red + mob.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)
-			}
-			// Whoever took the hit is the one to death check.
-			if char.DeathCheckBool("was slain by a " + mob.Name + ".") {
-				return false, 0, nil
-			}
-			break
-		}
 	}
 
 	return true, evasive, chasers
