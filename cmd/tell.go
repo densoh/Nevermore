@@ -23,7 +23,7 @@ func (tell) process(s *state) {
 		return
 	}
 	whoStr := s.words[0]
-	message := strings.Join(s.input[1:], " ")
+	message := s.actor.DrunkSpeech(strings.Join(s.input[1:], " "))
 	who := objects.ActiveCharacters.Find(whoStr)
 	if who != nil {
 		objects.ActiveCharacters.Lock()
