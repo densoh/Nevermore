@@ -23,7 +23,7 @@ func (ptell) process(s *state) {
 		return
 	}
 
-	msg := strings.Join(s.input, " ")
+	msg := s.actor.DrunkSpeech(strings.Join(s.input, " "))
 	msg = text.White + s.actor.Name + " party flashes# \"" + msg + "\""
 	data.StoreChatLog(5, s.actor.CharId, 0, msg)
 	if s.actor.PartyFollow == "" && len(s.actor.PartyFollowers) == 0 {

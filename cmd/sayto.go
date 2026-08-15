@@ -48,7 +48,7 @@ func (sayto) process(s *state) {
 		return
 	}
 
-	msg := strings.Join(s.input[1:], " ")
+	msg := s.actor.DrunkSpeech(strings.Join(s.input[1:], " "))
 	s.actor.RunHook("say")
 	data.StoreChatLog(0, s.actor.CharId, 0, msg)
 	if msg[len(msg)-1:] == "?" {

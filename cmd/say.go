@@ -34,7 +34,7 @@ func (say) process(s *state) {
 		who = "Someone"
 	}
 
-	msg := strings.Join(s.input, " ")
+	msg := s.actor.DrunkSpeech(strings.Join(s.input, " "))
 	s.actor.RunHook("say")
 	data.StoreChatLog(0, s.actor.CharId, 0, msg)
 	if msg[len(msg)-1:] == "?" {

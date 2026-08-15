@@ -28,7 +28,7 @@ func (yell) process(s *state) {
 		who = "Someone"
 	}
 
-	msg := strings.Join(s.input, " ")
+	msg := s.actor.DrunkSpeech(strings.Join(s.input, " "))
 	s.actor.RunHook("say")
 	s.msg.Actor.SendGood("You yell: \"", msg, "\"")
 	s.msg.Observers.SendInfo(who, " yells: \"", msg, "\"")

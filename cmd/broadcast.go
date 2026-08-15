@@ -21,7 +21,7 @@ func (broadcast) process(s *state) {
 		s.msg.Actor.SendInfo("What did you want to say?")
 		return
 	}
-	message := "### " + s.actor.Name + ": " + strings.Join(s.input, " ")
+	message := "### " + s.actor.Name + ": " + s.actor.DrunkSpeech(strings.Join(s.input, " "))
 	if !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.God, permissions.NPC, permissions.Dungeonmaster, permissions.Gamemaster) {
 		if s.actor.Broadcasts < 1 {
 			s.msg.Actor.SendBad("You're out of broadcasts today.")

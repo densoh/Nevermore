@@ -185,19 +185,44 @@ func disease(caller interface{}, target interface{}, magnitude int) string {
 	return ""
 }
 
-// DrunkState returns the description for a drunk level, or "" if sober enough to feel nothing
-func DrunkState(level int) string {
+var drunkStates = []string{"", "slightly buzzed", "tipsy", "drunk", "like a hot mess, absolutely smashed"}
+var drunkSlurChances = []int{0, 5, 15, 30, 50}
+
+// drunkTier maps a drunk level to an index into drunkStates/drunkSlurChances
+func drunkTier(level int) int {
 	switch {
 	case level >= 100:
-		return "like a hot mess, absolutely smashed"
-	case level >= 80:
-		return "drunk"
+		return 4
+	case level >= 60:
+		return 3
 	case level >= 40:
-		return "tipsy"
+		return 2
 	case level >= 20:
-		return "slightly buzzed"
+		return 1
 	}
-	return ""
+	return 0
+}
+
+// DrunkState returns the description for a drunk level, or "" if sober enough to feel nothing
+func DrunkState(level int) string {
+	return drunkStates[drunkTier(level)]
+}
+
+// DrunkSpeech slurs spoken text based on how drunk the character is; sober speech passes through untouched.
+// Adjacent letters within a word may swap; spaces never move.
+func (c *Character) DrunkSpeech(input string) string {
+	chance := drunkSlurChances[drunkTier(c.DrunkLevel())]
+	if chance == 0 {
+		return input
+	}
+	runes := []rune(input)
+	for n := 0; n < len(runes)-1; n++ {
+		if runes[n] != ' ' && runes[n+1] != ' ' && rand.Intn(100) < chance {
+			runes[n], runes[n+1] = runes[n+1], runes[n]
+			n++
+		}
+	}
+	return string(runes)
 }
 
 func drunk(caller interface{}, target interface{}, magnitude int) string {
