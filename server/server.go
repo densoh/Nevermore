@@ -3,17 +3,18 @@
 package main
 
 import (
+	"io"
+	"log"
+	"os"
+	"syscall"
+	"time"
+
 	"github.com/ArcCS/Nevermore/comms"
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/data"
 	"github.com/ArcCS/Nevermore/intelligence"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/stats"
-	"io"
-	"log"
-	"os"
-	"runtime/debug"
-	"time"
 )
 
 var RoomSyncTicker *time.Ticker
@@ -30,9 +31,9 @@ func main() {
 	}()
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
-	// Panics bypass the log package and only reach stderr; also copy them here
-	if err := debug.SetCrashOutput(logFile, debug.CrashOptions{}); err != nil {
-		log.Println("Error setting crash output:", err)
+	// Panics bypass the log package and go to stderr; redirect stderr into the log file
+	if err := syscall.Dup2(int(logFile.Fd()), 2); err != nil {
+		log.Println("Error redirecting stderr to log file:", err)
 	}
 	stats.Start()
 	go objects.StartJarvoral()
