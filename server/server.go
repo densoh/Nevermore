@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime/debug"
 	"time"
 )
 
@@ -29,6 +30,10 @@ func main() {
 	}()
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
+	// Panics bypass the log package and only reach stderr; also copy them here
+	if err := debug.SetCrashOutput(logFile, debug.CrashOptions{}); err != nil {
+		log.Println("Error setting crash output:", err)
+	}
 	stats.Start()
 	go objects.StartJarvoral()
 	objects.Load()
