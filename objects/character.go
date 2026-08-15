@@ -2,12 +2,6 @@ package objects
 
 import (
 	"encoding/json"
-	"github.com/ArcCS/Nevermore/config"
-	"github.com/ArcCS/Nevermore/data"
-	"github.com/ArcCS/Nevermore/permissions"
-	"github.com/ArcCS/Nevermore/prompt"
-	"github.com/ArcCS/Nevermore/text"
-	"github.com/ArcCS/Nevermore/utils"
 	"io"
 	"log"
 	"math"
@@ -15,6 +9,13 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/ArcCS/Nevermore/config"
+	"github.com/ArcCS/Nevermore/data"
+	"github.com/ArcCS/Nevermore/permissions"
+	"github.com/ArcCS/Nevermore/prompt"
+	"github.com/ArcCS/Nevermore/text"
+	"github.com/ArcCS/Nevermore/utils"
 )
 
 type Character struct {
@@ -340,6 +341,7 @@ func (c *Character) SingSong(song string, tickRate int) {
 		for {
 			select {
 			case <-c.SongTickerUnload:
+				c.SongTicker.Stop()
 				c.FlagOffAndMsg("singing", "sing", "You stop singing.")
 				return
 			case <-c.SongTicker.C:

@@ -38,6 +38,10 @@ func Roll(dieSides int, numDice int, mod int) int {
 }
 
 func DiceRoll(dieSides int, numDice int, mod int, drop int, total bool) []int {
+	if dieSides <= 0 || numDice <= 0 {
+		log.Println("Invalid dice roll parameters: dieSides and numDice must be greater than 0")
+		return []int{mod}
+	}
 	rolls := make([]int, numDice)
 
 	if time.Now().Unix()-LastUpdate >= 600 {

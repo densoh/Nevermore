@@ -1,13 +1,14 @@
 package cmd
 
 import (
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/utils"
-	"math"
-	"strconv"
-	"strings"
 )
 
 func init() {
@@ -92,11 +93,11 @@ func (sing) process(s *state) {
 		},
 		func() {
 			// Damage Instrument
+			s.actor.SongTickerUnload <- true
 			weapMsg := s.actor.Equipment.DamageWeapon("off", 1)
 			if weapMsg != "" {
 				s.msg.Actor.SendInfo(weapMsg)
 			}
-			s.actor.SongTickerUnload <- true
 		})
 
 	s.msg.Actor.SendGood("You begin singing " + song + "!")
