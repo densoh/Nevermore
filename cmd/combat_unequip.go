@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/ArcCS/Nevermore/config"
+	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 )
 
@@ -63,6 +66,20 @@ func (unequip) process(s *state) {
 		s.ok = true
 		return
 	}
+
+	// Nothing worn or wielded matched, but a weapon prepared for a quickdraw can be
+	// removed too, which stows it back in the pack the same as an empty prepare.
+	if prepared := s.actor.Equipment.Prepared; prepared != (*objects.Item)(nil) &&
+		strings.Contains(strings.ToLower(prepared.Name), strings.ToLower(name)) {
+		stowed := s.actor.Equipment.Unprepare()
+		s.actor.Inventory.Add(stowed)
+		s.msg.Actor.SendGood("You put a " + stowed.DisplayName() + " back in your pack.")
+		s.msg.Observers.SendInfo(s.actor.Name + " puts a " + stowed.DisplayName() + " away.")
+		s.actor.SetTimer("combat", config.UnequipCooldown)
+		s.ok = true
+		return
+	}
+
 	s.msg.Actor.SendInfo("What did you want to unequip?")
 	s.ok = true
 }

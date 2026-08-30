@@ -87,6 +87,10 @@ func (g *game) gameResumeInit() {
 	g.character.Writer = g.output
 	g.character.Unloader = g.CharUnloader
 	g.character.Disconnect = g.Disconnect
+	// The character may have been fighting blind the whole time they were
+	// link-dead. Give them a moment to see the screen before a death can
+	// cost them - the grace ends the moment they fight or move.
+	g.character.SetResumeGrace(config.ResumeGraceSeconds)
 	cmd.Script(g.character, "LOOK")
 	// Initialize this characters ticker
 	g.nextFunc = g.gameProcess

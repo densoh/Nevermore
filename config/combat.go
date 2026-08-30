@@ -31,6 +31,11 @@ var (
 	CombatCooldown  = 8
 	UnequipCooldown = 2
 
+	// ResumeGraceSeconds is how long after resuming a session a death still
+	// counts as a lag death, so a fight that ran while the player was
+	// link-dead cannot kill them for real before they have seen the screen.
+	ResumeGraceSeconds = 3
+
 	RoomClearTimer            = 3  // Seconds
 	RoomEffectInvocation      = 18 // Seconds
 	RoomDefaultEncounterSpeed = 10 // Seconds
