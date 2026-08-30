@@ -58,6 +58,10 @@ type godir cmd
 
 func (godir) process(s *state) {
 
+	// Moving ends the post-resume death grace, whether or not the move
+	// succeeds - a player picking an exit has seen the screen.
+	s.actor.ClearResumeGrace()
+
 	var exitName string
 	from := s.where
 	// Does this place even have exits?

@@ -104,6 +104,10 @@ type Character struct {
 	Disconnect      func()
 	Pose            string
 	claimed         int32
+	// ResumeGraceUntil marks the window after a session resume in which a
+	// death is downgraded to a penalty-free lag death. It ends early the
+	// moment the player fights or moves - see SetTimer and the GO handler.
+	ResumeGraceUntil time.Time
 }
 
 func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Character, bool) {
@@ -215,6 +219,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 			disconnect,
 			"",
 			0,
+			time.Time{},
 		}
 
 		for _, spellN := range strings.Split(charData["spells"].(string), ",") {
@@ -293,7 +298,29 @@ func (c *Character) EnableWrites() {
 	c.Flags["allow_writes"] = true
 }
 
+// SetResumeGrace opens the post-resume window in which a death is downgraded
+// to a penalty-free lag death. Only ResumeGame should call this.
+func (c *Character) SetResumeGrace(seconds int) {
+	c.ResumeGraceUntil = time.Now().Add(time.Duration(seconds) * time.Second)
+}
+
+// InResumeGrace reports whether the character is still inside that window.
+func (c *Character) InResumeGrace() bool {
+	return time.Now().Before(c.ResumeGraceUntil)
+}
+
+// ClearResumeGrace ends the window early: a character who has fought or moved
+// since resuming is playing again and takes deaths at full price.
+func (c *Character) ClearResumeGrace() {
+	c.ResumeGraceUntil = time.Time{}
+}
+
 func (c *Character) SetTimer(timer string, seconds int) {
+	// Every combat command funnels through here with a "combat"-prefixed
+	// timer name, so this is the one place that sees them all.
+	if strings.HasPrefix(timer, "combat") {
+		c.ClearResumeGrace()
+	}
 	// Looks like Sub on timers only accounts for seconds and not milliseconds, so folks are still blazing past a timer here add one second to increase to 8.
 	seconds += 1
 	if c.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {

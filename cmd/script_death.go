@@ -44,7 +44,10 @@ func (scriptDeath) process(s *state) {
 		return
 	}
 
-	if time.Now().Sub(objects.GetLastActivity(s.actor.Name)).Seconds() < 60 {
+	// A character inside the resume grace window takes the lag death below
+	// even if they have typed something: their first keystrokes after
+	// reconnecting must not turn a fight they never saw into a real death.
+	if time.Now().Sub(objects.GetLastActivity(s.actor.Name)).Seconds() < 60 && !s.actor.InResumeGrace() {
 		deathString := "### " + s.actor.Name + " has died."
 		if len(s.words[0]) > 0 {
 			deathString = "### " + s.actor.Name + " " + strings.Join(s.input[0:], " ")
