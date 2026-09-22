@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"log"
-	"math"
 	"strconv"
 	"strings"
 
 	"github.com/ArcCS/Nevermore/config"
-	"github.com/ArcCS/Nevermore/data"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/text"
@@ -403,18 +401,13 @@ func followVital(m mover, mob *objects.Mob) (landed bool, died bool) {
 		return false, false
 	}
 
-	vitDamage, resisted := char.ReceiveVitalDamage(int(math.Ceil(float64(mob.InflictDamage() * config.MobFollMult))))
-	data.StoreCombatMetric("follow_vital", 0, 1, vitDamage, resisted, vitDamage, 1, mob.MobId, mob.Level, 0, char.CharId)
-
-	if vitDamage == 0 {
-		m.info(text.Red + mob.Name + " attacks bounces off of you for no damage!" + "\n" + text.Reset)
-	} else {
-		m.bad(text.Red + "Vital Strike!!!!\n" + text.Reset)
-		m.bad(text.Red + mob.Name + " attacks you for " + strconv.Itoa(vitDamage) + " points of vital damage!" + "\n" + text.Reset)
-	}
-
 	// Whoever took the hit is the one to death check.
-	return true, char.DeathCheckBool("was slain by a " + mob.Name + ".")
+	died = mob.ApplyStrike(char, mob.InflictDamage(), objects.StyleVital, float64(config.MobFollMult), objects.StrikeOpts{
+		Metric:   "follow",
+		Mode:     1,
+		DeathMsg: "was slain by a " + mob.Name + ".",
+	})
+	return true, died
 }
 
 // takeFallDamage applies the damage for a failed levitate roll and returns the

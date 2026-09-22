@@ -157,20 +157,11 @@ func (backstab) process(s *state) {
 				whatMob.CurrentTarget = s.actor.Name
 				s.msg.Actor.SendInfo(whatMob.Name + " turns it's attention to you.")
 				s.msg.Observers.SendInfo(whatMob.Name + " turns to " + s.actor.Name + ".")
-				vitDamage, resisted := s.actor.ReceiveVitalDamage(int(math.Ceil(float64(whatMob.InflictDamage() * config.VitalStrikeScale))))
-				data.StoreCombatMetric("backstab_mob_vital", 0, 0, vitDamage+resisted, resisted, vitDamage, 1, whatMob.MobId, whatMob.Level, 0, s.actor.CharId)
-				if vitDamage == 0 {
-					s.msg.Actor.SendGood(whatMob.Name, " vital strike bounces off of you for no damage!")
-				} else {
-					s.msg.Actor.SendInfo(whatMob.Name, " attacks you for "+strconv.Itoa(vitDamage)+" points of vitality damage!")
-					if s.actor.CheckFlag("reflection") {
-						reflectDamage := int(float64(vitDamage) * (float64(s.actor.GetStat("int")) * config.ReflectDamagePerInt))
-						whatMob.ReceiveDamage(reflectDamage)
-						s.msg.Actor.Send(text.Cyan + "You reflect " + strconv.Itoa(reflectDamage) + " damage back to " + whatMob.Name + "!\n" + text.Reset)
-						whatMob.DeathCheck(s.actor)
-					}
-				}
-				s.actor.DeathCheck("was slain while trying to backstab a " + utils.Title(whatMob.Name))
+				whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleVital, float64(config.VitalStrikeScale), objects.StrikeOpts{
+					Metric:   "backstab_mob",
+					Mode:     0,
+					DeathMsg: "was slain while trying to backstab a " + utils.Title(whatMob.Name),
+				})
 			} else {
 				data.StoreCombatMetric("backstab-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			}
