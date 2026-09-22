@@ -95,7 +95,7 @@ func (tod) process(s *state) {
 		if todRoll <= config.VitalChance {
 			s.msg.Actor.SendInfo("Your chi flows through you and you perform a perfect touch of death on " + whatMob.Name + " and kill them.")
 			s.msg.Observers.SendInfo(s.actor.Name + " touches " + whatMob.Name + " and kills them.")
-			s.actor.AdvanceSkillExp(int((float64(whatMob.Stam.Max) * float64(whatMob.Experience)) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
+			s.actor.AdvanceSkillExp(int(float64(whatMob.Experience) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
 			whatMob.Stam.Current = 0
 			data.StoreCombatMetric("tod_whole", 0, 0, whatMob.Stam.Max, 0, whatMob.Stam.Max, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			DeathCheck(s, whatMob)
@@ -104,7 +104,7 @@ func (tod) process(s *state) {
 			s.msg.Actor.SendInfo("You focus your chi and perform a touch of death on " + whatMob.Name + "!")
 			s.msg.Observers.SendInfo(s.actor.Name + " performed a touch of death on " + whatMob.Name)
 			whatMob.AddThreatDamage(whatMob.Stam.Current/2, s.actor)
-			s.actor.AdvanceSkillExp(int((float64(whatMob.Stam.Max) / 2 * float64(whatMob.Experience)) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
+			s.actor.AdvanceSkillExp(int((float64(whatMob.Stam.Current/2) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
 			whatMob.Stam.Subtract(whatMob.Stam.Current / 2)
 			data.StoreCombatMetric("tod_half", 0, 0, whatMob.Stam.Current, 0, whatMob.Stam.Current, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 

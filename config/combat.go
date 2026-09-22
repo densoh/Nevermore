@@ -20,12 +20,41 @@ var CombatModifiers = map[string]int{
 	"snipe":    4,
 }
 
+// MultiAttackMultipliers is the damage multiplier for each landed hit of a
+// fighter or ranger multi attack, keyed by weapon skill level.  Multipliers
+// are applied to landed hits in order, so the first hit that connects always
+// takes the 1.0 slot.  Levels not present get a single swing.
+var MultiAttackMultipliers = map[int][]float64{
+	5:  {1, 0.2},
+	6:  {1, 0.4},
+	7:  {1, 0.4, 0.1},
+	8:  {1, 0.5, 0.2},
+	9:  {1, 0.5, 0.3, 0.2},
+	10: {1, 0.5, 0.3, 0.2, 0.2},
+}
+
+// MultiAttackMissPenaltyFor returns the extra miss chance, in percentage
+// points, applied to every swing after the first in a multi attack.  It starts
+// at MultiAttackMissPenalty and drops by MultiAttackMissReduction for each
+// weapon skill level above MultiAttackMissReductionLevel.
+func MultiAttackMissPenaltyFor(skillLevel int) int {
+	penalty := MultiAttackMissPenalty - MultiAttackMissReduction*(skillLevel-MultiAttackMissReductionLevel)
+	if penalty > MultiAttackMissPenalty {
+		penalty = MultiAttackMissPenalty
+	}
+	if penalty < 0 {
+		penalty = 0
+	}
+	return penalty
+}
+
 var (
-	MultiLower        = .1
-	MultiUpper        = .2
-	BaselineStatValue = 10
-	ProximityChance   = 80
-	ProximityStep     = 10
+	MultiAttackMissPenalty        = 25 // Percentage points added to follow-up swing miss chance
+	MultiAttackMissReduction      = 5  // Points removed from the penalty per skill level past the threshold
+	MultiAttackMissReductionLevel = 6  // Skill level at which the penalty starts falling off
+	BaselineStatValue             = 10
+	ProximityChance               = 80
+	ProximityStep                 = 10
 
 	BerserkCooldown = 60 * 5
 	CombatCooldown  = 8
@@ -72,6 +101,7 @@ var (
 	InertialDamageIgnore = .20 // Percentage ignored when using inertial barrier
 	ReflectDamagePerInt  = .02 // Percentage of damage reflected per int point
 	ReflectDamageFromMob = .15 // Percentage of damage reflected from mob
+	LethalSkillFloor     = .25 // Minimum fraction of a mob's exp granted as weapon skill on a lethal
 
 	DodgeDamagePerDex     = .01
 	FullDodgeChancePerDex = 1.0

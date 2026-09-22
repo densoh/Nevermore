@@ -9,12 +9,17 @@ import (
 	"math/big"
 	"math/rand"
 	"sort"
+	"sync"
 	"time"
 )
 
 var DieSeed = rand.NewSource(CryptoRandSecure(math.MaxInt64))
 var generator = rand.New(DieSeed)
 var LastUpdate = time.Now().Unix()
+
+// generatorMu guards DieSeed, generator, and LastUpdate. A *rand.Rand is not
+// goroutine-safe, and every mob goroutine rolls through this package.
+var generatorMu sync.Mutex
 
 func RollMax(dieSides int, numDice int, mod int) int {
 	return (dieSides * numDice) + mod
@@ -44,15 +49,16 @@ func DiceRoll(dieSides int, numDice int, mod int, drop int, total bool) []int {
 	}
 	rolls := make([]int, numDice)
 
+	generatorMu.Lock()
 	if time.Now().Unix()-LastUpdate >= 600 {
 		DieSeed = rand.NewSource(CryptoRandSecure(math.MaxInt64))
 		generator = rand.New(DieSeed)
 		LastUpdate = time.Now().Unix()
 	}
-
 	for i := range rolls {
 		rolls[i] = generator.Intn(dieSides) + 1
 	}
+	generatorMu.Unlock()
 
 	if drop > 0 {
 		sort.Sort(sort.Reverse(sort.IntSlice(rolls)))

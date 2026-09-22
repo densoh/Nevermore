@@ -1,7 +1,7 @@
 package config
 
 var LevelCap = 25
-var SkillCap = 45000000
+var SkillCap = 36000000
 
 // TierExpLevels Leveling Values
 var TierExpLevels = map[int]int{
