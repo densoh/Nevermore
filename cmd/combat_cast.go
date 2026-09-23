@@ -67,8 +67,13 @@ func (cast) process(s *state) {
 		return
 	}
 
-	if s.actor.GetStat("int") < config.IntMajorPenalty {
-		var fizzlePenalty = int(math.Min(float64(config.FizzleSave * (config.IntMajorPenalty - s.actor.GetStat("int"))), float64(75)))
+	// Clerics and paladins can lean on piety to steady divinity-based spells.
+	castStat := s.actor.GetStat("int")
+	if (s.actor.Class == config.CLERIC || s.actor.Class == config.PALADIN) && utils.StringIn(spellInstance.Name, objects.HealingSpells) {
+		castStat = int(math.Max(float64(castStat), float64((castStat+s.actor.GetStat("pie"))/2)))
+	}
+	if castStat < config.IntMajorPenalty {
+		var fizzlePenalty = int(math.Min(float64(config.FizzleSave*(config.IntMajorPenalty-castStat)), float64(75)))
 		var roll = utils.Roll(100, 1, 0)
 		if roll <= fizzlePenalty {
 			s.msg.Actor.SendBad("You attempt to cast the spell, but it fizzles out.")

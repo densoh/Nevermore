@@ -1195,6 +1195,16 @@ func (c *Character) RestoreMana(damage int) {
 	c.Mana.Add(damage)
 }
 
+// HealPiety is the piety value healing spells scale from. Bards may lean on
+// intelligence: max(pie, (int+pie)/2).
+func (c *Character) HealPiety() int {
+	pie := c.GetStat("pie")
+	if c.Class == config.BARD {
+		return int(math.Max(float64(pie), float64((c.GetStat("int")+pie)/2)))
+	}
+	return pie
+}
+
 func (c *Character) CalcHealPenalty(damage int) int {
 	if c.GetStat("pie") <= config.PieMajorPenalty {
 		damage -= int(float64(damage) * (.10 * float64(6-c.GetStat("pie"))))

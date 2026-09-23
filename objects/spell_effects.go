@@ -314,7 +314,7 @@ func healstam(caller interface{}, target interface{}, magnitude int) string {
 		damage := 0
 		if caller.CheckFlag("casting") {
 			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class)]
-			damage = int((float64(caller.Pie.Current) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))*(1+float64(divinityLevel)*.01))
+			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3))) * (1 + float64(divinityLevel)*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
 			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
@@ -370,7 +370,7 @@ func healvit(caller interface{}, target interface{}, magnitude int) string {
 		damage := 0
 		if caller.CheckFlag("casting") {
 			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class)]
-			damage = int((float64(caller.Pie.Current) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))*(1+float64(divinityLevel)*.01))
+			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3))) * (1 + float64(divinityLevel)*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
 			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
@@ -423,7 +423,7 @@ func heal(caller interface{}, target interface{}, magnitude int) string {
 		if caller.CheckFlag("casting") {
 
 			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class)]
-			damage = int((float64(damage) + (float64(caller.Pie.Current) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))) * (1 + float64(divinityLevel)*.01))
+			damage = int((float64(damage) + (float64(caller.HealPiety()) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))) * (1 + float64(divinityLevel)*.01))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
 			damage += int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
