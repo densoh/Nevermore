@@ -196,8 +196,10 @@ var (
 	BaseBroads             = 5
 	FizzleSave             = 25 // chance to fizzle per int below 9
 
-	PieRegenMod = .4 // Regen Mana per tick
-	PieHealMod  = .7 // Per point
+	PieRegenMod          = .4 // Regen Mana per tick
+	PieHealMod           = .7 // Per point
+	MinorPieHealMod      = .6 // Per point, vigor/mend only
+	MinorHealDivinityMod = .5 // Vigor/mend get half the divinity bonus of detraumatize/renewal
 
 	ArmorReduction         = .007
 	ArmorReductionPoints   = 10
