@@ -3,7 +3,6 @@ package cmd
 import (
 	"math"
 	"strconv"
-	"strings"
 
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
@@ -58,10 +57,8 @@ func (sing) process(s *state) {
 		return
 	}
 
-	song := strings.ToLower(s.words[0])
-
-	// Check if the song exists
-	songInstance, ok := objects.Songs[song]
+	// Check if the song exists, allowing a unique prefix like commands do
+	song, songInstance, ok := objects.ResolveSong(s.words[0])
 	if !ok {
 		s.msg.Actor.SendBad("That song doesn't exist!")
 		return

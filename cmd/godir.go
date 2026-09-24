@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ArcCS/Nevermore/config"
+	"github.com/ArcCS/Nevermore/message"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/text"
@@ -151,6 +152,7 @@ func (godir) process(s *state) {
 					// lock - a state of their own would deadlock on the rooms this
 					// one is holding. Each follower is judged on their own merits,
 					// so one who cannot come along does not strand the rest.
+					var arrived []*objects.Character
 					for _, peo := range s.actor.PartyFollowers {
 						follChar := from.Chars.SearchAll(peo)
 						if follChar == nil {
@@ -169,12 +171,6 @@ func (godir) process(s *state) {
 
 						moveChar(follChar, from, to, follEvasive)
 
-						if follChar.CheckFlag("blind") {
-							writeTo(follChar, text.Bad+"You can't see anything!")
-						} else {
-							writeTo(follChar, to.Look(follChar))
-						}
-
 						// Broadcast leaving and arrival notifications
 						if follChar.Flags["invisible"] == false {
 							s.msg.Observers[from.RoomId].SendInfo("You see ", follChar.Name, " follow "+s.actor.Name+" to the ", strings.ToLower(toE.Name), ".")
@@ -182,7 +178,7 @@ func (godir) process(s *state) {
 						}
 
 						// MOB-CHASE-SWITCH: delete this loop to stop mobs following party followers between rooms.
-						follVitalSpent := false
+						follVitalSpent, follDied := false, false
 						for _, mob := range follChasers {
 							if !mob.FollowChar(follChar, from, to) {
 								continue
@@ -193,9 +189,21 @@ func (godir) process(s *state) {
 							landed, died := followVital(followerMover(follChar), mob)
 							follVitalSpent = landed
 							if died {
+								// The death script has them; there is no one to show the room to.
+								follDied = true
 								break
 							}
 						}
+						if !follDied {
+							arrived = append(arrived, follChar)
+						}
+					}
+
+					// Show the room to everyone who made it, once the whole
+					// party is in it, so a follower sees the same thing their
+					// leader does: the room, and everyone standing in it.
+					for _, follChar := range arrived {
+						showRoom(follChar, to)
 					}
 
 					s.scriptActor("LOOK")
@@ -255,6 +263,17 @@ func followerMover(char *objects.Character) mover {
 		bad:  func(msg string) { writeTo(char, text.Bad+msg) },
 		info: func(msg string) { writeTo(char, text.Info+msg) },
 	}
+}
+
+// showRoom shows a character who is not this state's actor the room they have
+// just been led into, exactly as LOOK would. The view is built in a buffer of
+// their own and delivered in one write, as the actor's is, rather than a line
+// at a time with a prompt after each.
+func showRoom(char *objects.Character, room *objects.Room) {
+	b := message.AcquireBuffer()
+	lookRoom(char, room, b)
+	b.Deliver(char)
+	message.ReleaseBuffer(b)
 }
 
 // writeTo sends text straight to a character, for output that cannot go

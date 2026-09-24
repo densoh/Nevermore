@@ -218,22 +218,27 @@ func performAttack(s *state, whatMob *objects.Mob) {
 			missChance = followUpMiss
 		}
 		if utils.Roll(100, 1, 0) <= missChance {
-			s.msg.Actor.SendBad("You missed!!")
 			data.StoreCombatMetric("kill-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			whatMob.AddThreatDamage(1, s.actor)
 			continue
 		}
 		hits++
 	}
+	if hits == 0 {
+		s.msg.Actor.SendBad("You missed!!")
+	}
 
 	// Hand the multipliers out to the landed hits in order, so the first hit that
 	// connected always gets the full damage slot regardless of which roll it was.
+	// Damage and reflection are totalled across the hits and reported once.
 	weaponDamage := 1
 	weapMsg := ""
 	alwaysCrit := false
 	if s.actor.Class != 8 {
 		alwaysCrit = s.actor.Equipment.Main.Flags["always_crit"]
 	}
+	totalDamage := 0
+	totalReflect := 0
 	for hit := 0; hit < hits; hit++ {
 		mult := attacks[hit]
 		action := "kill"
@@ -254,14 +259,22 @@ func performAttack(s *state, whatMob *objects.Mob) {
 		data.StoreCombatMetric(action, 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage, s.actor)
 		s.actor.AdvanceSkillExp(int((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
-		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
+		totalDamage += actualDamage
 		if whatMob.CheckFlag("reflection") {
 			reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
 			stamDamage, vitDamage, resisted := s.actor.ReceiveDamage(reflectDamage)
 			data.StoreCombatMetric("kill_mob_reflect", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 1, whatMob.MobId, whatMob.Level, 0, s.actor.CharId)
-			s.msg.Actor.Send("The " + whatMob.Name + " reflects " + strconv.Itoa(reflectDamage) + " damage back at you!")
-			s.actor.DeathCheck(" was killed by reflection!")
+			totalReflect += reflectDamage
 		}
+	}
+	if hits == 1 {
+		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " for " + strconv.Itoa(totalDamage) + " damage!" + text.Reset)
+	} else if hits > 1 {
+		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " " + strconv.Itoa(hits) + " times for " + strconv.Itoa(totalDamage) + " damage!" + text.Reset)
+	}
+	if totalReflect > 0 {
+		s.msg.Actor.Send("The " + whatMob.Name + " reflects " + strconv.Itoa(totalReflect) + " damage back at you!")
+		s.actor.DeathCheck(" was killed by reflection!")
 	}
 	DeathCheck(s, whatMob)
 	if s.actor.Class != 8 {

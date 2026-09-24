@@ -49,7 +49,7 @@ func (cast) process(s *state) {
 		return
 	}
 
-	spellInstance, ok := objects.Spells[strings.ToLower(s.input[0])]
+	spellInstance, ok := objects.ResolveSpell(s.input[0])
 	if !ok {
 		s.msg.Actor.SendBad("What spell do you want to cast?")
 		return

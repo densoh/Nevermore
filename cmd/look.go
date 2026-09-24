@@ -22,60 +22,85 @@ func init() {
 
 type look cmd
 
-func (look) process(s *state) {
-	// Check to see if this person can see
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
-		return
+// roomSender is what lookRoom needs to write a room view: the state's actor
+// buffer, or a buffer of the character's own when they are not this state's
+// actor, such as a party follower being walked through an exit.
+type roomSender interface {
+	Send(s ...string)
+	SendInfo(s ...string)
+	SendBad(s ...string)
+}
+
+// cantSee reports why a character can see nothing of the room they are in, or
+// "" if they can see.
+func cantSee(char *objects.Character, room *objects.Room) string {
+	if char.CheckFlag("blind") {
+		return "You can't see anything!"
 	}
 
 	// Check if they have darkvision, a light source, or if they are a GM
-	if !s.actor.CheckFlag("darkvision") && !s.actor.CheckFlag("light") && !objects.Rooms[s.actor.ParentId].Flags["light_always"] && !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+	if !char.CheckFlag("darkvision") && !char.CheckFlag("light") && !room.Flags["light_always"] && !char.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 		// Check if they are flagged for a light source
-		if objects.Rooms[s.actor.ParentId].Flags["dark_always"] || (objects.Rooms[s.actor.ParentId].Flags["natural_light"] && !objects.DayTime) {
-			s.msg.Actor.SendBad("It's too dark to see anything!")
-			return
+		if room.Flags["dark_always"] || (room.Flags["natural_light"] && !objects.DayTime) {
+			return "It's too dark to see anything!"
 		}
 	}
+	return ""
+}
 
-	var others []string
-	var mobs string
-	var poses []string
-	var mobAttacking string
-	var charAttacking string
+// lookRoom writes everything a character sees on looking at the room they are
+// standing in: the description and exits, who and what is here, and who is
+// attacking whom - or the reason they see none of it. LOOK with no argument
+// and arriving somewhere both come here, so a party follower led into a room
+// is shown exactly what their leader is.
+func lookRoom(char *objects.Character, room *objects.Room, out roomSender) {
+	if why := cantSee(char, room); why != "" {
+		out.SendBad(why)
+		return
+	}
+
+	out.SendInfo(room.Look(char))
+	others := room.Chars.List(char)
+	poses := room.Chars.ListPoses(char)
+	mobs := room.Mobs.ReducedList(char)
+	mobAttacking := room.Mobs.ListAttackers(char)
+	charAttacking := room.Chars.ListAttackers(char)
+	if len(others) == 1 {
+		out.SendInfo(strings.Join(others, ", "), " is also here.")
+	} else if len(others) > 1 {
+		out.SendInfo(strings.Join(others, ", "), " are also here.")
+	}
+	if len(poses) > 0 {
+		out.SendInfo(strings.Join(poses, "\n"))
+	}
+	if len(mobs) > 0 {
+		out.SendInfo("You see " + mobs)
+	}
+	permItems := room.Items.PermanentReducedList()
+	if len(permItems) > 0 {
+		out.SendInfo("You see " + permItems)
+	}
+	items := room.Items.RoomReducedList()
+	if len(items) > 0 {
+		out.SendInfo("You see " + items)
+	}
+	if len(mobAttacking) > 0 {
+		out.Send(text.Red + mobAttacking + text.Reset)
+	}
+	if len(charAttacking) > 0 {
+		out.Send(text.Bold + text.Green + charAttacking + text.Reset)
+	}
+}
+
+func (look) process(s *state) {
 	if len(s.input) == 0 {
-		roomLook := objects.Rooms[s.actor.ParentId]
-		s.msg.Actor.SendInfo(roomLook.Look(s.actor))
-		others = objects.Rooms[s.actor.ParentId].Chars.List(s.actor)
-		poses = objects.Rooms[s.actor.ParentId].Chars.ListPoses(s.actor)
-		mobs = objects.Rooms[s.actor.ParentId].Mobs.ReducedList(s.actor)
-		mobAttacking = objects.Rooms[s.actor.ParentId].Mobs.ListAttackers(s.actor)
-		charAttacking = objects.Rooms[s.actor.ParentId].Chars.ListAttackers(s.actor)
-		if len(others) == 1 {
-			s.msg.Actor.SendInfo(strings.Join(others, ", "), " is also here.")
-		} else if len(others) > 1 {
-			s.msg.Actor.SendInfo(strings.Join(others, ", "), " are also here.")
-		}
-		if len(poses) > 0 {
-			s.msg.Actor.SendInfo(strings.Join(poses, "\n"))
-		}
-		if len(mobs) > 0 {
-			s.msg.Actor.SendInfo("You see " + mobs)
-		}
-		permItems := roomLook.Items.PermanentReducedList()
-		if len(permItems) > 0 {
-			s.msg.Actor.SendInfo("You see " + permItems)
-		}
-		items := roomLook.Items.RoomReducedList()
-		if len(items) > 0 {
-			s.msg.Actor.SendInfo("You see " + items)
-		}
-		if len(mobAttacking) > 0 {
-			s.msg.Actor.Send(text.Red + mobAttacking + text.Reset)
-		}
-		if len(charAttacking) > 0 {
-			s.msg.Actor.Send(text.Bold + text.Green + charAttacking + text.Reset)
-		}
+		lookRoom(s.actor, objects.Rooms[s.actor.ParentId], s.msg.Actor)
+		return
+	}
+
+	// Check to see if this person can see
+	if why := cantSee(s.actor, objects.Rooms[s.actor.ParentId]); why != "" {
+		s.msg.Actor.SendBad(why)
 		return
 	}
 
