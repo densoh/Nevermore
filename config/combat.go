@@ -199,7 +199,10 @@ var (
 	PieRegenMod          = .4 // Regen Mana per tick
 	PieHealMod           = .7 // Per point
 	MinorPieHealMod      = .6 // Per point, vigor/mend only
-	MinorHealDivinityMod = .5 // Vigor/mend get half the divinity bonus of detraumatize/renewal
+	MinorHealDivinityMod = .3 // Vigor/mend get 30% of the divinity bonus of detraumatize/renewal
+	MinorHealTierDiv     = 4  // Vigor/mend gain +1 base per this many tiers
+	MajorHealTierDiv     = 2  // Detraumatize/renewal gain +1 base per this many tiers
+	MajorHealBaseCut     = 5  // Subtracted from detraumatize/renewal base to offset the tier bonus
 
 	ArmorReduction         = .007
 	ArmorReductionPoints   = 10
