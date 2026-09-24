@@ -16,3 +16,15 @@
 .idea/
 
 log*.txt
+
+# Editor and OS files
+.DS_Store
+.vscode/
+
+# Locally built server binaries
+nexus-server
+server/server
+
+# Local Neo4j test instance (see test/README.md)
+test/data/
+test/plugins/

@@ -741,7 +741,7 @@ func (c *Character) ReturnVictim() string {
 	switch c.Victim.(type) {
 	case *Character:
 		target := c.Victim.(*Character)
-		return target.Name + target.ReturnState() + "," + utils.WhereAt(target.Placement, c.Placement)
+		return target.Name + target.ReturnStateMasked(c.CheckFlag("berserk")) + "," + utils.WhereAt(target.Placement, c.Placement)
 	case *Mob:
 		target := c.Victim.(*Mob)
 		return target.Name + target.ReturnState() + "," + utils.WhereAt(target.Placement, c.Placement)
@@ -763,9 +763,19 @@ func (c *Character) LookVictim() *Mob {
 	}
 }
 
+// ReturnState describes the character's full visible condition: stamina, vitality, and effects.
 func (c *Character) ReturnState() string {
+	return c.ReturnStateMasked(false)
+}
+
+// ReturnStateMasked describes the character's condition. When hideStamAndDrunk is true (a berserk
+// viewer), the stamina word and drunkenness are omitted; vitality and other effects still show.
+// A berserk character always reads as "appears berserk", followed by their injury level if they
+// are hurt and any other visible statuses; the rage hides their stamina.
+func (c *Character) ReturnStateMasked(hideStamAndDrunk bool) string {
 	stamStatus := text.Green + "energetic" + text.Info
 	vitStatus := text.Green + "healthy" + text.Info
+	vitHurt := c.Vit.Current < (c.Vit.Max - int(.10*float32(c.Vit.Max)))
 	effectStatus := ""
 	if c.Stam.Current < (c.Stam.Max - int(.75*float32(c.Stam.Max))) {
 		stamStatus = text.Red + "exhausted" + text.Info
@@ -776,10 +786,12 @@ func (c *Character) ReturnState() string {
 	}
 
 	if c.Vit.Current < (c.Vit.Max - int(.75*float32(c.Vit.Max))) {
-		vitStatus = text.Red + "mortally wounded" + text.Info
+		vitStatus = text.BrightRed + "mortally wounded" + text.Info
 	} else if c.Vit.Current < (c.Vit.Max - int(.5*float32(c.Vit.Max))) {
-		vitStatus = text.LightYellow + "injured" + text.Info
+		vitStatus = text.Red + "badly injured" + text.Info
 	} else if c.Vit.Current < (c.Vit.Max - int(.25*float32(c.Vit.Max))) {
+		vitStatus = text.LightYellow + "injured" + text.Info
+	} else if c.Vit.Current < (c.Vit.Max - int(.10*float32(c.Vit.Max))) {
 		vitStatus = text.LightGreen + "slightly injured" + text.Info
 	}
 
@@ -792,8 +804,25 @@ func (c *Character) ReturnState() string {
 	if c.CheckFlag("blind") {
 		effectStatus = effectStatus + " and " + text.LightRed + "blinded" + text.Info
 	}
-	if state := DrunkState(c.DrunkLevel()); state != "" {
-		effectStatus = effectStatus + " and " + text.LightYellow + state + text.Info
+	if !hideStamAndDrunk {
+		if state := DrunkState(c.DrunkLevel()); state != "" {
+			effectStatus = effectStatus + " and " + text.LightYellow + state + text.Info
+		}
+	}
+
+	if c.CheckFlag("berserk") {
+		state := " appears " + text.Red + "berserk" + text.Info
+		if vitHurt {
+			state += " and " + vitStatus
+		}
+		return state + effectStatus
+	}
+
+	if hideStamAndDrunk {
+		if c.Vit.Current == c.Vit.Max && effectStatus == "" {
+			return " appears untouched"
+		}
+		return " looks " + vitStatus + effectStatus
 	}
 
 	if c.Stam.Current == c.Stam.Max && c.Vit.Current == c.Vit.Max && effectStatus == "" {
