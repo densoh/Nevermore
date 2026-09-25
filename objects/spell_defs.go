@@ -351,7 +351,7 @@ var Spells = map[string]Spell{
 		Chant:       "Venom be purged from thy body.",
 		Magnitude:   1,
 		Effect:      "curepoison",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 1, "ranger": 1, "bard": 1, "thief": 1, "monk": 1, "fighter": 1, "barbarian": 1},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 1, "ranger": 1, "bard": 1, "thief": 1, "fighter": 1, "barbarian": 1, "monk": 1},
 	},
 	"bless": {
 		Name:        "bless",
@@ -396,7 +396,7 @@ var Spells = map[string]Spell{
 		Chant:       "Go where the winds carry thee.",
 		Magnitude:   1,
 		Effect:      "teleport",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 2, "ranger": 2, "bard": 2, "thief": 4, "monk": 3},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 2, "ranger": 2, "bard": 2, "thief": 4},
 	},
 	"stun": {
 		Name:        "stun",
@@ -405,7 +405,7 @@ var Spells = map[string]Spell{
 		Chant:       "Confusion of mind, and blast of body.",
 		Magnitude:   1,
 		Effect:      "stun",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 2, "ranger": 2, "bard": 2, "thief": 4, "monk": 3},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 2, "ranger": 2, "bard": 2, "thief": 4},
 	},
 	"word-of-recall": {
 		Description: "this spell, strictly in the realm of clerical magic, instantly transports the target to safety. to cast this spell, the cleric grips their holy symbol in one hand, while speaking the spell Chant. the cleric then need only point at the target, and they will be returned to the safest place in the nexus... the chamber of the order of the healing hand. while similar in effet to the spell, teleport, this spell functions entirely differently. when word-of-recall is cast, a manifestation of the cleric's deity (a ray of light for aalynor, an aura of black fire for tilnar, etc.) surrounds the target and safely transport the target, along with all carried equipment to the destination",
@@ -449,7 +449,7 @@ var Spells = map[string]Spell{
 		Chant:       "Flames bend and return to thy source!",
 		Magnitude:   1,
 		Effect:      "resist-fire",
-		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9, "monk": 13},
+		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9},
 	},
 	"resist-magic": {
 		Name:        "resist-magic",
@@ -468,7 +468,7 @@ var Spells = map[string]Spell{
 			Chant:       "Be freed from thy affliction...",
 			Magnitude:   1,
 			Effect:      "remove-curse",
-			Classes:     map[string]int{"cleric": 5, "mage": 6, "paladin": 7, "ranger": 9, "bard": 9, "thief": 13, "monk": 10},
+			Classes:     map[string]int{"cleric": 5, "mage": 6, "paladin": 7, "ranger": 9, "bard": 9, "thief": 13},
 		},
 
 	*/
@@ -479,7 +479,7 @@ var Spells = map[string]Spell{
 		Chant:       "Shield of warmth, I know no frost.",
 		Magnitude:   1,
 		Effect:      "resist-air",
-		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9, "monk": 13},
+		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9},
 	},
 	"resist-water": {
 		Name:        "resist-water",
@@ -488,7 +488,7 @@ var Spells = map[string]Spell{
 		Chant:       "Protect thee from liquid elements!",
 		Magnitude:   1,
 		Effect:      "resist-water",
-		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9, "monk": 13},
+		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9},
 	},
 	"resist-earth": {
 		Name:        "resist-earth",
@@ -497,7 +497,7 @@ var Spells = map[string]Spell{
 		Chant:       "Earth, protect me from thyself!",
 		Magnitude:   1,
 		Effect:      "resist-earth",
-		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9, "monk": 13},
+		Classes:     map[string]int{"cleric": 7, "mage": 7, "paladin": 11, "ranger": 11, "bard": 9},
 	},
 	"remove-disease": {
 		Name:        "remove-disease",
@@ -506,7 +506,7 @@ var Spells = map[string]Spell{
 		Chant:       "By fire and ice, thy pestilence purged.",
 		Magnitude:   1,
 		Effect:      "remove-disease",
-		Classes:     map[string]int{"cleric": 5, "mage": 6, "paladin": 6, "ranger": 7, "bard": 7, "thief": 9, "monk": 10},
+		Classes:     map[string]int{"cleric": 5, "mage": 6, "paladin": 6, "ranger": 7, "bard": 7, "thief": 9},
 	},
 	"remove-blindness": {
 		Name:        "remove-blindness",
@@ -562,7 +562,7 @@ var Spells = map[string]Spell{
 		Chant:       "Thy burning blood purge new venoms.",
 		Magnitude:   1,
 		Effect:      "resist-poison",
-		Classes:     map[string]int{"cleric": 5, "mage": 6, "paladin": 7, "ranger": 7, "bard": 7, "thief": 8, "monk": 7},
+		Classes:     map[string]int{"cleric": 5, "mage": 6, "paladin": 7, "ranger": 7, "bard": 7, "thief": 8},
 	},
 	"resilient-aura": {
 		Name:        "resilient-aura",
@@ -580,7 +580,7 @@ var Spells = map[string]Spell{
 		Chant:       "Thy blood thickens, be free from infection.",
 		Magnitude:   1,
 		Effect:      "resist-disease",
-		Classes:     map[string]int{"cleric": 6, "mage": 7, "paladin": 8, "ranger": 8, "bard": 8, "thief": 9, "monk": 8},
+		Classes:     map[string]int{"cleric": 6, "mage": 7, "paladin": 8, "ranger": 8, "bard": 8, "thief": 9},
 	},
 	"disrupt-magic": {
 		Name:        "disrupt-magic",
@@ -616,7 +616,7 @@ var Spells = map[string]Spell{
 		Chant:       "Thy flesh become basic and neutralize.",
 		Magnitude:   1,
 		Effect:      "resist-acid",
-		Classes:     map[string]int{"cleric": 9, "mage": 10, "paladin": 13, "ranger": 13, "bard": 13, "thief": 15, "monk": 11},
+		Classes:     map[string]int{"cleric": 9, "mage": 10, "paladin": 13, "ranger": 13, "bard": 13, "thief": 15},
 	}, /*
 		"embolden": {
 			Name:        "embolden",

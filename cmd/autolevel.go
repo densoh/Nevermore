@@ -29,7 +29,7 @@ func (autolevel) process(s *state) {
 	s.actor.Stam.Current = s.actor.Stam.Max
 	s.actor.Vit.Max = config.CalcHealth(s.actor.Tier, s.actor.Con.Current, s.actor.Class)
 	s.actor.Vit.Current = s.actor.Vit.Max
-	s.actor.Mana.Max = config.CalcMana(s.actor.Tier, s.actor.Int.Current, s.actor.Class)
+	s.actor.Mana.Max = config.CalcMana(s.actor.Tier, s.actor.Int.Current, s.actor.Pie.Current, s.actor.Class)
 	s.actor.Mana.Current = s.actor.Mana.Max
 	s.actor.ClassTitle = config.ClassTitle(s.actor.Class, s.actor.Gender, s.actor.Tier)
 	s.msg.Actor.SendGood("Tier changed to " + strconv.Itoa(s.actor.Tier))

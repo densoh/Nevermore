@@ -1,14 +1,17 @@
 package cmd
 
 import (
-	"github.com/ArcCS/Nevermore/config"
-	"github.com/ArcCS/Nevermore/permissions"
 	"strconv"
+	"strings"
+
+	"github.com/ArcCS/Nevermore/config"
+	"github.com/ArcCS/Nevermore/objects"
+	"github.com/ArcCS/Nevermore/permissions"
 )
 
 func init() {
 	addHandler(meditate{},
-		"Usage:  meditate \n\n Enter a meditative trance to recover your health and chi",
+		"Usage:  meditate \n\n Center yourself, restoring some of your health, stamina and chi and purging any poison, disease, blindness or drink, then enter a trance during which your chi does not fade and every gain is heightened.  A seasoned monk in a trance may shrug off afflictions that reach them.  Usable in or out of combat.",
 		permissions.Monk,
 		"meditate")
 }
@@ -16,10 +19,6 @@ func init() {
 type meditate cmd
 
 func (meditate) process(s *state) {
-	if s.actor.Tier < config.MinorAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MinorAbilityTier) + " to use this skill.")
-		return
-	}
 	ready, msg := s.actor.TimerReady("combat_meditate")
 	if !ready {
 		s.msg.Actor.SendBad(msg)
@@ -31,12 +30,22 @@ func (meditate) process(s *state) {
 		return
 	}
 
-	s.actor.Stam.Current = s.actor.Stam.Max
-	s.actor.Vit.Current = s.actor.Vit.Max
-	s.actor.Mana.Current = s.actor.Mana.Max
-	s.msg.Actor.SendGood("You slow your thoughts and enter a brief trance restoring your health and chi.")
+	pct := config.MeditateRestorePercent(s.actor.Tier, s.actor.GetStat("pie"))
+	vit := s.actor.HealVital(s.actor.Vit.Max * pct / 100)
+	stam := s.actor.HealStam(s.actor.Stam.Max * pct / 100)
+	chiBefore := s.actor.Mana.Current
+	s.actor.RestoreMana(s.actor.Mana.Max * pct / 100)
+	chi := s.actor.Mana.Current - chiBefore
+
+	if cleared := s.actor.ClearAfflictions(); len(cleared) > 0 {
+		s.msg.Actor.SendGood("Your discipline purges the " + strings.Join(cleared, ", ") + " from your body.")
+	}
+	objects.Effects["meditate"](s.actor, s.actor, 0)
+	s.msg.Actor.SendGood("You slow your breathing and center yourself, restoring " +
+		strconv.Itoa(vit) + " health, " + strconv.Itoa(stam) + " stamina and " + strconv.Itoa(chi) + " chi.")
 	s.msg.Observers.SendInfo(s.actor.Name + " meditates!")
 	s.actor.SetTimer("combat_meditate", config.MeditateTime)
+	s.actor.SetTimer("combat", config.CombatCooldown)
 
 	s.ok = true
 }

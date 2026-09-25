@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ArcCS/Nevermore/data"
 	"github.com/ArcCS/Nevermore/objects"
+	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/utils"
 	"log"
 	"regexp"
@@ -36,6 +37,21 @@ func NewCharacter(f *frontend) (a *newCharacter) {
 	a = &newCharacter{frontend: f}
 	a.explainCharName()
 	return
+}
+
+// availableClasses is the class list this account may pick from. Monk is
+// held back from general play, so only gamemaster accounts see it.
+func (a *newCharacter) availableClasses() []string {
+	if a.permissions.HasFlag(permissions.Gamemaster) {
+		return config.AvailableClasses
+	}
+	classes := make([]string, 0, len(config.AvailableClasses))
+	for _, class := range config.AvailableClasses {
+		if class != config.AvailableClasses[config.MONK] {
+			classes = append(classes, class)
+		}
+	}
+	return classes
 }
 
 // Character Name
@@ -249,7 +265,7 @@ func (a *newCharacter) selectClassProcess() {
 	case inputVal == "r":
 		a.buf.Send(text.Info, "Restart requested. \n", text.Reset)
 		a.newCharacterDisplay()
-	case utils.StringIn(inputVal, config.AvailableClasses):
+	case utils.StringIn(inputVal, a.availableClasses()):
 		a.buf.Send(text.Info, "Your character class is ", inputVal, ".", text.Reset)
 		a.class = utils.IndexOf(inputVal, config.AvailableClasses)
 		a.selectStatsDisplay()
@@ -424,7 +440,7 @@ func (a *newCharacter) fastStep1Process() {
 			a.helpDisplay("classes")
 		}
 		a.nextFunc = a.fastStep1Process
-	case validateFastStep(inputVal):
+	case a.validateFastStep(inputVal):
 		items := strings.Split(inputVal, " ")
 		a.buf.SendInfo(fmt.Sprintf("Gender: %[1]s, Race: %[2]s, Class: %[3]s", items[0], items[1], items[2]))
 		a.gender = items[0]
@@ -585,7 +601,7 @@ func (a *newCharacter) helpDisplay(subject string) {
 		a.buf.Send(strings.Join(config.AvailableRaces, ", "))
 	} else if subject == "classes" {
 		a.buf.Send("Available classes: \n")
-		a.buf.Send(strings.Join(config.AvailableClasses, ", "))
+		a.buf.Send(strings.Join(a.availableClasses(), ", "))
 	} else if utils.StringIn(subject, config.AvailableRaces) {
 		outLine := fmt.Sprintf("Race: %[1]s \n"+
 			"Desc: %[2]s \n"+
@@ -609,7 +625,7 @@ func (a *newCharacter) helpDisplay(subject string) {
 			strconv.Itoa(config.RaceDefs[subject].PieMax),
 		)
 		a.buf.Send(outLine)
-	} else if utils.StringIn(subject, config.AvailableClasses) {
+	} else if utils.StringIn(subject, a.availableClasses()) {
 		outLine := fmt.Sprintf(
 			"Class: %[1]s \n"+
 				"Desc: %[2]s \n"+
@@ -637,7 +653,7 @@ func parseStats(statInput string) []int {
 	return statOut
 }
 
-func validateFastStep(choiceInput string) bool {
+func (a *newCharacter) validateFastStep(choiceInput string) bool {
 	inputs := strings.Split(choiceInput, " ")
 	if len(inputs) < 3 {
 		return false
@@ -650,7 +666,7 @@ func validateFastStep(choiceInput string) bool {
 	if !utils.StringIn(inputs[1], config.AvailableRaces) {
 		return false
 	}
-	if !utils.StringIn(inputs[2], config.AvailableClasses) {
+	if !utils.StringIn(inputs[2], a.availableClasses()) {
 		return false
 	}
 	return true

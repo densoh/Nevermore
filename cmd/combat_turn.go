@@ -11,8 +11,8 @@ import (
 
 func init() {
 	addHandler(turn{},
-		"Usage:  turn target # \n\n Channel the power of your faith into an undead target, instilling"+
-			"fear and potentially destroying them completely.",
+		"Usage:  turn target # \n\n Channel the power of your faith into an undead target, instilling "+
+			"fear and potentially destroying them completely.  Should your faith falter, the creature will charge you and you will be open to a savage blow.",
 		permissions.Cleric|permissions.Paladin,
 		"turn")
 }
@@ -101,13 +101,20 @@ func (turn) process(s *state) {
 			whatMob.Stam.Subtract(whatMob.Stam.Current / 2)
 			data.StoreCombatMetric("turn_half", 0, 0, whatMob.Stam.Current, 0, whatMob.Stam.Current, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		} else {
-			s.msg.Actor.SendBad("You fail to turn the " + whatMob.Name + ".  They charge you!")
+			s.msg.Actor.SendBad("You fail to turn the " + whatMob.Name + ".  They charge you, and you are left open to a savage blow!")
 			whatMob.CurrentTarget = s.actor.Name
 			whatMob.Placement = s.actor.Placement
 			whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
-			stamDamage, vitDamage, resisted := s.actor.ReceiveDamage(s.actor.Stam.Max / 2)
-			data.StoreCombatMetric("turn_fail_retaliate", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 1, whatMob.MobId, whatMob.Level, 0, s.actor.CharId)
 			s.msg.Observers.SendInfo(s.actor.Name + " turn attempt fails and enrages " + whatMob.Name)
+			// The enraged mob gets a free swing at twice its damage, scaled to the
+			// mob rather than to the player. Resolved as a normal-style strike so
+			// the player sees the vulnerability text rather than a double banner.
+			whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, float64(config.CombatModifiers["double"]), objects.StrikeOpts{
+				Metric:    "turn_fail_retaliate",
+				Mode:      0,
+				HitPrefix: "Exposed!! ",
+				DeathMsg:  "was slain while trying to turn a " + utils.Title(whatMob.Name),
+			})
 		}
 		return
 	}

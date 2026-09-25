@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/text"
 	"log"
@@ -24,7 +25,7 @@ func (health) process(s *state) {
 		return
 	}
 
-	charTemplate := "You have {{.Stamina}}/{{.MaxStamina}} stamina, {{.Health}}/{{.MaxHealth}} health, and {{.Mana}}/{{.MaxMana}} mana pts.\n" +
+	charTemplate := "You have {{.Stamina}}/{{.MaxStamina}} stamina, {{.Health}}/{{.MaxHealth}} health, and {{.Mana}}/{{.MaxMana}} {{if .Monk}}chi{{else}}mana{{end}} pts.\n" +
 		"{{if .Poisoned}}" + text.Red + "You have poison coursing through your veins.\n{{end}}" + text.Good +
 		"{{if .Diseased}}" + text.Brown + "You are suffering from affliction.\n{{end}}" + text.Good
 
@@ -35,6 +36,7 @@ func (health) process(s *state) {
 		MaxHealth  int
 		Mana       int
 		MaxMana    int
+		Monk       bool
 		Poisoned   bool
 		Diseased   bool
 	}{
@@ -44,6 +46,7 @@ func (health) process(s *state) {
 		s.actor.Vit.Max,
 		s.actor.Mana.Current,
 		s.actor.Mana.Max,
+		s.actor.Class == config.MONK,
 		s.actor.CheckFlag("poisoned"),
 		s.actor.CheckFlag("disease"),
 	}

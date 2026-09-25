@@ -50,19 +50,44 @@ func (m *Mob) RollSpecial(target *Character) (AttackStyle, float64) {
 	styleRoll := utils.Roll(10, 1, 0)
 	switch {
 	case styleRoll <= config.MobVital:
-		return StyleVital, 2 - (dex / 100)
+		return StyleVital, monkIronBody(target, StyleVital, 2-(dex/100))
 	case styleRoll <= config.MobCritical:
-		return StyleCritical, 4 - (dex / 50)
+		return StyleCritical, monkIronBody(target, StyleCritical, 4-(dex/50))
 	case styleRoll <= config.MobDouble:
 		return StyleDouble, 2
 	}
 	return StyleNormal, 1
 }
 
+// monkIronBody blunts a vital or critical multiplier against a monk of
+// MonkIronBodyTier or higher. Other classes and styles pass through.
+func monkIronBody(target *Character, style AttackStyle, mult float64) float64 {
+	if target.Class != config.MONK {
+		return mult
+	}
+	reduction := 0.0
+	switch style {
+	case StyleVital:
+		reduction = config.MonkVitalReduction(target.Tier)
+	case StyleCritical:
+		reduction = config.MonkCriticalReduction(target.Tier)
+	}
+	if reduction <= 0 {
+		return mult
+	}
+	target.writeCombat(text.Cyan + "Your body hardens against the blow, blunting its force." + "\n" + text.Reset)
+	mult -= reduction
+	if mult < 1 {
+		return 1
+	}
+	return mult
+}
+
 // RollMiss rolls the mob's chance to miss the target based on level
 // difference and the target's dex. On a miss it tells the player and records
 // a metricPrefix+"-miss" metric, returning true.
 func (m *Mob) RollMiss(target *Character, metricPrefix string) bool {
+	target.MarkChiCombat()
 	missChance := 0
 	lvlDiff := target.Tier - m.Level
 	if lvlDiff >= 1 {
@@ -70,11 +95,62 @@ func (m *Mob) RollMiss(target *Character, metricPrefix string) bool {
 	}
 	missChance += target.GetStat("dex") * config.HitPerDex
 	if utils.Roll(100, 1, 0) > missChance {
-		return false
+		return m.rollMonkDodge(target, metricPrefix)
 	}
 	target.writeCombat(text.Green + m.Name + " missed you!!" + "\n" + text.Reset)
 	data.StoreCombatMetric(metricPrefix+"-miss", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
 	return true
+}
+
+// rollMonkDodge is the monk's passive evasion, rolled only after an attack has
+// beaten the normal miss chance. A feint spends one charge on every attack
+// that reaches this roll, hit or dodged. Runs on the mob goroutine, so it only
+// touches flags and plain fields on the character.
+func (m *Mob) rollMonkDodge(target *Character, metricPrefix string) bool {
+	if !monkDodgeRoll(target) {
+		return false
+	}
+	gained := target.GainChi(config.DodgeChiGain, false)
+	msg := text.Green + "You dodge " + m.Name + "'s attack!"
+	if gained > 0 {
+		msg += " (+" + strconv.Itoa(gained) + " chi)"
+	}
+	target.writeCombat(msg + "\n" + text.Reset)
+	data.StoreCombatMetric(metricPrefix+"-dodge", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
+	return true
+}
+
+// rollMonkBreathDodge is the passive dodge against a breath weapon. A breath
+// fills the whole square, so a successful dodge only softens it: the caller
+// applies the returned multiplier to the damage. It is 1 when there was no
+// dodge.
+func (m *Mob) rollMonkBreathDodge(target *Character) float64 {
+	if !monkDodgeRoll(target) {
+		return 1
+	}
+	gained := target.GainChi(config.DodgeChiGain, false)
+	msg := text.Green + "You roll with " + m.Name + "'s breath, taking only part of it!"
+	if gained > 0 {
+		msg += " (+" + strconv.Itoa(gained) + " chi)"
+	}
+	target.writeCombat(msg + "\n" + text.Reset)
+	data.StoreCombatMetric("breath-dodge", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
+	return config.BreathDodgeMultiplier
+}
+
+// monkDodgeRoll is the gate and the roll behind every passive dodge: a monk
+// of dodge tier, the feint bonus (spending a charge whether or not the roll
+// succeeds), and the chance itself.
+func monkDodgeRoll(target *Character) bool {
+	if target.Class != config.MONK || target.Tier < config.MonkDodgeTier {
+		return false
+	}
+	feinted := target.CheckFlag("feint")
+	chance := config.MonkDodgeChance(target.GetStat("dex"), config.WeaponLevel(target.Skills[5].Value, target.Class, 5), feinted)
+	if feinted {
+		target.ConsumeFeintCharge()
+	}
+	return utils.Roll(100, 1, 0) <= chance
 }
 
 // ApplyStrike resolves a hit that has already been rolled: it scales

@@ -26,10 +26,7 @@ func (information) process(s *state) {
 	if !ok {
 		berz = false
 	}
-	monk := false
-	if s.actor.Class == 8 {
-		monk = true
-	}
+	monk := s.actor.Class == config.MONK
 	singing, singOk := s.actor.Flags["singing"]
 	if !singOk {
 		singing = false
@@ -72,6 +69,9 @@ func (information) process(s *state) {
 		"{{if .Poisoned}}" + text.Red + "You have poison coursing through your veins.\n{{end}}" + text.Good +
 		"{{if .Diseased}}" + text.Brown + "You are suffering from affliction.\n{{end}}" + text.Good +
 		"{{if .Blind}}" + text.Blue + "You have been blinded!!\n{{end}}" + text.Good +
+		"{{if .Meditating}}" + text.Cyan + "You are in a meditative trance.\n{{end}}" + text.Good +
+		"{{if .Flurry}}" + text.Yellow + "You are unleashing a flurry of blows.\n{{end}}" + text.Good +
+		"{{if .Feinting}}" + text.Cyan + "You are poised to evade ({{.FeintCharges}} more attacks).\n{{end}}" + text.Good +
 		"{{if .DarkVision}}You can see in the dark naturally. \n{{end}}" +
 		"You have {{.Broadcasts}} broadcasts remaining today.\n" +
 		"You have {{.Evals}} evaluates remaining today.\n" +
@@ -131,6 +131,10 @@ func (information) process(s *state) {
 		Singing         bool
 		DispRerolls     bool
 		Rerolls         int
+		Meditating      bool
+		Flurry          bool
+		Feinting        bool
+		FeintCharges    int
 	}{
 		s.actor.Name,
 		config.TextTiers[s.actor.Tier],
@@ -179,6 +183,10 @@ func (information) process(s *state) {
 		singing,
 		disprerolls,
 		s.actor.Rerolls,
+		s.actor.CheckFlag("meditate"),
+		s.actor.CheckFlag("flurry"),
+		s.actor.CheckFlag("feint"),
+		s.actor.FeintCharges,
 	}
 
 	tmpl, _ := template.New("char_info").Parse(charTemplate)

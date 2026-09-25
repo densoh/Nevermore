@@ -98,12 +98,12 @@ func (bash) process(s *state) {
 
 		s.actor.Victim = whatMob
 		// Check the rolls in reverse order from hardest to lowest for bash rolls.
-		damageModifier, stunModifier, bashMsg := config.RollBash(config.WeaponLevel(s.actor.Skills[2].Value, s.actor.Class))
+		damageModifier, stunModifier, bashMsg := config.RollBash(config.WeaponLevel(s.actor.Skills[2].Value, s.actor.Class, 2))
 		whatMob.Stun(config.BashStuns * stunModifier)
 		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * float64(damageModifier))))
 		data.StoreCombatMetric("bash", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage, s.actor)
-		s.actor.AdvanceSkillExp(int((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
+		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
 		s.msg.Actor.SendInfo(bashMsg)
 		whatMob.CurrentTarget = s.actor.Name
 		s.msg.Actor.SendInfo("You bashed the " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
