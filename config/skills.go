@@ -181,10 +181,10 @@ var SpellDmgSkill = map[int]int{
 	10: 120,
 }
 
-func WeaponExpTitle(exp int, class int) string {
+func WeaponExpTitle(exp int, class int, slot int) string {
 	var weaponLevel = CalculateLevel(exp, WeaponExpLevels)
 	if weaponLevel == 10 {
-		if class == 0 {
+		if ReachesGrandmaster(class, slot) {
 			return WeaponTitles[10]
 		} else {
 			return WeaponTitles[9]
@@ -219,10 +219,38 @@ func StealthExpNext(exp int) int {
 	}
 }
 
-func WeaponLevel(exp int, class int) int {
+// MissileSkill is the skill slot for missile weapons (item type 4).
+const MissileSkill = 4
+
+// RangerMeleeAdvancement is the ranger's weapon exp multiplier for anything
+// but a missile weapon; their class value applies to bows alone.
+const RangerMeleeAdvancement = .7
+
+// WeaponAdvancementFor is the weapon exp multiplier a class earns in a skill
+// slot. Rangers advance at full pace only with missile weapons.
+func WeaponAdvancementFor(class int, slot int) float64 {
+	if class == RANGER && slot != MissileSkill {
+		return RangerMeleeAdvancement
+	}
+	return Classes[AvailableClasses[class]].WeaponAdvancement
+}
+
+// ReachesGrandmaster reports whether a class can reach skill level 10 in a
+// slot. Rangers get there with missile weapons only.
+func ReachesGrandmaster(class int, slot int) bool {
+	switch class {
+	case FIGHTER, MAGE, CLERIC, PALADIN, MONK:
+		return true
+	case RANGER:
+		return slot == MissileSkill
+	}
+	return false
+}
+
+func WeaponLevel(exp int, class int, slot int) int {
 	var currentLevel = CalculateLevel(exp, WeaponExpLevels)
 	if currentLevel == 10 {
-		if class == 0 || class == 4 || class == 5 || class == 6 {
+		if ReachesGrandmaster(class, slot) {
 			return 10
 		} else {
 			return 9
@@ -232,10 +260,10 @@ func WeaponLevel(exp int, class int) int {
 	}
 }
 
-func WeaponExpNext(exp int, class int) int {
+func WeaponExpNext(exp int, class int, slot int) int {
 	var currentLevel = CalculateLevel(exp, WeaponExpLevels)
 	if currentLevel >= 9 {
-		if currentLevel == 9 && (class == 0 || class == 4 || class == 5 || class == 6) {
+		if currentLevel == 9 && ReachesGrandmaster(class, slot) {
 			return WeaponExpLevels[10]
 		} else {
 			return 0

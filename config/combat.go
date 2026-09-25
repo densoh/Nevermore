@@ -135,14 +135,6 @@ var (
 	TrackChancePerLevel         = 5
 	TrackChancePerPoint         = 1
 
-	TodMax            = 5
-	TodScaleDown      = 10
-	MonkArmorPerLevel = 15
-	TodTimer          = 600
-	TodCost           = 10
-	VitalChance       = 15
-	MeditateTime      = 600
-
 	TurnMax            = 50
 	TurnScaleDown      = 10
 	DisintegrateChance = 5
@@ -175,7 +167,6 @@ var (
 	SickConBonus      = 2
 	ConBonusHealthDiv = 5
 	ConHealRegenMod   = .10
-	ConMonkArmor      = 2 // 2 Armor Extra Per Con
 	ConFallDamageMod  = 1
 	ConArmorMod       = .005
 
@@ -238,9 +229,14 @@ func CalcStamina(tier int, con int, class int) int {
 	return (tier * Classes[AvailableClasses[class]].Stamina) + int(float64(tier)*(float64(con)/float64(ConBonusHealthDiv)))
 }
 
-func CalcMana(tier int, intel int, class int) int {
+// CalcMana is the mana pool at a tier. Monks carry chi instead, which scales
+// on piety rather than intelligence.
+func CalcMana(tier int, intel int, pie int, class int) int {
 	if class >= 99 {
 		return 800
+	}
+	if class == MONK {
+		return MonkMaxChi(tier, pie)
 	}
 	return (tier * Classes[AvailableClasses[class]].Mana) + int(float64(tier)*(float64(intel)/float64(IntManaPoolDiv))*float64(IntManaPool))
 }

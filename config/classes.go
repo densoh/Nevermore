@@ -109,15 +109,15 @@ var Classes = map[string]classDef{
 		WeaponAdvancement: .4,
 	},
 	"monk": {
-		Desc:              "The monk is the master of self-discipline. By calling upon inner strength, the monk can do grave damage to foes. A monk must spend his time in self-contemplation, growing stronger all the time. He can call upon his strength to heal himself or others, or to hide from his enemies. The path of the monk is a hard one, but those few warriors who chose it will be rewarded with powers beyond most mortal men. As their Chi grows in strength they gain natural resistance to attacks.",
-		Skills:            "Meditate, Touch of Death",
+		Desc:              "The monk is the master of self-discipline. By calling upon inner strength, the monk can do grave damage to foes. A monk must spend his time in self-contemplation, growing stronger all the time. Every blow that lands builds chi, which the monk spends on flurries of strikes, leaps across the battlefield, and the fabled touch of death. The path of the monk is a hard one, but those few warriors who chose it will be rewarded with powers beyond most mortal men. As their Chi grows in strength they gain natural resistance to attacks.",
+		Skills:            "Meditate, Leap Strike, Sweep, Flurry, Touch of Death, Dodge, Feint",
 		Stats:             "Piety, Constitution, Dexterity",
 		Armor:             "Constitution Based",
 		Races:             "Human, Dwarven",
 		Health:            11,
 		Stamina:           15,
 		Mana:              2,
-		WeaponAdvancement: .5,
+		WeaponAdvancement: .7,
 	},
 	"paladin": {
 		Desc:              "The paladin is a brave warrior of faith, and must continue to be good aligned in order to inflict damage. An evil paladin suffers greatly. The paladin is a powerful warrior and healer, and like clerics, can turn the undead. A paladin suffers a small loss if he flees from a fight. The paladin is also required to spend a term serving in the militia to show their interest in benefitting society.",

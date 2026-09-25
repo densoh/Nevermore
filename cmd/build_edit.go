@@ -416,6 +416,7 @@ func (edit) process(s *state) {
 				case "tier":
 					value, _ := strconv.Atoi(s.words[3])
 					character.Tier = value
+					character.RecalcMaxes()
 					s.msg.Actor.SendGood("Changed Tier")
 				case "class":
 					value, _ := strconv.Atoi(s.words[3])

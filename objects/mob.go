@@ -79,6 +79,8 @@ type Mob struct {
 	IsStunned  bool
 	IsActive   bool
 	IsThinking bool
+	// StunnedUntil is when the current stun releases the mob's tick.
+	StunnedUntil time.Time
 }
 
 func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
@@ -146,6 +148,7 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		false,
 		false,
 		false,
+		time.Time{},
 	}
 
 	for _, spellN := range strings.Split(mobData["spells"].(string), ",") {
@@ -253,6 +256,7 @@ func (m *Mob) Tick() {
 	if m.IsStunned {
 		m.MobTicker.Reset(time.Duration(8-m.TickModifier) * time.Second)
 		m.IsStunned = false
+		m.MobStunned = 0
 	}
 	m.TicksAlive++
 	if m.TicksAlive >= m.NumWander && m.CurrentTarget == "" {
@@ -339,7 +343,8 @@ func (m *Mob) Tick() {
 				for _, t := range targets {
 					if utils.StringIn(m.BreathWeapon, []string{"fire", "air", "earth", "water"}) {
 						t.RunHook("attacked")
-						stamDam, vitDam, resisted := t.ReceiveMagicDamage(damageTotal, m.BreathWeapon)
+						breathDamage := int(math.Ceil(float64(damageTotal) * m.rollMonkBreathDodge(t)))
+						stamDam, vitDam, resisted := t.ReceiveMagicDamage(breathDamage, m.BreathWeapon)
 						if _, err := t.Write([]byte(text.Bad + m.Name + "'s breath  struck you for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality. You resisted " + strconv.Itoa(resisted) + "damage." + text.Reset + "\n")); err != nil {
 							log.Println("Error writing to player:", err)
 						}
@@ -355,6 +360,9 @@ func (m *Mob) Tick() {
 					} else if m.BreathWeapon == "paralytic" {
 						if _, err := t.Write([]byte(text.Gray + m.Name + " breathes paralytic gas on to you.\n")); err != nil {
 							log.Println("Error writing to player:", err)
+						}
+						if t.MeditativeSave("paralysis", m.Level) {
+							continue
 						}
 						target.SetTimer("global", 24)
 					} else if m.BreathWeapon == "pestilence" {
@@ -468,7 +476,7 @@ func (m *Mob) Tick() {
 		}
 
 		// Am I against a fighter, and they succeed in a parry roll?
-		if target.Class == 0 && target.Equipment.Main != nil && config.RollParry(config.WeaponLevel(target.Skills[target.Equipment.Main.ItemType].Value, target.Class)) {
+		if target.Class == 0 && target.Equipment.Main != nil && config.RollParry(config.WeaponLevel(target.Skills[target.Equipment.Main.ItemType].Value, target.Class, target.Equipment.Main.ItemType)) {
 			if ranged {
 				target.writeCombat(text.Green + "You deflect the attack from " + m.Name + "\n" + text.Reset)
 				data.StoreCombatMetric("range-parry", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
@@ -479,7 +487,7 @@ func (m *Mob) Tick() {
 				target.RunHook("attacked")
 				actualDamage, _, resisted := m.ReceiveDamage(int(math.Ceil(float64(target.InflictDamage()))))
 				data.StoreCombatMetric("melee_player_riposte", 0, 1, actualDamage+resisted, resisted, actualDamage, 0, target.CharId, target.Tier, 1, m.MobId)
-				target.AdvanceSkillExp(int((float64(actualDamage) / float64(m.Stam.Max) * float64(m.Experience)) * config.Classes[config.AvailableClasses[target.Class]].WeaponAdvancement))
+				target.AdvanceSkillExp((float64(actualDamage) / float64(m.Stam.Max) * float64(m.Experience)))
 				target.writeCombat(text.Green + "You parry and riposte the attack from " + m.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + "\n" + text.Reset)
 				if m.DeathCheck(target) {
 					return
@@ -778,11 +786,20 @@ func (m *Mob) MobScript(inputStr string) {
 
 }
 
+// Stun holds the mob's next tick off for amt seconds. A stun landing on top
+// of a longer one is ignored so a short stun can never cut a long one short.
 func (m *Mob) Stun(amt int) {
-	if !m.Flags["no_stun"] {
-		m.IsStunned = true
-		m.MobTicker.Reset(time.Duration(amt) * time.Second)
+	if m.Flags["no_stun"] || amt <= 0 {
+		return
 	}
+	until := time.Now().Add(time.Duration(amt) * time.Second)
+	if m.IsStunned && until.Before(m.StunnedUntil) {
+		return
+	}
+	m.IsStunned = true
+	m.MobStunned = amt
+	m.StunnedUntil = until
+	m.MobTicker.Reset(time.Until(until))
 }
 
 // Teleport Special handler for handling a mobs cast of a teleport spell
@@ -1205,6 +1222,7 @@ func (m *Mob) Save() {
 	mobData["flees"] = utils.Btoi(m.Flags["flees"])
 	mobData["blinds"] = utils.Btoi(m.Flags["blinds"])
 	mobData["no_specials"] = utils.Btoi(m.Flags["no_specials"])
+	mobData["no_touch"] = utils.Btoi(m.Flags["no_touch"])
 	mobData["placement"] = m.Placement
 	mobData["immobile"] = utils.Btoi(m.Flags["immobile"])
 	data.UpdateMob(mobData)
@@ -1248,6 +1266,9 @@ func (m *Mob) Eval() string {
 	}
 	if m.CheckFlag("no_stun") {
 		descriptions = append(descriptions, "It is immune to stun.")
+	}
+	if m.CheckFlag("no_touch") {
+		descriptions = append(descriptions, "Its life force cannot be touched.")
 	}
 	if m.CheckFlag("diseases") {
 		descriptions = append(descriptions, "It can spread diseases.")

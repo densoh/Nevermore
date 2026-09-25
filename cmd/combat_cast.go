@@ -55,8 +55,8 @@ func (cast) process(s *state) {
 		return
 	}
 	cost := spellInstance.Cost
-	if s.actor.Class == 8 {
-		cost = cost / 4
+	if s.actor.Class == config.MONK {
+		cost = cost / config.MonkSpellCostDivisor
 		if cost < 1 {
 			cost = 1
 		}

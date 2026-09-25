@@ -108,6 +108,14 @@ type Character struct {
 	// death is downgraded to a penalty-free lag death. It ends early the
 	// moment the player fights or moves - see SetTimer and the GO handler.
 	ResumeGraceUntil time.Time
+	// LastChiCombat is the last moment a monk landed a hit or was attacked.
+	// Chi only bleeds away once this is ChiDecayGraceSeconds in the past.
+	LastChiCombat time.Time
+	// FeintCharges counts the incoming attacks the feint dodge bonus still covers.
+	FeintCharges int
+	// TodWarnedTarget is the last mob the monk was told looked vulnerable to
+	// a touch of death, so the warning fires once per target.
+	TodWarnedTarget *Mob
 }
 
 func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Character, bool) {
@@ -220,6 +228,18 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 			"",
 			0,
 			time.Time{},
+			time.Now(),
+			0,
+			nil,
+		}
+
+		// Chi scales on piety, and the pool formula may have changed since the
+		// character was last saved, so rebuild it rather than trusting the DB.
+		if FilledCharacter.Class == config.MONK {
+			FilledCharacter.Mana.Max = config.CalcMana(FilledCharacter.Tier, FilledCharacter.Int.Current, FilledCharacter.Pie.Current, config.MONK)
+			if FilledCharacter.Mana.Current > FilledCharacter.Mana.Max {
+				FilledCharacter.Mana.Current = FilledCharacter.Mana.Max
+			}
 		}
 
 		for _, spellN := range strings.Split(charData["spells"].(string), ",") {
@@ -313,6 +333,68 @@ func (c *Character) InResumeGrace() bool {
 // since resuming is playing again and takes deaths at full price.
 func (c *Character) ClearResumeGrace() {
 	c.ResumeGraceUntil = time.Time{}
+}
+
+// MarkChiCombat notes that the monk is fighting, which holds off chi decay.
+func (c *Character) MarkChiCombat() {
+	c.LastChiCombat = time.Now()
+}
+
+// GainChi awards chi to a monk and returns how much was actually added. Chi
+// is not generated while flurrying unless force is set (leap strike), and
+// meditating boosts every gain.
+func (c *Character) GainChi(amount int, force bool) int {
+	if c.Class != config.MONK || amount <= 0 {
+		return 0
+	}
+	c.MarkChiCombat()
+	if c.CheckFlag("flurry") && !force {
+		return 0
+	}
+	if c.CheckFlag("meditate") {
+		amount = int(math.Ceil(float64(amount) * config.MeditateChiMultiplier))
+	}
+	before := c.Mana.Current
+	c.Mana.Add(amount)
+	return c.Mana.Current - before
+}
+
+// tickChi bleeds chi away once the monk has been out of combat long enough.
+func (c *Character) tickChi() {
+	if c.Mana.Current <= 0 || c.CheckFlag("meditate") {
+		return
+	}
+	if time.Since(c.LastChiCombat) < time.Duration(config.ChiDecayGraceSeconds)*time.Second {
+		return
+	}
+	c.Mana.Subtract(config.ChiDecayAmount(c.Mana.Max))
+}
+
+// ConsumeFeintCharge spends one feint charge; the flag drops with the last
+// one. Safe to call from the mob goroutine: it touches only Flags and an int.
+func (c *Character) ConsumeFeintCharge() {
+	c.FeintCharges--
+	if c.FeintCharges <= 0 {
+		c.FeintCharges = 0
+		c.FlagOff("feint", "feint")
+	}
+}
+
+// RecalcMaxes rebuilds the stamina, vitality, and mana pools from the
+// character's tier, stats, and class.
+func (c *Character) RecalcMaxes() {
+	c.Stam.Max = config.CalcStamina(c.Tier, c.Con.Current, c.Class)
+	c.Vit.Max = config.CalcHealth(c.Tier, c.Con.Current, c.Class)
+	c.Mana.Max = config.CalcMana(c.Tier, c.Int.Current, c.Pie.Current, c.Class)
+	if c.Stam.Current > c.Stam.Max {
+		c.Stam.Current = c.Stam.Max
+	}
+	if c.Vit.Current > c.Vit.Max {
+		c.Vit.Current = c.Vit.Max
+	}
+	if c.Mana.Current > c.Mana.Max {
+		c.Mana.Current = c.Mana.Max
+	}
 }
 
 func (c *Character) SetTimer(timer string, seconds int) {
@@ -605,8 +687,8 @@ func (c *Character) GetStat(stat string) int {
 	case "con":
 		return c.Con.Current + c.Modifiers["con"]
 	case "armor":
-		if c.Class == 8 {
-			return c.Modifiers["armor"] + (c.Tier * config.MonkArmorPerLevel) + (c.GetStat("con") * config.ConMonkArmor)
+		if c.Class == config.MONK {
+			return c.Modifiers["armor"] + config.MonkNaturalArmor(c.Tier, c.GetStat("con"))
 		}
 		return c.Equipment.Armor + c.Modifiers["armor"] + int(float64(c.Con.Current)*config.ConArmorMod*float64(c.Equipment.Armor))
 	default:
@@ -845,12 +927,16 @@ func (c *Character) Tick() {
 		c.LastSave = time.Now()
 		c.TickSaveWrapper()
 	}
+	regenMod := 1.0
 	if Rooms[c.ParentId].Flags["heal_fast"] {
-		c.Heal(int(math.Ceil(float64(c.GetStat("con")) * config.ConHealRegenMod * 2)))
-		c.RestoreMana(int(math.Ceil(float64(c.GetStat("pie")) * config.PieRegenMod * 2)))
+		regenMod = 2
+	}
+	c.Heal(int(math.Ceil(float64(c.GetStat("con")) * config.ConHealRegenMod * regenMod)))
+	if c.Class == config.MONK {
+		// Chi never regenerates on its own; it only comes from fighting.
+		c.tickChi()
 	} else {
-		c.Heal(int(math.Ceil(float64(c.GetStat("con")) * config.ConHealRegenMod)))
-		c.RestoreMana(int(math.Ceil(float64(c.GetStat("pie")) * config.PieRegenMod)))
+		c.RestoreMana(int(math.Ceil(float64(c.GetStat("pie")) * config.PieRegenMod * regenMod)))
 	}
 
 	// Loop the currently applied effects, drop them if needed, or execute their functions as necessary
@@ -900,7 +986,7 @@ func (c *Character) CanEquip(item *Item) (bool, string) {
 	if c.Class >= 99 {
 		return true, ""
 	}
-	if c.Class == 8 {
+	if c.Class == config.MONK {
 		//check if weapon
 		if utils.IntIn(item.ItemType, []int{0, 1, 2, 3, 4}) {
 			return false, "You cannot wield weapons effectively."
@@ -944,6 +1030,40 @@ func (c *Character) HasEffect(effectName string) bool {
 	return false
 }
 
+// Afflictions are the negative statuses meditate clears and the meditative
+// save guards against. Each is an effect name on the character.
+var Afflictions = []string{"poison", "disease", "blind", "drunk"}
+
+// ClearAfflictions removes every active affliction and reports which ones
+// were cleared. Each effect's own effectOff tells the player it lifted.
+func (c *Character) ClearAfflictions() []string {
+	var cleared []string
+	for _, name := range Afflictions {
+		if c.HasEffect(name) {
+			c.RemoveEffect(name)
+			cleared = append(cleared, name)
+		}
+	}
+	return cleared
+}
+
+// MeditativeSave reports whether a meditating monk shrugs off an incoming
+// affliction from a source of the given level. It only ever consults flags
+// and plain fields, so it is safe to call from the mob goroutine. On a save
+// the monk is told what they resisted.
+func (c *Character) MeditativeSave(affliction string, attackerLevel int) bool {
+	if c.Class != config.MONK || c.Tier < config.MonkMeditateSaveTier || !c.CheckFlag("meditate") {
+		return false
+	}
+	if utils.Roll(100, 1, 0) > config.MeditateSaveChance(c.Tier, attackerLevel, c.GetStat("con")) {
+		return false
+	}
+	if _, err := c.Write([]byte(text.Cyan + "Your trance holds; the " + affliction + " washes over you and finds no purchase.\n")); err != nil {
+		log.Println("Error writing to player:", err)
+	}
+	return true
+}
+
 func (c *Character) ApplyHook(hook string, hookName string, executions int, length string, interval int, effect func(), effectOff func()) {
 	c.Hooks[hook][hookName] = NewHook(executions, length, interval, effect, effectOff)
 }
@@ -965,6 +1085,9 @@ func (c *Character) RemoveHook(hook string, hookName string) {
 }
 
 func (c *Character) RunHook(hook string) {
+	if hook == "attacked" {
+		c.MarkChiCombat()
+	}
 	for name, hookInstance := range c.Hooks[hook] {
 		// Process Removing the hook
 		if hookInstance.TimeRemaining() == 0 {
@@ -982,15 +1105,21 @@ func (c *Character) RunHook(hook string) {
 	return
 }
 
-func (c *Character) AdvanceSkillExp(amount int) {
-	if c.Equipment.Main != nil {
-		if c.Skills[c.Equipment.Main.ItemType].Value < config.SkillCap {
-			c.Skills[c.Equipment.Main.ItemType].Add(amount)
-		}
-	} else if c.Class == 8 {
-		if c.Skills[8].Value < config.SkillCap {
-			c.Skills[5].Add(amount)
-		}
+// AdvanceSkillExp credits weapon skill from a raw exp amount: hand-to-hand
+// for monks, otherwise the slot matching the wielded weapon's type. The
+// class's advancement multiplier for that slot is applied here.
+func (c *Character) AdvanceSkillExp(rawAmount float64) {
+	slot := -1
+	if c.Class == config.MONK {
+		slot = 5
+	} else if c.Equipment.Main != nil && utils.IntIn(c.Equipment.Main.ItemType, []int{0, 1, 2, 3, 4}) {
+		slot = c.Equipment.Main.ItemType
+	}
+	if slot < 0 {
+		return
+	}
+	if c.Skills[slot].Value < config.SkillCap {
+		c.Skills[slot].Add(int(rawAmount * config.WeaponAdvancementFor(c.Class, slot)))
 	}
 }
 
@@ -1256,7 +1385,7 @@ func (c *Character) GetSpellMultiplier() int {
 }
 
 func (c *Character) InflictDamage() (damage int) {
-	if c.Class != 8 {
+	if c.Class != config.MONK {
 		damage = utils.Roll(c.Equipment.Main.SidesDice,
 			c.Equipment.Main.NumDice,
 			c.Equipment.Main.PlusDice)
@@ -1268,12 +1397,11 @@ func (c *Character) InflictDamage() (damage int) {
 		}
 		damage += c.Equipment.Main.Adjustment
 	} else {
-		// Monks do 1/3 of max damage no matter what
-		baseMonkDamage := config.MaxWeaponDamage[c.Tier] / 3
-		// Max dex is 45, divide current dex by 45 to get percentage and multiply that by the remaining 1/3rd of damage
+		// Monks always land the base for their tier, plus a strength share of
+		// it (max str is 45), plus a bell-curved roll of two dice of half the base.
+		baseMonkDamage := config.MonkUnarmedBase(c.Tier)
 		strDamage := int(math.Ceil(float64(c.GetStat("str")) / float64(45) * float64(baseMonkDamage)))
-		// rng on the remaining 1/3rd
-		rngDamage := utils.Roll(baseMonkDamage, 1, 0)
+		rngDamage := utils.Roll(baseMonkDamage/2, config.MonkDamageDice, 0)
 		damage = baseMonkDamage + strDamage + rngDamage
 	}
 

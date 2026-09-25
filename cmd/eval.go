@@ -92,10 +92,7 @@ func (evaluate) process(s *state) {
 		if !ok {
 			berz = false
 		}
-		monk := false
-		if s.actor.Class == 8 {
-			monk = true
-		}
+		monk := s.actor.Class == config.MONK
 
 		charTemplate := "{{.Charname}}, the {{.Tier}} tier {{.Race}} {{.Title}}\n" +
 			"----------------------------------------------------------------------\n" +

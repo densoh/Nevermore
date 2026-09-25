@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"github.com/ArcCS/Nevermore/config"
 	"log"
 	"text/template"
 )
@@ -24,7 +25,7 @@ func (stat) process(s *state) {
 		}
 	}
 
-	statTemplate := "You have {{.Stamina}}/{{.MaxStamina}} stamina, {{.Health}}/{{.MaxHealth}} health, and {{.Mana}}/{{.MaxMana}} mana pts.\n"
+	statTemplate := "You have {{.Stamina}}/{{.MaxStamina}} stamina, {{.Health}}/{{.MaxHealth}} health, and {{.Mana}}/{{.MaxMana}} {{if .Monk}}chi{{else}}mana{{end}} pts.\n"
 
 	data := struct {
 		Stamina    int
@@ -33,6 +34,7 @@ func (stat) process(s *state) {
 		MaxHealth  int
 		Mana       int
 		MaxMana    int
+		Monk       bool
 	}{
 		s.actor.Stam.Current,
 		s.actor.Stam.Max,
@@ -40,6 +42,7 @@ func (stat) process(s *state) {
 		s.actor.Vit.Max,
 		s.actor.Mana.Current,
 		s.actor.Mana.Max,
+		s.actor.Class == config.MONK,
 	}
 
 	tmpl, _ := template.New("stat_info").Parse(statTemplate)

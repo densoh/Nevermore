@@ -33,7 +33,8 @@ Missile Weapons      {{.Missile}} ({{.MissileTotal}}/{{.MissileNext}})
 `
 
 	monkSkills :=
-		`Hand-to-Hand combat  {{.Unarmed}}    {{.UnarmedTotal}}/{{.UnarmedNext}}`
+		`Hand-to-Hand combat  {{.Unarmed}} ({{.UnarmedTotal}}/{{.UnarmedNext}})
+`
 
 	mageSkills :=
 		`
@@ -98,12 +99,12 @@ Covert Arts              {{.Stealth}} ({{.StealthTotal}}/{{.StealthNext}})
 		StealthTotal  string
 		StealthNext   string
 	}{
-		config.WeaponExpTitle(s.actor.Skills[0].Value, s.actor.Class),
-		config.WeaponExpTitle(s.actor.Skills[1].Value, s.actor.Class),
-		config.WeaponExpTitle(s.actor.Skills[2].Value, s.actor.Class),
-		config.WeaponExpTitle(s.actor.Skills[3].Value, s.actor.Class),
-		config.WeaponExpTitle(s.actor.Skills[4].Value, s.actor.Class),
-		config.WeaponExpTitle(s.actor.Skills[5].Value, s.actor.Class),
+		config.WeaponExpTitle(s.actor.Skills[0].Value, s.actor.Class, 0),
+		config.WeaponExpTitle(s.actor.Skills[1].Value, s.actor.Class, 1),
+		config.WeaponExpTitle(s.actor.Skills[2].Value, s.actor.Class, 2),
+		config.WeaponExpTitle(s.actor.Skills[3].Value, s.actor.Class, 3),
+		config.WeaponExpTitle(s.actor.Skills[4].Value, s.actor.Class, 4),
+		config.WeaponExpTitle(s.actor.Skills[5].Value, s.actor.Class, 5),
 		config.AffinityExpTitle(s.actor.Skills[6].Value),
 		config.AffinityExpTitle(s.actor.Skills[7].Value),
 		config.AffinityExpTitle(s.actor.Skills[8].Value),
@@ -111,32 +112,32 @@ Covert Arts              {{.Stealth}} ({{.StealthTotal}}/{{.StealthNext}})
 		config.DivinityExpTitle(s.actor.Skills[10].Value),
 		config.StealthExpTitle(s.actor.Skills[11].Value),
 		strconv.Itoa(s.actor.Skills[0].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[0].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[0].Value, s.actor.Class, 0)),
 		strconv.Itoa(s.actor.Skills[1].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[1].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[1].Value, s.actor.Class, 1)),
 		strconv.Itoa(s.actor.Skills[2].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[2].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[2].Value, s.actor.Class, 2)),
 		strconv.Itoa(s.actor.Skills[3].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[3].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[3].Value, s.actor.Class, 3)),
 		strconv.Itoa(s.actor.Skills[4].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[4].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[4].Value, s.actor.Class, 4)),
 		strconv.Itoa(s.actor.Skills[5].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[5].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[5].Value, s.actor.Class, 5)),
 		strconv.Itoa(s.actor.Skills[6].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[6].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[6].Value, s.actor.Class, 6)),
 		strconv.Itoa(s.actor.Skills[7].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[7].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[7].Value, s.actor.Class, 7)),
 		strconv.Itoa(s.actor.Skills[8].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[8].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[8].Value, s.actor.Class, 8)),
 		strconv.Itoa(s.actor.Skills[9].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[9].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[9].Value, s.actor.Class, 9)),
 		strconv.Itoa(s.actor.Skills[10].Value),
-		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[10].Value, s.actor.Class)),
+		strconv.Itoa(config.WeaponExpNext(s.actor.Skills[10].Value, s.actor.Class, 10)),
 		strconv.Itoa(s.actor.Skills[11].Value),
 		strconv.Itoa(config.StealthExpNext(s.actor.Skills[11].Value)),
 	}
 
-	if s.actor.Class == 8 {
+	if s.actor.Class == config.MONK {
 		skillHeader += monkSkills
 	} else {
 		skillHeader += standardSkills

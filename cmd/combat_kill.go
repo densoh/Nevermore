@@ -84,7 +84,7 @@ func (kill) process(s *state) {
 		s.actor.RunHook("combat")
 
 		// Shortcut a missing weapon:
-		if s.actor.Equipment.Main == (*objects.Item)(nil) && s.actor.Class != 8 {
+		if s.actor.Equipment.Main == (*objects.Item)(nil) && s.actor.Class != config.MONK {
 			s.msg.Actor.SendBad("You have no weapon to attack with.")
 			return
 		}
@@ -97,7 +97,7 @@ func (kill) process(s *state) {
 
 		// Shortcut target not being in the right location, check if it's a missile weapon, or that they are placed right.
 		weapon := s.actor.Equipment.Main
-		if s.actor.Class == 8 {
+		if s.actor.Class == config.MONK {
 			weapon = (*objects.Item)(nil)
 		}
 		if inRange, rangeMsg := weaponInRange(s, weapon, whatMob); !inRange {
@@ -152,10 +152,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 		1.0,
 	}
 
-	skillLevel := config.WeaponLevel(s.actor.Skills[5].Value, s.actor.Class)
-	if s.actor.Class != 8 {
-		skillLevel = config.WeaponLevel(s.actor.Skills[s.actor.Equipment.Main.ItemType].Value, s.actor.Class)
-	}
+	skillLevel := attackSkillLevel(s)
 	// Kill is really the fighters realm for specialty.
 	if s.actor.Permission.HasAnyFlags(permissions.Fighter) && s.actor.Equipment.Main.ItemType != 4 {
 		// mob lethal?
@@ -167,7 +164,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 			data.StoreCombatMetric("lethal", 0, 0, whatMob.Stam.Current, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
 			lethalFraction := math.Max(float64(whatMob.Stam.Current)/float64(whatMob.Stam.Max), config.LethalSkillFloor)
-			s.actor.AdvanceSkillExp(int(lethalFraction * float64(whatMob.Experience) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
+			s.actor.AdvanceSkillExp(lethalFraction * float64(whatMob.Experience))
 			whatMob.Stam.Current = 0
 			DeathCheck(s, whatMob)
 			s.actor.SetTimer("combat", config.CombatCooldown)
@@ -183,7 +180,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * float64(config.CombatModifiers["snipe"]))))
 			data.StoreCombatMetric("snipe", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			s.msg.Actor.SendInfo("You sniped the " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
-			s.actor.AdvanceSkillExp(int((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
+			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
 			s.msg.Observers.SendInfo(s.actor.Name + " snipes " + whatMob.Name)
 			if whatMob.CheckFlag("reflection") {
 				reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
@@ -198,93 +195,149 @@ func performAttack(s *state, whatMob *objects.Mob) {
 		}
 	}
 
+	flurried := false
 	if s.actor.Permission.HasAnyFlags(permissions.Fighter) || (s.actor.Permission.HasAnyFlags(permissions.Ranger) && s.actor.Equipment.Main.ItemType == 4) {
 		if mults, ok := config.MultiAttackMultipliers[skillLevel]; ok {
 			attacks = mults
 		}
+	} else if s.actor.Class == config.MONK {
+		attacks, flurried = monkAttackPlan(s, skillLevel)
 	}
 
-	// Roll to hit for every swing up front.  The first swing uses the normal miss
-	// chance; every follow-up swing carries the multi attack penalty on top.
-	baseMiss := DetermineMissChance(s, whatMob.Level-s.actor.Tier)
-	followUpMiss := baseMiss + config.MultiAttackMissPenaltyFor(skillLevel)
-	if followUpMiss > 95 {
-		followUpMiss = 95
-	}
-	hits := 0
-	for swing := range attacks {
-		missChance := baseMiss
-		if swing > 0 {
-			missChance = followUpMiss
-		}
-		if utils.Roll(100, 1, 0) <= missChance {
-			data.StoreCombatMetric("kill-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
-			whatMob.AddThreatDamage(1, s.actor)
-			continue
-		}
-		hits++
-	}
-	if hits == 0 {
-		s.msg.Actor.SendBad("You missed!!")
-	}
-
-	// Hand the multipliers out to the landed hits in order, so the first hit that
-	// connected always gets the full damage slot regardless of which roll it was.
-	// Damage and reflection are totalled across the hits and reported once.
-	weaponDamage := 1
-	weapMsg := ""
-	alwaysCrit := false
-	if s.actor.Class != 8 {
-		alwaysCrit = s.actor.Equipment.Main.Flags["always_crit"]
-	}
-	totalDamage := 0
-	totalReflect := 0
-	for hit := 0; hit < hits; hit++ {
-		mult := attacks[hit]
-		action := "kill"
-		if hit == 0 {
-			if config.RollCritical(skillLevel) || alwaysCrit {
-				mult *= float64(config.CombatModifiers["critical"])
-				s.msg.Actor.SendGood("Critical Strike!")
-				weaponDamage = 10
-				action = "kill-critical"
-			} else if config.RollDouble(skillLevel) {
-				mult *= float64(config.CombatModifiers["double"])
-				s.msg.Actor.SendGood("Double Damage!")
-				action = "kill-double"
-			}
-		}
-
-		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * mult)))
-		data.StoreCombatMetric(action, 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
-		whatMob.AddThreatDamage(actualDamage, s.actor)
-		s.actor.AdvanceSkillExp(int((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)) * config.Classes[config.AvailableClasses[s.actor.Class]].WeaponAdvancement))
-		totalDamage += actualDamage
-		if whatMob.CheckFlag("reflection") {
-			reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
-			stamDamage, vitDamage, resisted := s.actor.ReceiveDamage(reflectDamage)
-			data.StoreCombatMetric("kill_mob_reflect", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 1, whatMob.MobId, whatMob.Level, 0, s.actor.CharId)
-			totalReflect += reflectDamage
-		}
-	}
-	if hits == 1 {
-		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " for " + strconv.Itoa(totalDamage) + " damage!" + text.Reset)
-	} else if hits > 1 {
-		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " " + strconv.Itoa(hits) + " times for " + strconv.Itoa(totalDamage) + " damage!" + text.Reset)
-	}
-	if totalReflect > 0 {
-		s.msg.Actor.Send("The " + whatMob.Name + " reflects " + strconv.Itoa(totalReflect) + " damage back at you!")
-		s.actor.DeathCheck(" was killed by reflection!")
+	result := resolveHits(s, whatMob, attacks, skillLevel, "kill")
+	if s.actor.Class == config.MONK && result.hits > 0 && !flurried {
+		gainChiFromHits(s, result.hits)
 	}
 	DeathCheck(s, whatMob)
-	if s.actor.Class != 8 {
-		weapMsg = s.actor.Equipment.DamageWeapon("main", weaponDamage)
+	if s.actor.Class != config.MONK {
+		weapMsg := s.actor.Equipment.DamageWeapon("main", result.weaponDamage)
 		if weapMsg != "" {
 			s.msg.Actor.SendInfo(weapMsg)
 		}
 	}
 
 	s.actor.SetTimer("combat", config.CombatCooldown)
+}
+
+// attackSkillLevel is the weapon skill level behind the actor's attacks:
+// hand-to-hand for monks, otherwise the wielded weapon's skill.
+func attackSkillLevel(s *state) int {
+	if s.actor.Class == config.MONK {
+		return config.WeaponLevel(s.actor.Skills[5].Value, s.actor.Class, 5)
+	}
+	return config.WeaponLevel(s.actor.Skills[s.actor.Equipment.Main.ItemType].Value, s.actor.Class, s.actor.Equipment.Main.ItemType)
+}
+
+// monkAttackPlan returns the swing multipliers for a monk's attack round and
+// whether the flurry stance paid for them. Flurry costs chi every round; when
+// the monk can't cover it the stance drops and the round is a single swing.
+func monkAttackPlan(s *state, skillLevel int) ([]float64, bool) {
+	single := []float64{1.0}
+	if !s.actor.CheckFlag("flurry") {
+		return single, false
+	}
+	cost := config.FlurryChiCost(skillLevel)
+	if s.actor.Mana.Current < cost {
+		s.actor.RemoveEffect("flurry")
+		s.msg.Actor.SendBad("You are too drained to keep up the flurry.")
+		return single, false
+	}
+	s.actor.Mana.Subtract(cost)
+	return config.MonkFlurryFor(skillLevel), true
+}
+
+// gainChiFromHits awards a monk chi for landed hits and tells them about it.
+func gainChiFromHits(s *state, hits int) {
+	gained := s.actor.GainChi(config.ChiPerHitFor(s.actor.GetStat("pie"))*hits, false)
+	if gained > 0 {
+		s.msg.Actor.Send(text.Cyan + "Your chi rises by " + strconv.Itoa(gained) + "." + text.Reset)
+	}
+}
+
+// hitResult is what resolveHits reports back: how many swings landed, the
+// damage dealt, and how much wear the weapon took (10 on a critical).
+type hitResult struct {
+	hits         int
+	totalDamage  int
+	weaponDamage int
+}
+
+// resolveHits runs the swings of one attack round against the mob and reports
+// the outcome. metric names the combat metric family ("kill", "leap", ...).
+//
+// It resolves in two passes. Every swing rolls to hit first, with the first
+// swing at the normal miss chance and follow-ups at a penalised one. The damage
+// multipliers are then handed out to the landed hits in order, so whichever
+// swing connects first always takes the full damage slot and any critical or
+// double roll rides on it. Damage and reflection are totalled and reported once.
+func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel int, metric string) hitResult {
+	result := hitResult{weaponDamage: 1}
+	baseMiss := DetermineMissChance(s, whatMob.Level-s.actor.Tier)
+	followUpMiss := baseMiss + config.MultiAttackMissPenaltyFor(skillLevel)
+	if followUpMiss > 95 {
+		followUpMiss = 95
+	}
+	for swing := range attacks {
+		missChance := baseMiss
+		if swing > 0 {
+			missChance = followUpMiss
+		}
+		if utils.Roll(100, 1, 0) <= missChance {
+			data.StoreCombatMetric(metric+"-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+			whatMob.AddThreatDamage(1, s.actor)
+			continue
+		}
+		result.hits++
+	}
+	if result.hits == 0 {
+		s.msg.Actor.SendBad("You missed!!")
+		return result
+	}
+
+	alwaysCrit := false
+	if s.actor.Class != config.MONK {
+		alwaysCrit = s.actor.Equipment.Main.Flags["always_crit"]
+	}
+	totalReflect := 0
+	for hit := 0; hit < result.hits; hit++ {
+		mult := attacks[hit]
+		action := metric
+		if hit == 0 {
+			if config.RollCritical(skillLevel) || alwaysCrit {
+				mult *= float64(config.CombatModifiers["critical"])
+				s.msg.Actor.SendGood("Critical Strike!")
+				result.weaponDamage = 10
+				action = metric + "-critical"
+			} else if config.RollDouble(skillLevel) {
+				mult *= float64(config.CombatModifiers["double"])
+				s.msg.Actor.SendGood("Double Damage!")
+				action = metric + "-double"
+			}
+		}
+
+		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * mult)))
+		data.StoreCombatMetric(action, 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+		whatMob.AddThreatDamage(actualDamage, s.actor)
+		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
+		result.totalDamage += actualDamage
+		if whatMob.CheckFlag("reflection") {
+			reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
+			stamDamage, vitDamage, resisted := s.actor.ReceiveDamage(reflectDamage)
+			data.StoreCombatMetric(metric+"_mob_reflect", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 1, whatMob.MobId, whatMob.Level, 0, s.actor.CharId)
+			totalReflect += reflectDamage
+		}
+	}
+	if result.hits == 1 {
+		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " for " + strconv.Itoa(result.totalDamage) + " damage!" + text.Reset)
+	} else {
+		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " " + strconv.Itoa(result.hits) + " times for " + strconv.Itoa(result.totalDamage) + " damage!" + text.Reset)
+	}
+	if totalReflect > 0 {
+		s.msg.Actor.Send("The " + whatMob.Name + " reflects " + strconv.Itoa(totalReflect) + " damage back at you!")
+		s.actor.DeathCheck(" was killed by reflection!")
+	}
+	warnTouchVulnerable(s, whatMob)
+	return result
 }
 
 // DeathCheck Universal death check for mobs on whatever the current state is
@@ -381,7 +434,7 @@ func DeathCheck(s *state, m *objects.Mob) {
 // DetermineMissChance Determine Miss Chance based on weapon Skills
 func DetermineMissChance(s *state, lvlDiff int) int {
 	missChance := 0
-	if s.actor.Class == 8 {
+	if s.actor.Class == config.MONK {
 		missChance = config.WeaponMissChance(s.actor.Skills[5].Value)
 	} else {
 		missChance = config.WeaponMissChance(s.actor.Skills[s.actor.Equipment.Main.ItemType].Value)

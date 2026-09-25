@@ -74,9 +74,24 @@ func berserk(caller interface{}, target interface{}, magnitude int) string {
 	return ""
 }
 
+// callerLevel is the level behind an effect: a mob's level, a character's
+// tier, or the fallback when the source is neither.
+func callerLevel(caller interface{}, fallback int) int {
+	switch caller := caller.(type) {
+	case *Mob:
+		return caller.Level
+	case *Character:
+		return caller.Tier
+	}
+	return fallback
+}
+
 func blind(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
+		if target.MeditativeSave("blindness", callerLevel(caller, target.Tier)) {
+			return ""
+		}
 		target.ApplyEffect("blind", "30", 0, 0,
 			func(triggers int) {
 				target.FlagOnAndMsg("blind", "blind", text.Red+"You've been blinded!!!!\n")
@@ -94,6 +109,9 @@ func blind(caller interface{}, target interface{}, magnitude int) string {
 func poison(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
+		if target.MeditativeSave("poison", callerLevel(caller, target.Tier)) {
+			return ""
+		}
 		if !target.CheckFlag("resist-poison") {
 			target.FlagOn("poisoned", "mob_poisoned")
 			target.ApplyEffect("poison", strconv.Itoa(magnitude*5), 8, magnitude, // magnitude maps to level of mob
@@ -141,6 +159,9 @@ func poison(caller interface{}, target interface{}, magnitude int) string {
 func disease(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
+		if target.MeditativeSave("disease", callerLevel(caller, target.Tier)) {
+			return ""
+		}
 		if !target.CheckFlag("resist-disease") {
 			target.ApplyEffect("disease", strconv.Itoa(magnitude*4), 8, magnitude,
 				func(triggers int) {
@@ -313,7 +334,7 @@ func healstam(caller interface{}, target interface{}, magnitude int) string {
 	case *Character:
 		damage := 0
 		if caller.CheckFlag("casting") {
-			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class)]
+			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class, 10)]
 			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + float64(divinityLevel)*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
@@ -369,7 +390,7 @@ func healvit(caller interface{}, target interface{}, magnitude int) string {
 	case *Character:
 		damage := 0
 		if caller.CheckFlag("casting") {
-			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class)]
+			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class, 10)]
 			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + float64(divinityLevel)*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
@@ -422,7 +443,7 @@ func heal(caller interface{}, target interface{}, magnitude int) string {
 	case *Character:
 		if caller.CheckFlag("casting") {
 
-			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class)]
+			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class, 10)]
 			damage = int((float64(damage-config.MajorHealBaseCut+caller.Tier/config.MajorHealTierDiv) + (float64(caller.HealPiety()) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))) * (1 + float64(divinityLevel)*.01))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
@@ -532,7 +553,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 		actualDamage = elementalDamage(magnitude, intel)
 		damage = int(float64(actualDamage) + float64(actualDamage)*float64(math.Max(float64(caller.Int.Current-config.BaselineStatValue), 0)*config.StatDamageMod))
 		if caller.Class == 4 {
-			affinityLevel := config.SpellDmgSkill[config.WeaponLevel(caller.Skills[magicSkillMap[magicType]].Value, caller.Class)]
+			affinityLevel := config.SpellDmgSkill[config.WeaponLevel(caller.Skills[magicSkillMap[magicType]].Value, caller.Class, magicSkillMap[magicType])]
 			damage = int(float64(damage) * (1 + float64(affinityLevel)*.01))
 		}
 	case *Mob:
@@ -851,6 +872,9 @@ func stun(caller interface{}, target interface{}, magnitude int) string {
 	case *Mob:
 		switch target := target.(type) {
 		case *Character:
+			if target.MeditativeSave("stun", caller.Level) {
+				return ""
+			}
 			diff := (caller.Level - target.Tier) * 5
 			chance := 10 + diff
 			if utils.Roll(100, 1, 0) > chance {
@@ -1284,6 +1308,71 @@ func reflection(caller interface{}, target interface{}, magnitude int) string {
 	return ""
 }
 
+// meditate is the monk trance: while it lasts, chi does not bleed away out of
+// combat and every chi gain is boosted. The instant restore happens in the
+// command; this is only the lingering buff.
+func meditate(caller interface{}, target interface{}, magnitude int) string {
+	switch target := target.(type) {
+	case *Character:
+		target.ApplyEffect("meditate", strconv.Itoa(config.MeditateDuration(target.Tier)), 0, 0,
+			func(triggers int) {
+				target.FlagOnAndMsg("meditate", "meditate", text.Cyan+"You settle into a meditative trance; your chi flows freely.\n")
+			},
+			func() {
+				target.FlagOffAndMsg("meditate", "meditate", text.Cyan+"Your trance fades and your thoughts return to the world.\n")
+			})
+	case *Mob:
+		return ""
+	}
+	return ""
+}
+
+// flurry is the monk's multi-swing stance. The per-round chi cost and the
+// auto-toggle when chi runs dry live in the attack code; the long duration
+// here is only a safety net so the stance never lingers forever.
+func flurry(caller interface{}, target interface{}, magnitude int) string {
+	switch target := target.(type) {
+	case *Character:
+		target.ApplyEffect("flurry", strconv.Itoa(config.FlurryMaxDuration), 0, 0,
+			func(triggers int) {
+				target.FlagOnAndMsg("flurry", "flurry", text.Yellow+"Your hands blur into a flurry of blows.\n")
+			},
+			func() {
+				target.FlagOffAndMsg("flurry", "flurry", text.Cyan+"Your flurry subsides.\n")
+			})
+	case *Mob:
+		return ""
+	}
+	return ""
+}
+
+// feint primes the monk's passive dodge for the next few incoming attacks.
+// magnitude is the charge count so it survives a save/load; the charges are
+// spent in Mob.RollMiss.
+func feint(caller interface{}, target interface{}, magnitude int) string {
+	switch target := target.(type) {
+	case *Character:
+		if magnitude <= 0 {
+			magnitude = config.FeintCharges
+		}
+		// A fresh feint always starts with a full set of charges; re-applying
+		// an existing effect would only refresh its timer.
+		target.RemoveEffect("feint")
+		target.ApplyEffect("feint", strconv.Itoa(config.FeintSafetyDuration), 0, magnitude,
+			func(triggers int) {
+				target.FeintCharges = magnitude
+				target.FlagOnAndMsg("feint", "feint", text.Cyan+"You shift your stance, ready to slip the next blows.\n")
+			},
+			func() {
+				target.FeintCharges = 0
+				target.FlagOff("feint", "feint")
+			})
+	case *Mob:
+		return ""
+	}
+	return ""
+}
+
 func dodge(caller interface{}, target interface{}, magnitude int) string {
 	duration := 300
 	switch caller := caller.(type) {
@@ -1459,6 +1548,9 @@ func init() {
 		"disrupt-magic":    disruptmagic,
 		"reflection":       reflection,
 		"dodge":            dodge,
+		"meditate":         meditate,
+		"flurry":           flurry,
+		"feint":            feint,
 		"resist-acid":      resistacid,
 		//"embolden":         embolden,
 	}
