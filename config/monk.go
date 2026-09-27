@@ -35,6 +35,7 @@ const (
 	// after the last hit is a reprieve, the bleed starts on the second.
 	ChiDecayGraceSeconds = 8
 	ChiDecayPercent      = 10 // of max chi, per tick, once out of combat
+	ChiGainCapPercent    = 10 // no single chi award exceeds this share of max chi
 
 	// Meditate: instant restore of (base + pie/div + tier*perTier)% of each pool,
 	// then a trance that halts chi decay and boosts chi generation.
@@ -127,16 +128,18 @@ const (
 	MonkVitalReductionPerTier    = 0.01
 	MonkCriticalReductionPerTier = 0.02
 
-	// Unarmed damage: base + ceil(str/45 * base) + MonkDamageDice d(base/MonkRollDivisor),
+	// Unarmed damage: base + ceil(str/45 * base) + MonkDamageDice d(base/MonkRollDivisor) - MonkDamageFlatCut,
 	// where base is the tier's max weapon damage over MonkDamageDivisor.
-	// Two dice keep the roll bell-shaped, so the spread feels tighter than
-	// its range. The roll was base/2 until 2026-09-26; base/3 takes ~8% off
-	// the average hit and leaves the floor alone, so a monk sits a rung under
-	// the fighter, ranger and barbarian, above the bard, with the finisher
-	// on top.
+	// Three dice keep the roll bell-shaped, so the spread feels tighter than
+	// its range. The flat cut is a large share of a low-tier hit and a small
+	// share of a high-tier one, so the monk lands near three quarters of a
+	// geared melee hit from tier 5 up instead of drifting down with level
+	// (2026-09-27: was 2 dice with no cut).
 	MonkDamageDivisor = 2
 	MonkRollDivisor   = 3
-	MonkDamageDice    = 2
+	MonkDamageDice    = 3
+	MonkDamageFlatCut = 8
+	MonkDamageFloor   = 1
 )
 
 // MonkVitalReduction is how much a monk of the given tier shaves off an
@@ -179,8 +182,15 @@ func MonkUnarmedRollSides(tier int) int {
 // and strength, before surge or damage modifiers.
 func MonkUnarmedRange(tier int, str int) (int, int) {
 	base := MonkUnarmedBase(tier)
-	fixed := base + int(math.Ceil(float64(str)/45*float64(base)))
-	return fixed + MonkDamageDice, fixed + MonkDamageDice*MonkUnarmedRollSides(tier)
+	fixed := base + int(math.Ceil(float64(str)/45*float64(base))) - MonkDamageFlatCut
+	lo, hi := fixed+MonkDamageDice, fixed+MonkDamageDice*MonkUnarmedRollSides(tier)
+	if lo < MonkDamageFloor {
+		lo = MonkDamageFloor
+	}
+	if hi < MonkDamageFloor {
+		hi = MonkDamageFloor
+	}
+	return lo, hi
 }
 
 // FlurryMinSkill is the unarmed skill level a flurry swings at when the monk's
@@ -231,6 +241,15 @@ func ChiPerHitFor(pie int) int {
 		bonus = ChiPerHitPieMin
 	}
 	return ChiPerHit + bonus
+}
+
+// ChiGainCap is the most chi one award can add to a pool of the given size.
+func ChiGainCap(max int) int {
+	cap := max * ChiGainCapPercent / 100
+	if cap < 1 {
+		return 1
+	}
+	return cap
 }
 
 // ChiDecayAmount is how much chi bleeds away per tick out of combat.

@@ -464,7 +464,9 @@ func missChance(s *state, baseMiss int, missPerLevel int, lvlDiff int) int {
 	if s.actor.CheckFlag("reckless") {
 		missChance -= config.RecklessMissReduction
 	}
-	if s.actor.CheckFlag("bless") {
+	// The seal of justice carries the to-hit half of bless for paladins, who
+	// cannot cast bless themselves. The two do not stack.
+	if s.actor.CheckFlag("bless") || s.actor.CheckFlag("seal-justice") {
 		missChance -= config.BlessHitBonus
 	}
 	if missChance >= 100 {
