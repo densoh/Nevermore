@@ -342,6 +342,7 @@ func healstam(caller interface{}, target interface{}, magnitude int) string {
 			divinityLevel := caller.DivinityBonus()
 			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + divinityLevel*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
+			damage = int(float64(damage) * caller.SingCastMod())
 		} else {
 			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
 		}
@@ -387,6 +388,7 @@ func healvit(caller interface{}, target interface{}, magnitude int) string {
 			divinityLevel := caller.DivinityBonus()
 			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + divinityLevel*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
+			damage = int(float64(damage) * caller.SingCastMod())
 		} else {
 			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
 		}
@@ -429,6 +431,7 @@ func heal(caller interface{}, target interface{}, magnitude int) string {
 			divinityLevel := caller.DivinityBonus()
 			damage = int((float64(damage-config.MajorHealBaseCut+caller.Tier/config.MajorHealTierDiv) + (float64(caller.HealPiety()) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))) * (1 + divinityLevel*.01))
 			damage = caller.CalcHealPenalty(damage)
+			damage = int(float64(damage) * caller.SingCastMod())
 		} else {
 			damage += int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
 		}
@@ -529,6 +532,9 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 		if caller.Class == 4 {
 			affinityLevel := config.SpellDmgSkill[config.WeaponLevel(caller.Skills[magicSkillMap[magicType]].Value, caller.Class, magicSkillMap[magicType])]
 			damage = int(float64(damage) * (1 + float64(affinityLevel)*.01))
+		}
+		if caller.CheckFlag("casting") {
+			damage = int(float64(damage) * caller.SingCastMod())
 		}
 	case *Mob:
 		name = caller.Name
@@ -1608,21 +1614,23 @@ func removecurse(caller interface{}, target interface{}, magnitude int) string {
 }
 */
 
-// HealThreat hands the healer threat for a heal: the full amount healed,
-// split evenly across every mob in the room currently attacking the
-// recipient. A heal on someone nothing is attacking draws no threat.
+// HealThreat hands the healer threat for a heal: the amount healed, split
+// evenly across every mob in the room currently attacking the recipient plus
+// the mob the healer is fighting, capped at HealThreatCapPercent of the heal
+// per mob. A heal on someone nothing is attacking, by a healer who is not
+// fighting anything, draws no threat.
 func HealThreat(caller *Character, target *Character, healed int) {
 	room, ok := Rooms[target.ParentId]
 	if !ok {
 		return
 	}
-	splitHealThreat(caller, target.Name, healed, room.Mobs.Contents)
+	splitHealThreat(caller, target.Name, healed, room.Mobs.Contents, caller.LookVictim())
 }
 
-func splitHealThreat(caller *Character, recipient string, healed int, mobs []*Mob) {
+func splitHealThreat(caller *Character, recipient string, healed int, mobs []*Mob, victim *Mob) {
 	var attackers []*Mob
 	for _, mob := range mobs {
-		if mob.CurrentTarget == recipient {
+		if mob.CurrentTarget == recipient || mob == victim {
 			attackers = append(attackers, mob)
 		}
 	}
@@ -1630,6 +1638,9 @@ func splitHealThreat(caller *Character, recipient string, healed int, mobs []*Mo
 		return
 	}
 	share := healed / len(attackers)
+	if cap := healed * config.HealThreatCapPercent / 100; share > cap {
+		share = cap
+	}
 	for _, mob := range attackers {
 		mob.AddThreatDamage(share, caller)
 	}
