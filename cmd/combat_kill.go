@@ -437,9 +437,9 @@ func DeathCheck(s *state, m *objects.Mob) {
 // DetermineMissChance is the miss chance of a weapon attack: the weapon skill
 // sets the base and the shared modifiers do the rest.
 func DetermineMissChance(s *state, lvlDiff int) int {
-	skill := s.actor.Equipment.Main.ItemType
-	if s.actor.Class == config.MONK {
-		skill = 5
+	skill := 5
+	if s.actor.Class != config.MONK {
+		skill = s.actor.Equipment.Main.ItemType
 	}
 	return missChance(s, config.WeaponMissChance(s.actor.Skills[skill].Value), config.MissPerLevel, lvlDiff)
 }
