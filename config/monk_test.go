@@ -159,6 +159,12 @@ func TestChiHelpers(t *testing.T) {
 	if ChiPerHitFor(16) != 4 || ChiPerHitFor(24) != 5 {
 		t.Errorf("chi per hit at pie 16 / 24 = %d / %d, want 4 / 5", ChiPerHitFor(16), ChiPerHitFor(24))
 	}
+	if ChiGainCap(5) != 1 {
+		t.Errorf("gain cap on a tiny pool = %d, want 1", ChiGainCap(5))
+	}
+	if ChiGainCap(100) != 100*ChiGainCapPercent/100 {
+		t.Errorf("gain cap on 100 = %d", ChiGainCap(100))
+	}
 }
 
 func TestSweepStunChanceBounds(t *testing.T) {
@@ -198,17 +204,21 @@ func TestMonkReachesGrandmaster(t *testing.T) {
 }
 
 func TestMonkUnarmedRange(t *testing.T) {
-	// Tier 10, str 20: base 30, str share 14, roll 2d10 -> 46..64.
-	if lo, hi := MonkUnarmedRange(10, 20); lo != 46 || hi != 64 {
-		t.Errorf("tier 10 str 20 range = %d..%d, want 46..64", lo, hi)
+	// Tier 10, str 20: base 30, str share 14, roll 3d10, less 8 -> 39..66.
+	if lo, hi := MonkUnarmedRange(10, 20); lo != 39 || hi != 66 {
+		t.Errorf("tier 10 str 20 range = %d..%d, want 39..66", lo, hi)
 	}
-	// Tier 21, str 20: base 57, str share 26, roll 2d19 -> 85..121.
-	if lo, hi := MonkUnarmedRange(21, 20); lo != 85 || hi != 121 {
-		t.Errorf("tier 21 str 20 range = %d..%d, want 85..121", lo, hi)
+	// Tier 21, str 20: base 57, str share 26, roll 3d19, less 8 -> 78..132.
+	if lo, hi := MonkUnarmedRange(21, 20); lo != 78 || hi != 132 {
+		t.Errorf("tier 21 str 20 range = %d..%d, want 78..132", lo, hi)
 	}
-	// Tier 20, str 30: base 55, str share 37, roll 2d18 -> 94..128.
-	if lo, hi := MonkUnarmedRange(20, 30); lo != 94 || hi != 128 {
-		t.Errorf("tier 20 str 30 range = %d..%d, want 94..128", lo, hi)
+	// Tier 20, str 30: base 55, str share 37, roll 3d18, less 8 -> 87..138.
+	if lo, hi := MonkUnarmedRange(20, 30); lo != 87 || hi != 138 {
+		t.Errorf("tier 20 str 30 range = %d..%d, want 87..138", lo, hi)
+	}
+	// The flat cut never drives a hit below the floor.
+	if lo, _ := MonkUnarmedRange(1, 0); lo < MonkDamageFloor {
+		t.Errorf("tier 1 str 0 floor = %d, want at least %d", lo, MonkDamageFloor)
 	}
 	prevHi := 0
 	for tier := 1; tier <= 25; tier++ {

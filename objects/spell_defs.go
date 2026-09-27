@@ -362,7 +362,7 @@ var Spells = map[string]Spell{
 		Chant:       "Thy gods aid thee.",
 		Magnitude:   1,
 		Effect:      "bless",
-		Classes:     map[string]int{"cleric": 5, "paladin": 8},
+		Classes:     map[string]int{"cleric": 5},
 	},
 	"protection": {
 		Name:        "protection",

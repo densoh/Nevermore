@@ -9,9 +9,10 @@ import "math"
 // int-heavy caster is not punished for skipping piety. Health regenerates
 // from ConHealRegenMod * con. Both are halved (RegenCombatMod) while the
 // character has attacked or been attacked within CombatRegenWindowSeconds.
-// Rooms flagged heal_fast double both. Bless adds a fifth to both and softens
-// the combat cut to BlessRegenCombatMod; the room and bless multipliers apply
-// before the combat cut.
+// Rooms flagged heal_fast double both. Bless (or, for paladins, the seal of
+// faith) adds a fifth to both and softens the combat cut to
+// BlessRegenCombatMod; the room and bless multipliers apply before the
+// combat cut.
 var (
 	ManaRegenMod             = .3
 	RegenCombatMod           = .5  // share of regen kept while in combat

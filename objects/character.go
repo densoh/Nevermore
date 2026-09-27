@@ -357,7 +357,8 @@ func (c *Character) InCombat() bool {
 
 // GainChi awards chi to a monk and returns how much was actually added. Chi
 // is not generated while flurrying unless force is set (leap strike), and
-// meditating boosts every gain.
+// meditating boosts every gain. No single award adds more than
+// config.ChiGainCapPercent of the pool, applied after the meditate boost.
 func (c *Character) GainChi(amount int, force bool) int {
 	if c.Class != config.MONK || amount <= 0 {
 		return 0
@@ -368,6 +369,9 @@ func (c *Character) GainChi(amount int, force bool) int {
 	}
 	if c.CheckFlag("meditate") {
 		amount = int(math.Ceil(float64(amount) * config.MeditateChiMultiplier))
+	}
+	if cap := config.ChiGainCap(c.Mana.Max); amount > cap {
+		amount = cap
 	}
 	before := c.Mana.Current
 	c.Mana.Add(amount)
@@ -982,7 +986,9 @@ func (c *Character) Tick() {
 		roomMod = config.HealFastRoomRegenMod
 	}
 	inCombat := c.InCombat()
-	blessed := c.CheckFlag("bless")
+	// The seal of faith carries the regen half of bless for paladins, who
+	// cannot cast bless themselves.
+	blessed := c.CheckFlag("bless") || c.CheckFlag("seal-faith")
 	c.Heal(config.HealthRegen(c.GetStat("con"), roomMod, inCombat, blessed))
 	if c.Class == config.MONK {
 		// Chi never regenerates on its own; it only comes from fighting.
@@ -1479,12 +1485,16 @@ func (c *Character) InflictDamage() (damage int) {
 		}
 		damage += c.Equipment.Main.Adjustment
 	} else {
-		// Monks always land the base for their tier, plus a strength share of
-		// it (max str is 45), plus a bell-curved roll of two dice of half the base.
+		// Monks land the base for their tier, plus a strength share of it
+		// (max str is 45), plus a bell-curved roll of a few dice, less a flat
+		// cut that bites hardest at low tier.
 		baseMonkDamage := config.MonkUnarmedBase(c.Tier)
 		strDamage := int(math.Ceil(float64(c.GetStat("str")) / float64(45) * float64(baseMonkDamage)))
 		rngDamage := utils.Roll(config.MonkUnarmedRollSides(c.Tier), config.MonkDamageDice, 0)
-		damage = baseMonkDamage + strDamage + rngDamage
+		damage = baseMonkDamage + strDamage + rngDamage - config.MonkDamageFlatCut
+		if damage < config.MonkDamageFloor {
+			damage = config.MonkDamageFloor
+		}
 	}
 
 	if c.CheckFlag("surge") {

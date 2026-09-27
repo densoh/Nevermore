@@ -12,8 +12,8 @@ func init() {
 	addHandler(aura{},
 		"Usage:  seal (courage|faith|justice|off) \n\n Invoke a holy seal upon yourself; only one seal can be held at a time.\n"+
 			" courage: requires a shield, hardens you against blows and lets you rescue allies.\n"+
-			" faith:   your healing draws on the full strength of your divinity.\n"+
-			" justice: your blows deal extra damage scaling with piety and weapon skill.",
+			" faith:   your healing draws on the full strength of your divinity and your health and mana recover as if blessed.\n"+
+			" justice: your blows deal extra damage scaling with piety and weapon skill, and land as if blessed.",
 		permissions.Paladin,
 		"seal")
 }
