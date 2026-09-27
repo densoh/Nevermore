@@ -1439,6 +1439,12 @@ func (c *Character) DivinityBonus() float64 {
 	return bonus
 }
 
+// SingCastMod is the damage and healing multiplier for a spell this
+// character casts; only a low-tier singing bard pays a penalty.
+func (c *Character) SingCastMod() float64 {
+	return config.BardSingCastMod(c.Class, c.Tier, c.CheckFlag("singing"))
+}
+
 func (c *Character) CalcHealPenalty(damage int) int {
 	if c.GetStat("pie") <= config.PieMajorPenalty {
 		damage -= int(float64(damage) * (.10 * float64(6-c.GetStat("pie"))))

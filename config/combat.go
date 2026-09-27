@@ -175,6 +175,10 @@ var (
 	BashThreatPercent           = 25
 	FailedBackstabThreatPercent = 25
 	FailedTurnThreatCapPercent  = 50
+	// Heal threat is the amount healed split evenly across the mobs
+	// attacking the recipient (plus the healer's own target), but no single
+	// mob takes more than HealThreatCapPercent of the heal.
+	HealThreatCapPercent = 50
 
 	// MobThreatSwitchChance is the percent chance per mob tick (about 8s)
 	// that a mob turns on whoever tops its threat table when that is not its

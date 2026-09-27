@@ -38,7 +38,8 @@ func (cast) process(s *state) {
 		return
 	}
 
-	if s.actor.CheckFlag("singing") {
+	// Only bards can sing, and they may cast through it; see noteSingingCast.
+	if s.actor.CheckFlag("singing") && s.actor.Class != config.BARD {
 		s.msg.Actor.SendBad("You can't cast a spell while singing!")
 		return
 	}
@@ -167,6 +168,7 @@ func (cast) process(s *state) {
 					s.actor.ClassProps["restore"]--
 				}
 			}
+			noteSingingCast(s)
 			s.actor.FlagOn("casting", "cast")
 			msg = objects.Cast(s.actor, whatChar, spellInstance.Effect, spellInstance.Magnitude)
 			s.actor.FlagOff("casting", "cast")
@@ -204,6 +206,7 @@ func (cast) process(s *state) {
 			s.ok = true
 			return
 		}
+		noteSingingCast(s)
 		s.actor.FlagOn("casting", "cast")
 		msg = objects.Cast(s.actor, whatChar, spellInstance.Effect, spellInstance.Magnitude)
 		s.actor.FlagOff("casting", "cast")
@@ -247,6 +250,7 @@ func (cast) process(s *state) {
 		if utils.StringIn(spellInstance.Name, objects.OffensiveSpells) {
 			s.actor.Victim = whatMob
 		}
+		noteSingingCast(s)
 		s.actor.FlagOn("casting", "cast")
 		msg = objects.Cast(s.actor, whatMob, spellInstance.Effect, spellInstance.Magnitude)
 		s.actor.FlagOff("casting", "cast")
@@ -276,6 +280,7 @@ func (cast) process(s *state) {
 
 	log.Println("Casting on self")
 	s.actor.RunHook("combat")
+	noteSingingCast(s)
 	s.actor.FlagOn("casting", "cast")
 	msg = objects.Cast(s.actor, s.actor, spellInstance.Effect, spellInstance.Magnitude)
 	s.actor.FlagOff("casting", "cast")
@@ -301,4 +306,12 @@ func (cast) process(s *state) {
 	s.ok = true
 	return
 
+}
+
+// noteSingingCast warns a low-tier bard that their song is weakening the
+// spell they are about to cast.
+func noteSingingCast(s *state) {
+	if s.actor.CheckFlag("singing") && s.actor.SingCastMod() < 1 {
+		s.msg.Actor.SendInfo("Your song strains your concentration, weakening the spell.")
+	}
 }
