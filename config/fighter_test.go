@@ -25,12 +25,12 @@ func TestCrippledChance(t *testing.T) {
 
 func TestCircleStunFor(t *testing.T) {
 	cases := []struct{ class, level, want int }{
-		{FIGHTER, 0, 1},
-		{FIGHTER, 1, 1},
-		{FIGHTER, 2, 2},
-		{FIGHTER, 5, 3},
-		{FIGHTER, 10, 6},
-		{BARBARIAN, 10, 1},
+		{FIGHTER, 0, 6},
+		{FIGHTER, 1, 6},
+		{FIGHTER, 2, 7},
+		{FIGHTER, 5, 8},
+		{FIGHTER, 10, 11},
+		{BARBARIAN, 10, 6},
 	}
 	for _, c := range cases {
 		if got := CircleStunFor(c.class, c.level); got != c.want {
