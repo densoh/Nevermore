@@ -29,7 +29,8 @@ func LoadItems() []interface{} {
 	magic:i.magic,
 	no_take: i.no_take,
 	light: i.light,
-	weightless_chest: i.weightless_chest}
+	weightless_chest: i.weightless_chest,
+	two_handed: i.two_handed}
 	}`, nil)
 	if err != nil {
 		log.Println(err)
@@ -66,7 +67,8 @@ func LoadItem(itemId int) map[string]interface{} {
 	magic:i.magic,
 	no_take: i.no_take,
 	light: i.light,
-	weightless_chest: i.weightless_chest}
+	weightless_chest: i.weightless_chest,
+	two_handed: i.two_handed}
 	}`,
 		map[string]interface{}{
 			"itemId": itemId,
@@ -104,7 +106,8 @@ func CreateItem(itemData map[string]interface{}) (int, bool) {
 		i.adjustment = 0,
 		i.no_take = 0,
 		i.light = 0,
-		i.weightless_chest = 0`,
+		i.weightless_chest = 0,
+		i.two_handed = 0`,
 		map[string]interface{}{
 			"item_id": item_id,
 			"name":    itemData["name"],
@@ -147,6 +150,7 @@ func UpdateItem(itemData map[string]interface{}) bool {
 		i.light = $light,
 		i.adjustment = $adjustment,
 		i.weightless_chest = $weightless_chest,
+		i.two_handed = $two_handed,
 		i.magic = $magic`,
 		map[string]interface{}{
 			"item_id":          itemData["item_id"],
@@ -170,6 +174,7 @@ func UpdateItem(itemData map[string]interface{}) bool {
 			"light":            itemData["light"],
 			"no_take":          itemData["no_take"],
 			"weightless_chest": itemData["weightless_chest"],
+			"two_handed":       itemData["two_handed"],
 			"commands":         itemData["commands"],
 			"adjustment":       itemData["adjustment"],
 		},

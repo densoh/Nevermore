@@ -23,12 +23,6 @@ func (drink) process(s *state) {
 		return
 	}
 
-	ready, msg := s.actor.TimerReady("use")
-	if !ready {
-		s.msg.Actor.SendBad(msg)
-		return
-	}
-
 	itemName := s.words[0]
 	itemNum := 1
 	if len(s.words) == 2 {
@@ -54,15 +48,34 @@ func (drink) process(s *state) {
 		return
 	}
 
-	castMsg := ""
-	if what.Spell != "" {
-		if objects.Rooms[s.actor.ParentId].Flags["no_magic"] {
-			s.msg.Actor.SendBad("An oppressive anti-magic aura prevents you from drinking that here.")
-			return
-		}
-		spellInstance, ok := objects.Spells[strings.ToLower(what.Spell)]
+	// Healing and status-removal potions only wait on the use timer; everything
+	// else also respects the global timer.
+	var spellInstance objects.Spell
+	hasSpell := what.Spell != ""
+	if hasSpell {
+		var ok bool
+		spellInstance, ok = objects.Spells[strings.ToLower(what.Spell)]
 		if !ok {
 			s.msg.Actor.SendBad("Spell doesn't exist in this world. ")
+			return
+		}
+	}
+	var ready bool
+	var msg string
+	if hasSpell && objects.IsRestorativeSpell(spellInstance.Name) {
+		ready, msg = s.actor.TimerReadyIgnoreGlobal("use")
+	} else {
+		ready, msg = s.actor.TimerReady("use")
+	}
+	if !ready {
+		s.msg.Actor.SendBad(msg)
+		return
+	}
+
+	castMsg := ""
+	if hasSpell {
+		if objects.Rooms[s.actor.ParentId].Flags["no_magic"] {
+			s.msg.Actor.SendBad("An oppressive anti-magic aura prevents you from drinking that here.")
 			return
 		}
 		castMsg = objects.Cast(s.actor, s.actor, spellInstance.Effect, spellInstance.Magnitude)

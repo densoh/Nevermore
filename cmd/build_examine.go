@@ -191,6 +191,7 @@ func (examine) process(s *state) {
 				{"T", "no_take", strconv.FormatBool(objRef.Flags["no_take"]), "Cannot be picked up."},
 				{"T", "light", strconv.FormatBool(objRef.Flags["light"]), "Provides user illumination."},
 				{"T", "weightless_chest", strconv.FormatBool(objRef.Flags["weightless_chest"]), "Holds items weightlessly"},
+				{"T", "two_handed", strconv.FormatBool(objRef.Flags["two_handed"]), "Weapon needs both hands; no off hand item, higher damage cap"},
 			})
 			t.SetCaption("X = Cannot Modify,  T=Toggle to Edit, V=Edit by value name\nSee 'help edit' for more.")
 			s.msg.Actor.SendGood(t.Render())

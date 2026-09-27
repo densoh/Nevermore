@@ -57,6 +57,12 @@ func (equip) process(s *state) {
 			return
 		}
 
+		if ok, msg := s.actor.Equipment.HandsFree(what); !ok {
+			s.msg.Actor.SendBad(msg)
+			s.ok = true
+			return
+		}
+
 		if s.actor.Equipment.Equip(what, s.actor.Class) {
 			s.msg.Actor.SendGood("You equip " + what.DisplayName())
 			s.msg.Observers.SendInfo(s.actor.Name + " equips " + what.DisplayName())

@@ -101,7 +101,7 @@ func (feint) process(s *state) {
 		gainChiFromHits(s, result.hits)
 	}
 
-	whatMob.AddThreatDamage(int(float64(whatMob.Stam.Max)*config.FeintThreatFraction), s.actor)
+	whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
 	whatMob.CurrentTarget = s.actor.Name
 	s.msg.Actor.SendInfo(whatMob.Name + " turns its attention to you.")
 	s.msg.Observers.SendInfo(s.actor.Name + " feints at " + whatMob.Name + ", drawing its attention.")

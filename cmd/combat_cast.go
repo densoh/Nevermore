@@ -38,12 +38,6 @@ func (cast) process(s *state) {
 		return
 	}
 
-	ready, msg := s.actor.TimerReady("cast")
-	if !ready {
-		s.msg.Actor.SendBad(msg)
-		return
-	}
-
 	if s.actor.CheckFlag("singing") {
 		s.msg.Actor.SendBad("You can't cast a spell while singing!")
 		return
@@ -52,6 +46,20 @@ func (cast) process(s *state) {
 	spellInstance, ok := objects.ResolveSpell(s.input[0])
 	if !ok {
 		s.msg.Actor.SendBad("What spell do you want to cast?")
+		return
+	}
+
+	// Healing and status-removal spells only wait on the cast timer; everything
+	// else also respects the global timer (e.g. blocked movement). Stun and paralysis block all casting.
+	var ready bool
+	var msg string
+	if objects.IsRestorativeSpell(spellInstance.Name) {
+		ready, msg = s.actor.TimerReadyIgnoreGlobal("cast")
+	} else {
+		ready, msg = s.actor.TimerReady("cast")
+	}
+	if !ready {
+		s.msg.Actor.SendBad(msg)
 		return
 	}
 	cost := spellInstance.Cost

@@ -10,7 +10,7 @@ import (
 
 func init() {
 	addHandler(circle{},
-		"Usage:  circle target # \n\n Try to circle a mob to apply a short duration stun and generate threat",
+		"Usage:  circle target # \n\n Try to circle a mob to apply a short duration stun and generate threat.  Fighters stun for longer as their weapon skill rises.",
 		permissions.Fighter|permissions.Barbarian,
 		"circle", "cir")
 }
@@ -90,8 +90,8 @@ func (circle) process(s *state) {
 			return
 		}
 
-		whatMob.Stun(config.CircleStuns)
-		whatMob.AddThreatDamage(whatMob.Stam.Max/2, s.actor)
+		whatMob.Stun(config.CircleStunFor(s.actor.Class, attackSkillLevel(s)))
+		whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
 		whatMob.CurrentTarget = s.actor.Name
 		s.actor.SetTimer("combat_circle", config.CircleTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)

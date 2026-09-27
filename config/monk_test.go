@@ -95,18 +95,32 @@ func TestMonkFlurryFollowsFighterTable(t *testing.T) {
 	}
 	for skill := FlurryMinSkill; skill <= 10; skill++ {
 		want := MultiAttackMultipliers[skill]
+		if len(want) > FlurryMaxSwings {
+			want = want[:FlurryMaxSwings]
+		}
 		got := MonkFlurryFor(skill)
 		if len(got) != len(want) {
-			t.Errorf("skill %d flurry = %v, want fighter row %v", skill, got, want)
+			t.Errorf("skill %d flurry = %v, want %v", skill, got, want)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("skill %d flurry = %v, want %v", skill, got, want)
+				break
+			}
 		}
 	}
-	if len(MonkFlurryFor(10)) <= len(MonkFlurryFor(5)) {
-		t.Error("Grandmaster flurry should out-swing Ace")
+	// Master and Grandmaster keep their row's multipliers but never a fourth swing.
+	if got := MonkFlurryFor(10); len(got) != 3 || got[2] != MultiAttackMultipliers[10][2] {
+		t.Errorf("Grandmaster flurry = %v, want the first three of %v", got, MultiAttackMultipliers[10])
+	}
+	if len(MonkFlurryFor(8)) <= len(MonkFlurryFor(5)) {
+		t.Error("Specialist flurry should out-swing Ace")
 	}
 }
 
 func TestFlurryChiCostScalesWithSkill(t *testing.T) {
-	cases := map[int]int{0: 5, 6: 5, 7: 7, 8: 7, 9: 7, 10: 7}
+	cases := map[int]int{0: 8, 6: 8, 7: 10, 8: 10, 9: 10, 10: 10}
 	for skill, want := range cases {
 		if got := FlurryChiCost(skill); got != want {
 			t.Errorf("FlurryChiCost(%d) = %d, want %d", skill, got, want)
@@ -169,13 +183,13 @@ func TestMeditateHelpers(t *testing.T) {
 }
 
 func TestMonkReachesGrandmaster(t *testing.T) {
-	if WeaponLevel(WeaponExpLevels[10], MONK, 5) != 10 {
+	if WeaponLevel(WeaponExpLevels[10], MONK, HandSkill) != 10 {
 		t.Error("monk capped below weapon level 10")
 	}
-	if WeaponExpTitle(WeaponExpLevels[10], MONK, 5) != WeaponTitles[10] {
+	if WeaponExpTitle(WeaponExpLevels[10], MONK, HandSkill) != WeaponTitles[10] {
 		t.Error("monk denied the grandmaster title")
 	}
-	if WeaponExpNext(WeaponExpLevels[9], MONK, 5) != WeaponExpLevels[10] {
+	if WeaponExpNext(WeaponExpLevels[9], MONK, HandSkill) != WeaponExpLevels[10] {
 		t.Error("monk next-level lookup stops at 9")
 	}
 	if WeaponLevel(WeaponExpLevels[10], THIEF, 0) != 9 {
@@ -184,13 +198,17 @@ func TestMonkReachesGrandmaster(t *testing.T) {
 }
 
 func TestMonkUnarmedRange(t *testing.T) {
-	// Tier 10, str 20: base 30, str share 14, roll 2d15 -> 46..74.
-	if lo, hi := MonkUnarmedRange(10, 20); lo != 46 || hi != 74 {
-		t.Errorf("tier 10 str 20 range = %d..%d, want 46..74", lo, hi)
+	// Tier 10, str 20: base 30, str share 14, roll 2d10 -> 46..64.
+	if lo, hi := MonkUnarmedRange(10, 20); lo != 46 || hi != 64 {
+		t.Errorf("tier 10 str 20 range = %d..%d, want 46..64", lo, hi)
 	}
-	// Tier 21, str 20: base 57, str share 26, roll 2d28 -> 85..139.
-	if lo, hi := MonkUnarmedRange(21, 20); lo != 85 || hi != 139 {
-		t.Errorf("tier 21 str 20 range = %d..%d, want 85..139", lo, hi)
+	// Tier 21, str 20: base 57, str share 26, roll 2d19 -> 85..121.
+	if lo, hi := MonkUnarmedRange(21, 20); lo != 85 || hi != 121 {
+		t.Errorf("tier 21 str 20 range = %d..%d, want 85..121", lo, hi)
+	}
+	// Tier 20, str 30: base 55, str share 37, roll 2d18 -> 94..128.
+	if lo, hi := MonkUnarmedRange(20, 30); lo != 94 || hi != 128 {
+		t.Errorf("tier 20 str 30 range = %d..%d, want 94..128", lo, hi)
 	}
 	prevHi := 0
 	for tier := 1; tier <= 25; tier++ {

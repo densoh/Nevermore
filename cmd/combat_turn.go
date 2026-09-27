@@ -104,7 +104,7 @@ func (turn) process(s *state) {
 			s.msg.Actor.SendBad("You fail to turn the " + whatMob.Name + ".  They charge you, and you are left open to a savage blow!")
 			whatMob.CurrentTarget = s.actor.Name
 			whatMob.Placement = s.actor.Placement
-			whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
+			whatMob.AddThreatDamage(config.FailedTurnThreat(whatMob.Stam.Current, whatMob.Stam.Max), s.actor)
 			s.msg.Observers.SendInfo(s.actor.Name + " turn attempt fails and enrages " + whatMob.Name)
 			// The enraged mob gets a free swing at twice its damage, scaled to the
 			// mob rather than to the player. Resolved as a normal-style strike so

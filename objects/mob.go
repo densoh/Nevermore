@@ -292,11 +292,12 @@ func (m *Mob) Tick() {
 
 		m.PickTarget()
 
-		// Do I want to change targets? 33% chance if the current target isn't the highest on the threat table
+		// Do I want to change targets? MobThreatSwitchChance percent per tick
+		// if the current target isn't the highest on the threat table.
 		if len(m.ThreatTable) > 1 {
 			rankedThreats := utils.RankMapStringInt(m.ThreatTable)
 			if m.CurrentTarget != rankedThreats[0] {
-				if utils.Roll(100, 1, 0) <= 5 {
+				if utils.Roll(100, 1, 0) <= config.MobThreatSwitchChance {
 					if utils.StringIn(rankedThreats[0], Rooms[m.ParentId].Chars.MobList(m)) {
 						m.CurrentTarget = rankedThreats[0]
 						Rooms[m.ParentId].MessageAll(m.Name + " turns to " + m.CurrentTarget + "\n" + text.Reset)
@@ -364,7 +365,9 @@ func (m *Mob) Tick() {
 						if t.MeditativeSave("paralysis", m.Level) {
 							continue
 						}
-						target.SetTimer("global", 24)
+						// Paralysis is a stun: it blocks healing and support casts too.
+						target.SetTimer("global", 16)
+						target.SetTimer("stun", 16)
 					} else if m.BreathWeapon == "pestilence" {
 						if _, err := t.Write([]byte(text.Gray + m.Name + " breathes infectious gas on to you.\n")); err != nil {
 							log.Println("Error writing to player:", err)
@@ -454,6 +457,17 @@ func (m *Mob) Tick() {
 		distance := math.Abs(float64(m.Placement - target.Placement))
 		ranged := m.Flags["ranged_attack"] && distance >= 1
 
+		// A paladin rescuing the target intercepts this attack: a melee mob is
+		// pulled onto the paladin and charges them, a ranged mob keeps its
+		// target but this shot lands on the paladin instead.
+		if rescuer := target.Rescuer(); rescuer != nil {
+			if !ranged {
+				m.Charge(rescuer, target)
+				return
+			}
+			target = rescuer
+		}
+
 		if !ranged {
 			if (!m.CheckFlag("immobile") && m.Placement != target.Placement) || distance > 1 {
 				// Close the gap; attack next tick.
@@ -475,14 +489,28 @@ func (m *Mob) Tick() {
 			}
 		}
 
-		// Am I against a fighter, and they succeed in a parry roll?
-		if target.Class == 0 && target.Equipment.Main != nil && config.RollParry(config.WeaponLevel(target.Skills[target.Equipment.Main.ItemType].Value, target.Class, target.Equipment.Main.ItemType)) {
+		// Am I against a fighter, and they succeed in a parry roll? A shield
+		// widens the parry window, but a parry that only the shield caught is
+		// a block and never ripostes.
+		parried, shieldBlock := false, false
+		if target.Class == config.FIGHTER && target.Equipment.Main != nil {
+			parried, shieldBlock = config.RollFighterParry(config.WeaponLevel(target.Skills[target.Equipment.Main.ItemType].Value, target.Class, target.Equipment.Main.ItemType), target.Tier, target.HasShield())
+		}
+		if parried {
 			if ranged {
-				target.writeCombat(text.Green + "You deflect the attack from " + m.Name + "\n" + text.Reset)
+				if shieldBlock {
+					target.writeCombat(text.Green + "You catch the attack from " + m.Name + " on your shield\n" + text.Reset)
+				} else {
+					target.writeCombat(text.Green + "You deflect the attack from " + m.Name + "\n" + text.Reset)
+				}
 				data.StoreCombatMetric("range-parry", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
 				return
-			}
-			if target.Tier >= config.SpecialAbilityTier {
+			} else if shieldBlock {
+				target.writeCombat(text.Green + "You block the attack from " + m.Name + " with your shield\n" + text.Reset)
+				data.StoreCombatMetric("melee_player_shield_block", 0, 1, 0, 0, 0, 1, m.MobId, m.Level, 0, target.CharId)
+				// A block only stops the hit; unlike a parry it does not stun.
+				return
+			} else if target.Tier >= config.SpecialAbilityTier {
 				// It's a riposte
 				target.RunHook("attacked")
 				actualDamage, _, resisted := m.ReceiveDamage(int(math.Ceil(float64(target.InflictDamage()))))
@@ -492,11 +520,13 @@ func (m *Mob) Tick() {
 				if m.DeathCheck(target) {
 					return
 				}
+				m.Stun(config.ParryStuns * 8)
+				return
 			} else {
 				target.writeCombat(text.Green + "You parry the attack from " + m.Name + "\n" + text.Reset)
+				m.Stun(config.ParryStuns * 8)
+				return
 			}
-			m.Stun(config.ParryStuns * 8)
-			return
 		}
 
 		metric, hitPrefix := "melee", ""
@@ -519,6 +549,42 @@ func (m *Mob) Tick() {
 			DeathMsg:  "was slain by a " + m.Name + ".",
 		})
 	}
+}
+
+// Charge is the melee half of a rescue: the mob abandons rescued for the
+// rescuer, becomes fixed on them as its top threat, closes to their placement
+// and lands a hit that ignores armor. An immobile mob that cannot reach the
+// rescuer is retargeted but gets no hit.
+func (m *Mob) Charge(rescuer *Character, rescued *Character) {
+	m.CurrentTarget = rescuer.Name
+	top := 0
+	for _, threat := range m.ThreatTable {
+		if threat > top {
+			top = threat
+		}
+	}
+	if m.ThreatTable[rescuer.Name] <= top {
+		m.AddThreatDamage(top-m.ThreatTable[rescuer.Name]+1, rescuer)
+	}
+	if m.Placement != rescuer.Placement {
+		if m.CheckFlag("immobile") {
+			Rooms[m.ParentId].MessageAll(m.Name + " turns to " + rescuer.Name + "\n" + text.Reset)
+			return
+		}
+		oldPlacement := m.Placement
+		m.Placement = rescuer.Placement
+		if !m.Flags["hidden"] {
+			whichNumber := Rooms[m.ParentId].Mobs.GetNumber(m)
+			Rooms[m.ParentId].MessageMovement(oldPlacement, m.Placement, m.Name+" #"+strconv.Itoa(whichNumber))
+		}
+	}
+	Rooms[m.ParentId].MessageAll(text.Red + m.Name + " charges at " + rescuer.Name + "!\n" + text.Reset)
+	rescuer.RunHook("attacked")
+	damage := m.InflictDamage()
+	stamDamage, vitDamage := rescuer.ReceiveDamageNoArmor(damage)
+	data.StoreCombatMetric("melee_rescue", 0, 1, damage, 0, stamDamage+vitDamage, 1, m.MobId, m.Level, 0, rescuer.CharId)
+	rescuer.writeCombat(text.Red + m.Name + " slams into you for " + strconv.Itoa(stamDamage+vitDamage) + " points of damage!\n" + text.Reset)
+	rescuer.DeathCheck("was slain by a " + m.Name + " while rescuing " + rescued.Name + ".")
 }
 
 func (m *Mob) DeathCheck(target *Character) bool {
@@ -728,13 +794,16 @@ func (m *Mob) FollowChar(target *Character, from *Room, to *Room) bool {
 	}
 
 	// Still angry at this one in particular, and in any shape to give chase?
-	if m.CurrentTarget != target.Name || m.IsStunned || m.MobStunned > 0 || m.Stam.Current <= 0 {
+	if m.CurrentTarget != target.Name || m.Stunned() || m.Stam.Current <= 0 {
 		return false
 	}
 
 	curChance := config.MobFollow - ((target.Tier - m.Level) * config.MobFollowPerLevel)
 	if curChance > 85 {
 		curChance = 85
+	}
+	if m.CheckFlag("crippled") {
+		curChance = config.CrippledChance(curChance)
 	}
 	if utils.Roll(100, 1, 0) > curChance {
 		return false
@@ -800,6 +869,12 @@ func (m *Mob) Stun(amt int) {
 	m.MobStunned = amt
 	m.StunnedUntil = until
 	m.MobTicker.Reset(time.Until(until))
+}
+
+// Stunned reports whether the mob is currently held by a stun. A stunned mob
+// cannot act on its tick, block an exit, or follow a character out of the room.
+func (m *Mob) Stunned() bool {
+	return m.IsStunned && time.Now().Before(m.StunnedUntil)
 }
 
 // Teleport Special handler for handling a mobs cast of a teleport spell
@@ -906,6 +981,7 @@ func (m *Mob) DropInventory() string {
 }
 
 func (m *Mob) AddThreatDamage(damage int, attacker *Character) {
+	attacker.MarkCombat()
 	if !attacker.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 		m.ThreatTable[attacker.Name] += damage
 		if m.CurrentTarget == "" {
@@ -1266,6 +1342,9 @@ func (m *Mob) Eval() string {
 	}
 	if m.CheckFlag("no_stun") {
 		descriptions = append(descriptions, "It is immune to stun.")
+	}
+	if m.CheckFlag("crippled") {
+		descriptions = append(descriptions, "It is crippled.")
 	}
 	if m.CheckFlag("no_touch") {
 		descriptions = append(descriptions, "Its life force cannot be touched.")

@@ -290,8 +290,12 @@ func (r *Room) Encounter() {
 			if aug <= 1 {
 				aug = 0
 			}
+			// Crowding: too many hostiles for the number of characters
+			// stops doubles and scales the spawn chance down.
+			allowDouble, chancePct := EncounterCrowding(len(r.Chars.Contents), len(r.Mobs.ListHostile()))
+			chance := (r.EncounterRate + (aug * config.MobAugmentPerCharacter)) * chancePct / 100
 			// Roll the dice and see if we get a mob here
-			if utils.Roll(100, 1, 0) <= r.EncounterRate+(aug*config.MobAugmentPerCharacter) {
+			if utils.Roll(100, 1, 0) <= chance {
 				// Successful roll:  Roll again to pick the mob
 				multMob := 1
 				doubleChance := 0
@@ -302,7 +306,7 @@ func (r *Room) Encounter() {
 				} else if len(r.Chars.Contents) == 3 {
 					doubleChance = 10
 				}
-				if utils.Roll(100, 1, 0) <= doubleChance && len(r.Mobs.ListHostile()) <= config.RoomEncNoDoubles {
+				if allowDouble && utils.Roll(100, 1, 0) <= doubleChance {
 					multMob = 2
 				}
 				for i := 0; i < multMob; i++ {
@@ -332,6 +336,22 @@ func (r *Room) Encounter() {
 			}
 		}
 	}
+}
+
+// EncounterCrowding reports whether a double spawn is allowed and what
+// percentage (0-100) of the base spawn chance to keep, given the number of
+// characters and hostile mobs in the room. Nothing changes while mobs <= chars.
+// From chars+1 mobs doubles are suppressed and the chance falls linearly,
+// reaching half at chars+RoomEncCrowdHalfAt mobs and staying half beyond.
+func EncounterCrowding(chars, hostileMobs int) (allowDouble bool, chancePct int) {
+	excess := hostileMobs - chars
+	if excess < 1 {
+		return true, 100
+	}
+	if excess >= config.RoomEncCrowdHalfAt {
+		return false, 50
+	}
+	return false, 100 - (50*excess)/config.RoomEncCrowdHalfAt
 }
 
 func (r *Room) AttractionEncounter() {

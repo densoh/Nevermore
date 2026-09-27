@@ -55,7 +55,7 @@ type classDef struct {
 var Classes = map[string]classDef{
 	"barbarian": {
 		Desc:              "Raised in the harsh lands of tribal villages, barbarians are hearty warriors capable of sustaining blow after blow from opponents. The barbarian can bash its opponent, rendering them stunned for a while and unable to attack. The barbarian can circle an opponent, an excellent tactic used while fighting.",
-		Skills:            "Bash, Circle, Berserk",
+		Skills:            "Bash, Circle, Reckless, Berserk",
 		Stats:             "Strength, Constitution, Dexterity",
 		Armor:             "Light, Medium, Heavy",
 		Races:             "Half-Giant, Human, Dwarf, Orc",
@@ -87,8 +87,8 @@ var Classes = map[string]classDef{
 		WeaponAdvancement: .4,
 	},
 	"fighter": {
-		Desc:              "The fighter is a master of the fighting arts. As the fighter advances he will achieve great proficiency in the use of weapons. The greater proficiency in weapon use is, the less chances fighter has to shatter weapon when he/she does a critical strike, vital strike. Compared to all other classes fighters gain weapon proficiency much faster than any other class. The fighter is able to bash and circle opponents like a barbarian.",
-		Skills:            "Hamstring, Circle",
+		Desc:              "The fighter is a master of the fighting arts. As the fighter advances he will achieve great proficiency in the use of weapons. The greater proficiency in weapon use is, the less chances fighter has to shatter weapon when he/she does a critical strike, vital strike. Compared to all other classes fighters gain weapon proficiency much faster than any other class. The fighter can circle opponents like a barbarian, stunning them longer as their weapon skill grows, hamstring an enemy to cripple and taunt it, and slam with a shield when carrying one. At tier 15 an expert fighter's lethal blows come far more often against a wounded foe.",
+		Skills:            "Hamstring, Circle, Shield Slam",
 		Stats:             "Strength , Dexterity",
 		Armor:             "Light, Medium, Heavy",
 		Races:             "Human, Half-Giant, Dwarf, Orc",
@@ -121,7 +121,7 @@ var Classes = map[string]classDef{
 	},
 	"paladin": {
 		Desc:              "The paladin is a brave warrior of faith, and must continue to be good aligned in order to inflict damage. An evil paladin suffers greatly. The paladin is a powerful warrior and healer, and like clerics, can turn the undead. A paladin suffers a small loss if he flees from a fight. The paladin is also required to spend a term serving in the militia to show their interest in benefitting society.",
-		Skills:            "Turn, Pray, Shield Slam",
+		Skills:            "Turn, Shield Slam, Seals, Rescue",
 		Stats:             "Strength Piety",
 		Armor:             "Light, Medium, Heavy",
 		Races:             "Human, Dwarf, Gnome, Orc",

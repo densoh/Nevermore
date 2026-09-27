@@ -10,12 +10,37 @@ import (
 
 func init() {
 	addHandler(aura{},
-		"Usage:  aura (type) \n\n Channel your focus and devotion outward, giving off one of several possible auras.",
+		"Usage:  seal (courage|faith|justice|off) \n\n Invoke a holy seal upon yourself; only one seal can be held at a time.\n"+
+			" courage: requires a shield, hardens you against blows and lets you rescue allies.\n"+
+			" faith:   your healing draws on the full strength of your divinity.\n"+
+			" justice: your blows deal extra damage scaling with piety and weapon skill.",
 		permissions.Paladin,
-		"aura")
+		"seal")
 }
 
 type aura cmd
+
+// sealDef is what a seal demands before it can be invoked.
+type sealDef struct {
+	tier   int
+	shield bool
+}
+
+var seals = map[string]sealDef{
+	"courage": {tier: config.MinorAbilityTier, shield: true},
+	"faith":   {tier: config.MinorAbilityTier},
+	"justice": {tier: config.SealJusticeTier},
+}
+
+// activeSeal returns the name of the seal the character currently holds, or "".
+func activeSeal(c *objects.Character) string {
+	for name := range seals {
+		if c.CheckFlag("seal-" + name) {
+			return name
+		}
+	}
+	return ""
+}
 
 func (aura) process(s *state) {
 	if s.actor.Tier < config.MinorAbilityTier {
@@ -23,36 +48,43 @@ func (aura) process(s *state) {
 		return
 	}
 	if len(s.input) < 1 {
-		s.msg.Actor.SendBad("What aura?")
-	} else if s.input[0] == "courage" {
-		courage, ok := s.actor.Flags["aura-courage"]
-		if ok {
-			if courage {
-				s.msg.Actor.SendBad("You already are inspiring courage.")
-				return
-			}
-		}
-	} else if s.input[0] == "faith" {
-		faith, ok := s.actor.Flags["aura-faith"]
-		if ok {
-			if faith {
-				s.msg.Actor.SendBad("You already are inspiring faith.")
-				return
-			}
-		}
-	} else if s.input[0] == "judgement" {
-		judgement, ok := s.actor.Flags["aura-judgement"]
-		if ok {
-			if judgement {
-				s.msg.Actor.SendBad("You already have an aura of judgement.")
-			}
-		}
-	} else {
-		s.msg.Actor.SendBad("I don't know that aura.")
+		s.msg.Actor.SendBad("What seal?")
 		return
 	}
 
-	ready, msg := s.actor.TimerReady("combat_aura")
+	which := s.input[0]
+	current := activeSeal(s.actor)
+
+	if which == "off" || which == "none" {
+		if current == "" {
+			s.msg.Actor.SendBad("You have no seal to release.")
+			return
+		}
+		s.actor.RemoveEffect("seal-" + current)
+		s.msg.Observers.SendInfo(s.actor.Name + " releases " + config.TextPosPronoun[s.actor.Gender] + " seal.")
+		s.ok = true
+		return
+	}
+
+	def, ok := seals[which]
+	if !ok {
+		s.msg.Actor.SendBad("I don't know that seal.")
+		return
+	}
+	if s.actor.Tier < def.tier {
+		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(def.tier) + " to invoke the seal of " + which + ".")
+		return
+	}
+	if current == which {
+		s.msg.Actor.SendBad("You already bear the seal of " + which + ".")
+		return
+	}
+	if def.shield && !s.actor.HasShield() {
+		s.msg.Actor.SendBad("The seal of " + which + " requires a shield in your offhand.")
+		return
+	}
+
+	ready, msg := s.actor.TimerReady("combat_seal")
 	if !ready {
 		s.msg.Actor.SendBad(msg)
 		return
@@ -63,10 +95,12 @@ func (aura) process(s *state) {
 		return
 	}
 
-	objects.Effects["aura_"+s.input[0]](s.actor, s.actor, 0)
-	s.msg.Observers.SendInfo(s.actor.Name + " has an aura of " + s.input[0] + ".")
-	s.actor.SetTimer("combat_aura", 10)
+	if current != "" {
+		s.actor.RemoveEffect("seal-" + current)
+	}
+	objects.Effects["seal-"+which](s.actor, s.actor, 0)
+	s.msg.Observers.SendInfo(s.actor.Name + " invokes the seal of " + which + ".")
+	s.actor.SetTimer("combat_seal", config.SealTimer)
 	s.actor.SetTimer("combat", 3)
-
 	s.ok = true
 }

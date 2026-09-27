@@ -25,12 +25,6 @@ func (use) process(s *state) {
 		return
 	}
 
-	ready, msg := s.actor.TimerReady("use")
-	if !ready {
-		s.msg.Actor.SendBad(msg)
-		return
-	}
-
 	itemName := s.words[0]
 	itemNum := 1
 	name := ""
@@ -79,6 +73,19 @@ func (use) process(s *state) {
 			spellInstance, ok := objects.Spells[strings.ToLower(what.Spell)]
 			if !ok {
 				s.msg.Actor.SendBad("Spell doesn't exist in this world. ")
+				return
+			}
+			// Healing and status-removal devices only wait on the use timer;
+			// everything else also respects the global timer.
+			var ready bool
+			var msg string
+			if objects.IsRestorativeSpell(spellInstance.Name) {
+				ready, msg = s.actor.TimerReadyIgnoreGlobal("use")
+			} else {
+				ready, msg = s.actor.TimerReady("use")
+			}
+			if !ready {
+				s.msg.Actor.SendBad(msg)
 				return
 			}
 			if utils.StringIn(spellInstance.Name, objects.OffensiveSpells) || what.ItemType == 8 {

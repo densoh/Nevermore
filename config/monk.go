@@ -13,15 +13,15 @@ const (
 	// Tier gates.
 	MonkLeapTier     = 5
 	MonkSweepTier    = 5
-	MonkFlurryTier   = 10
-	MonkTodTier      = 10
-	MonkLongLeapTier = 10
+	MonkFlurryTier   = MajorAbilityTier
+	MonkTodTier      = MajorAbilityTier
+	MonkLongLeapTier = MajorAbilityTier
 	MonkDodgeTier    = 15
 	MonkFeintTier    = 15
 	// From this tier a monk's discipline blunts vital and critical strikes.
 	MonkIronBodyTier = 15
 	// From this tier, afflictions aimed at a meditating monk must beat a save.
-	MonkMeditateSaveTier = 10
+	MonkMeditateSaveTier = MajorAbilityTier
 
 	// Chi meter: max = tier*MonkChiPerTier + pie*MonkChiPerPie.
 	MonkChiPerTier       = 4
@@ -55,9 +55,9 @@ const (
 	MeditateSaveCap          = 90
 
 	// Flurry: a stance that spends chi every attack round for extra swings.
-	// A round costs 5 chi below Expert and 7 from Expert up.
-	FlurryChiCostBase   = 5
-	FlurryChiCostExpert = 7
+	// A round costs 8 chi below Expert and 10 from Expert up (was 5/7 until 2026-09-26).
+	FlurryChiCostBase   = 8
+	FlurryChiCostExpert = 10
 	FlurryExpertSkill   = 7
 	FlurryMaxDuration   = 3600 // safety expiry for the stance, seconds
 
@@ -112,7 +112,6 @@ const (
 	MonkDodgeCap          = 60
 	BreathDodgeMultiplier = 0.5 // a dodged breath weapon still lands, at this share of its damage
 	FeintDamageMultiplier = 0.5
-	FeintThreatFraction   = 0.5 // of the mob's max stamina, added as threat on a landed feint
 	FeintDodgeBonus       = 25
 	FeintCharges          = 2
 	FeintTimer            = 16
@@ -128,12 +127,15 @@ const (
 	MonkVitalReductionPerTier    = 0.01
 	MonkCriticalReductionPerTier = 0.02
 
-	// Unarmed damage: base + ceil(str/45 * base) + MonkDamageDice d(base/2),
+	// Unarmed damage: base + ceil(str/45 * base) + MonkDamageDice d(base/MonkRollDivisor),
 	// where base is the tier's max weapon damage over MonkDamageDivisor.
-	// Fitted against what active players actually wield: ~85-90% of a real
-	// weapon from tier 8 up, with flurry carrying it to parity. Two dice keep
-	// the roll bell-shaped, so the spread feels tighter than its range.
+	// Two dice keep the roll bell-shaped, so the spread feels tighter than
+	// its range. The roll was base/2 until 2026-09-26; base/3 takes ~8% off
+	// the average hit and leaves the floor alone, so a monk sits a rung under
+	// the fighter, ranger and barbarian, above the bard, with the finisher
+	// on top.
 	MonkDamageDivisor = 2
+	MonkRollDivisor   = 3
 	MonkDamageDice    = 2
 )
 
@@ -163,9 +165,14 @@ func MonkNaturalArmor(tier int, con int) int {
 }
 
 // MonkUnarmedBase is the fixed portion of a monk's hit at a tier; the rolled
-// portion is MonkDamageDice dice of half that.
+// portion is MonkDamageDice dice of MonkUnarmedRollSides.
 func MonkUnarmedBase(tier int) int {
 	return MaxWeaponDamage[tier] / MonkDamageDivisor
+}
+
+// MonkUnarmedRollSides is the sides on each rolled die of a monk's hit.
+func MonkUnarmedRollSides(tier int) int {
+	return MonkUnarmedBase(tier) / MonkRollDivisor
 }
 
 // MonkUnarmedRange is the lowest and highest hit a monk can land at a tier
@@ -173,7 +180,7 @@ func MonkUnarmedBase(tier int) int {
 func MonkUnarmedRange(tier int, str int) (int, int) {
 	base := MonkUnarmedBase(tier)
 	fixed := base + int(math.Ceil(float64(str)/45*float64(base)))
-	return fixed + MonkDamageDice, fixed + MonkDamageDice*(base/2)
+	return fixed + MonkDamageDice, fixed + MonkDamageDice*MonkUnarmedRollSides(tier)
 }
 
 // FlurryMinSkill is the unarmed skill level a flurry swings at when the monk's
@@ -188,17 +195,28 @@ func FlurryChiCost(skill int) int {
 	return FlurryChiCostBase
 }
 
+// FlurryMaxSwings caps how many swings a flurry throws. Monks have touch of
+// death, leap and sweep on top of flurry, so a Master or Grandmaster keeps
+// that row's multipliers for its first three swings but never gets the
+// fighter's fourth and fifth.
+const FlurryMaxSwings = 3
+
 // MonkFlurryFor returns the swing multipliers for a flurried round. Flurry
-// follows the fighter multi-attack table exactly, except that a monk below
-// Ace still swings as an Ace.
+// follows the fighter multi-attack table for the monk's unarmed skill, except
+// that a monk below Ace still swings as an Ace and no row is longer than
+// FlurryMaxSwings.
 func MonkFlurryFor(skill int) []float64 {
 	if skill < FlurryMinSkill {
 		skill = FlurryMinSkill
 	}
-	if mults, ok := MultiAttackMultipliers[skill]; ok {
-		return mults
+	mults, ok := MultiAttackMultipliers[skill]
+	if !ok {
+		return []float64{1}
 	}
-	return []float64{1}
+	if len(mults) > FlurryMaxSwings {
+		mults = mults[:FlurryMaxSwings]
+	}
+	return mults
 }
 
 // MonkMaxChi is the monk's chi pool at a tier and piety.

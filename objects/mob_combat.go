@@ -87,7 +87,7 @@ func monkIronBody(target *Character, style AttackStyle, mult float64) float64 {
 // difference and the target's dex. On a miss it tells the player and records
 // a metricPrefix+"-miss" metric, returning true.
 func (m *Mob) RollMiss(target *Character, metricPrefix string) bool {
-	target.MarkChiCombat()
+	target.MarkCombat()
 	missChance := 0
 	lvlDiff := target.Tier - m.Level
 	if lvlDiff >= 1 {

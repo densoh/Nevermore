@@ -183,6 +183,7 @@ func (i *Item) Save() {
 	itemData["light"] = utils.Btoi(i.Flags["light"])
 	itemData["no_take"] = utils.Btoi(i.Flags["no_take"])
 	itemData["weightless_chest"] = utils.Btoi(i.Flags["weightless_chest"])
+	itemData["two_handed"] = utils.Btoi(i.Flags["two_handed"])
 	itemData["adjustment"] = i.Adjustment
 	itemData["commands"] = i.SerializeCommands()
 	data.UpdateItem(itemData)
@@ -237,6 +238,9 @@ func (i *Item) Eval() string {
 		stringOut += "It is a " + config.ItemTypes[i.ItemId] + " weapon. \n" +
 			"It deals between " + strconv.Itoa(utils.RollMin(i.NumDice, i.PlusDice)+i.Adjustment) + " and " + strconv.Itoa(utils.RollMax(i.SidesDice, i.NumDice, i.PlusDice)+i.Adjustment) + " damage. \n" +
 			"It has " + strconv.Itoa(i.MaxUses) + " uses before it breaks \n."
+		if i.Flags["two_handed"] {
+			stringOut += "It takes both hands to wield. \n"
+		}
 	} else if utils.IntIn(i.ItemType, []int{5, 26, 25, 24, 23, 22, 21, 20, 19}) { // Armor
 		stringOut += "It is a " + config.ArmorClass[i.ArmorClass] + " " + config.ItemTypes[i.ItemId] + " armor. \n" +
 			"It has " + strconv.Itoa(i.MaxUses) + " uses before it breaks. \n"

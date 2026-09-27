@@ -26,6 +26,22 @@ func (e *Effect) ExtendDuration(duration float64) {
 	e.length = time.Duration(duration)*time.Second - time.Duration(calc.Seconds())
 }
 
+// Extend adds seconds to the effect's total length, never letting the total
+// exceed maxLength seconds. It returns the seconds actually added.
+func (e *Effect) Extend(seconds int, maxLength int) int {
+	limit := time.Duration(maxLength) * time.Second
+	newLength := e.length + time.Duration(seconds)*time.Second
+	if newLength > limit {
+		newLength = limit
+	}
+	if newLength <= e.length {
+		return 0
+	}
+	added := newLength - e.length
+	e.length = newLength
+	return int(added.Seconds())
+}
+
 func NewEffect(length string, interval int, magnitude int, effect func(triggers int), effectOff func()) *Effect {
 	lengthTime, _ := strconv.Atoi(length)
 	parseLength := time.Duration(lengthTime) * time.Second
