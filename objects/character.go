@@ -108,14 +108,20 @@ type Character struct {
 	// death is downgraded to a penalty-free lag death. It ends early the
 	// moment the player fights or moves - see SetTimer and the GO handler.
 	ResumeGraceUntil time.Time
-	// LastChiCombat is the last moment a monk landed a hit or was attacked.
-	// Chi only bleeds away once this is ChiDecayGraceSeconds in the past.
-	LastChiCombat time.Time
+	// LastCombat is the last moment the character landed a hit, cast an
+	// offensive spell, or was attacked. Regen is halved while it is within
+	// CombatRegenWindowSeconds, and monk chi only bleeds away once it is
+	// ChiDecayGraceSeconds in the past.
+	LastCombat time.Time
 	// FeintCharges counts the incoming attacks the feint dodge bonus still covers.
 	FeintCharges int
 	// TodWarnedTarget is the last mob the monk was told looked vulnerable to
 	// a touch of death, so the warning fires once per target.
 	TodWarnedTarget *Mob
+	// RescuedBy names the paladin drawing this character's attackers until
+	// RescueUntil. Never persisted.
+	RescuedBy   string
+	RescueUntil time.Time
 }
 
 func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Character, bool) {
@@ -231,6 +237,8 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 			time.Now(),
 			0,
 			nil,
+			"",
+			time.Time{},
 		}
 
 		// Chi scales on piety, and the pool formula may have changed since the
@@ -335,9 +343,16 @@ func (c *Character) ClearResumeGrace() {
 	c.ResumeGraceUntil = time.Time{}
 }
 
-// MarkChiCombat notes that the monk is fighting, which holds off chi decay.
-func (c *Character) MarkChiCombat() {
-	c.LastChiCombat = time.Now()
+// MarkCombat notes that the character is fighting, which halves regen and
+// holds off chi decay.
+func (c *Character) MarkCombat() {
+	c.LastCombat = time.Now()
+}
+
+// InCombat reports whether the character fought recently enough for regen
+// to be halved.
+func (c *Character) InCombat() bool {
+	return time.Since(c.LastCombat) < time.Duration(config.CombatRegenWindowSeconds)*time.Second
 }
 
 // GainChi awards chi to a monk and returns how much was actually added. Chi
@@ -347,7 +362,7 @@ func (c *Character) GainChi(amount int, force bool) int {
 	if c.Class != config.MONK || amount <= 0 {
 		return 0
 	}
-	c.MarkChiCombat()
+	c.MarkCombat()
 	if c.CheckFlag("flurry") && !force {
 		return 0
 	}
@@ -364,7 +379,7 @@ func (c *Character) tickChi() {
 	if c.Mana.Current <= 0 || c.CheckFlag("meditate") {
 		return
 	}
-	if time.Since(c.LastChiCombat) < time.Duration(config.ChiDecayGraceSeconds)*time.Second {
+	if time.Since(c.LastCombat) < time.Duration(config.ChiDecayGraceSeconds)*time.Second {
 		return
 	}
 	c.Mana.Subtract(config.ChiDecayAmount(c.Mana.Max))
@@ -421,17 +436,33 @@ func (c *Character) ReturnToInventory(item *Item) {
 	c.Inventory.Add(item)
 }
 
+// TimerReady reports whether the named timer and the global timer have both expired.
 func (c *Character) TimerReady(timer string) (bool, string) {
+	return c.timerReady(timer, true)
+}
+
+// TimerReadyIgnoreGlobal reports whether the named timer has expired, letting
+// the action through even while the global timer (e.g. blocked movement)
+// is still running. A stun (including paralysis) still blocks the action.
+func (c *Character) TimerReadyIgnoreGlobal(timer string) (bool, string) {
+	if ready, msg := c.timerReady("stun", false); !ready {
+		return ready, msg
+	}
+	return c.timerReady(timer, false)
+}
+
+func (c *Character) timerReady(timer string, checkGlobal bool) (bool, string) {
 	remaining := 0.0
-	globalRemaining := math.Ceil(float64(c.Timers["global"].Sub(time.Now()) / time.Second))
+	globalRemaining := 0.0
+	if checkGlobal {
+		globalRemaining = math.Ceil(float64(c.Timers["global"].Sub(time.Now()) / time.Second))
+	}
 	timeCheck := timer
 	if curTimer, ok := c.Timers[timer]; ok {
 		remaining = math.Ceil(float64(curTimer.Sub(time.Now()) / time.Second))
 	}
 	if remaining <= 0 && globalRemaining <= 0 {
-		if remaining <= 0 {
-			return true, ""
-		}
+		return true, ""
 	} else if globalRemaining > remaining {
 		timeCheck = "global"
 		remaining = globalRemaining
@@ -664,6 +695,25 @@ func (c *Character) GetModifier(modifier string) int {
 	} else {
 		return 0
 	}
+}
+
+// HasShield reports whether a shield is equipped in the offhand.
+func (c *Character) HasShield() bool {
+	return c.Equipment.Off != (*Item)(nil) && c.Equipment.Off.ItemType == 23
+}
+
+// Rescuer returns the living paladin in this room still within their rescue
+// window for this character, or nil.
+func (c *Character) Rescuer() *Character {
+	if c.RescuedBy == "" || time.Now().After(c.RescueUntil) {
+		return nil
+	}
+	for _, ch := range Rooms[c.ParentId].Chars.Contents {
+		if ch != c && ch.Name == c.RescuedBy && ch.Vit.Current > 0 {
+			return ch
+		}
+	}
+	return nil
 }
 
 func (c *Character) SetModifier(modifier string, value int) {
@@ -927,16 +977,18 @@ func (c *Character) Tick() {
 		c.LastSave = time.Now()
 		c.TickSaveWrapper()
 	}
-	regenMod := 1.0
+	roomMod := 1.0
 	if Rooms[c.ParentId].Flags["heal_fast"] {
-		regenMod = 2
+		roomMod = config.HealFastRoomRegenMod
 	}
-	c.Heal(int(math.Ceil(float64(c.GetStat("con")) * config.ConHealRegenMod * regenMod)))
+	inCombat := c.InCombat()
+	blessed := c.CheckFlag("bless")
+	c.Heal(config.HealthRegen(c.GetStat("con"), roomMod, inCombat, blessed))
 	if c.Class == config.MONK {
 		// Chi never regenerates on its own; it only comes from fighting.
 		c.tickChi()
 	} else {
-		c.RestoreMana(int(math.Ceil(float64(c.GetStat("pie")) * config.PieRegenMod * regenMod)))
+		c.RestoreMana(config.ManaRegen(c.GetStat("pie"), c.GetStat("int"), c.Tier, roomMod, inCombat, blessed))
 	}
 
 	// Loop the currently applied effects, drop them if needed, or execute their functions as necessary
@@ -967,6 +1019,16 @@ func (c *Character) ApplyEffect(effectName string, length string, interval int, 
 	}
 	c.Effects[effectName] = NewEffect(length, interval, magnitude, effect, effectOff)
 	c.Effects[effectName].RunEffect()
+}
+
+// ExtendEffect lengthens a running effect by seconds, capped at maxLength
+// seconds in total, and reports the seconds actually added. A missing effect
+// adds nothing.
+func (c *Character) ExtendEffect(effectName string, seconds int, maxLength int) int {
+	if effectInstance, ok := c.Effects[effectName]; ok {
+		return effectInstance.Extend(seconds, maxLength)
+	}
+	return 0
 }
 
 func (c *Character) RemoveEffect(effectName string) {
@@ -1007,7 +1069,10 @@ func (c *Character) CanEquip(item *Item) (bool, string) {
 	}
 	if utils.IntIn(item.ItemType, []int{0, 1, 2, 3, 4, 16}) &&
 		!c.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
-		if !config.CanWield(c.Tier, c.Class, utils.RollMax(item.SidesDice, item.NumDice, item.PlusDice)) {
+		if item.IsTwoHanded() && !config.CanWieldTwoHanded(c.Class) {
+			return false, "Only fighters, barbarians and paladins can handle a two-handed weapon."
+		}
+		if !config.CanWield(c.Tier, c.Class, utils.RollMax(item.SidesDice, item.NumDice, item.PlusDice), item.Flags["two_handed"]) {
 			return false, "You are not well enough trained to wield " + item.Name
 		}
 	}
@@ -1086,7 +1151,7 @@ func (c *Character) RemoveHook(hook string, hookName string) {
 
 func (c *Character) RunHook(hook string) {
 	if hook == "attacked" {
-		c.MarkChiCombat()
+		c.MarkCombat()
 	}
 	for name, hookInstance := range c.Hooks[hook] {
 		// Process Removing the hook
@@ -1363,6 +1428,17 @@ func (c *Character) HealPiety() int {
 	return pie
 }
 
+// DivinityBonus is the percentage healing bonus the caster's divinity skill
+// grants. Paladins receive only a share of it unless the seal of faith is
+// active.
+func (c *Character) DivinityBonus() float64 {
+	bonus := float64(config.HealingSkill[config.WeaponLevel(c.Skills[config.DivinitySkill].Value, c.Class, config.DivinitySkill)])
+	if c.Class == config.PALADIN && !c.CheckFlag("seal-faith") {
+		bonus *= config.PaladinDivinityMod
+	}
+	return bonus
+}
+
 func (c *Character) CalcHealPenalty(damage int) int {
 	if c.GetStat("pie") <= config.PieMajorPenalty {
 		damage -= int(float64(damage) * (.10 * float64(6-c.GetStat("pie"))))
@@ -1401,12 +1477,19 @@ func (c *Character) InflictDamage() (damage int) {
 		// it (max str is 45), plus a bell-curved roll of two dice of half the base.
 		baseMonkDamage := config.MonkUnarmedBase(c.Tier)
 		strDamage := int(math.Ceil(float64(c.GetStat("str")) / float64(45) * float64(baseMonkDamage)))
-		rngDamage := utils.Roll(baseMonkDamage/2, config.MonkDamageDice, 0)
+		rngDamage := utils.Roll(config.MonkUnarmedRollSides(c.Tier), config.MonkDamageDice, 0)
 		damage = baseMonkDamage + strDamage + rngDamage
 	}
 
 	if c.CheckFlag("surge") {
 		damage += int(math.Ceil(float64(damage) * config.SurgeDamageBonus))
+	}
+	if c.CheckFlag("seal-justice") {
+		damage += int(math.Ceil(float64(damage) * c.SealJusticeBonus()))
+	}
+
+	if c.CheckFlag("reckless") {
+		damage += int(math.Ceil(float64(damage) * float64(config.RecklessDamagePercent) / 100))
 	}
 
 	// Add any modified base damage
@@ -1419,6 +1502,17 @@ func (c *Character) InflictDamage() (damage int) {
 		damage = 0
 	}
 	return damage
+}
+
+// SealJusticeBonus is the fraction of extra damage the seal of justice adds:
+// a flat base plus shares of tier, piety and the wielded weapon's skill level.
+func (c *Character) SealJusticeBonus() float64 {
+	weaponLevel := 0
+	if c.Equipment.Main != (*Item)(nil) {
+		weaponLevel = config.WeaponLevel(c.Skills[c.Equipment.Main.ItemType].Value, c.Class, c.Equipment.Main.ItemType)
+	}
+	percent := config.SealJusticeBase + float64(c.Tier)/config.SealJusticeTierDiv + float64(c.GetStat("pie"))/config.SealJusticePieDiv + float64(weaponLevel)/config.SealJusticeWeaponDiv
+	return percent / 100
 }
 
 func (c *Character) MaxWeight() int {

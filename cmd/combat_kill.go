@@ -71,6 +71,7 @@ func (kill) process(s *state) {
 	whatMob = s.where.Mobs.Search(name, nameNum, s.actor)
 	if whatMob != nil {
 		s.actor.Victim = whatMob
+		s.actor.MarkCombat()
 
 		// This is an override for a GM to delete a mob
 		if s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
@@ -155,8 +156,9 @@ func performAttack(s *state, whatMob *objects.Mob) {
 	skillLevel := attackSkillLevel(s)
 	// Kill is really the fighters realm for specialty.
 	if s.actor.Permission.HasAnyFlags(permissions.Fighter) && s.actor.Equipment.Main.ItemType != 4 {
-		// mob lethal?
-		if config.RollLethal(skillLevel) {
+		// mob lethal? A tier 15 expert executes wounded mobs more often.
+		execute := config.ExecuteMultiplier(s.actor.Tier, skillLevel, float64(whatMob.Stam.Current)/float64(whatMob.Stam.Max))
+		if config.RollLethalScaled(skillLevel, execute) {
 			// Sure did.  Kill this fool and bail.
 			s.msg.Actor.SendInfo("You landed a lethal blow on the " + whatMob.Name)
 			s.msg.Observers.SendInfo(s.actor.Name + " landed a lethal blow on " + whatMob.Name)
@@ -345,6 +347,7 @@ func DeathCheck(s *state, m *objects.Mob) {
 	if m.Stam.Current <= 0 {
 		s.msg.Actor.SendGood("You killed " + m.Name)
 		s.msg.Observers.SendGood(s.actor.Name + " killed " + m.Name)
+		bloodlust(s, m.Name)
 		partyLead := s.actor
 		if s.actor.PartyFollow != "" {
 			partyLead = objects.ActiveCharacters.Find(s.actor.PartyFollow)
@@ -431,20 +434,39 @@ func DeathCheck(s *state, m *objects.Mob) {
 	}
 }
 
-// DetermineMissChance Determine Miss Chance based on weapon Skills
+// DetermineMissChance is the miss chance of a weapon attack: the weapon skill
+// sets the base and the shared modifiers do the rest.
 func DetermineMissChance(s *state, lvlDiff int) int {
-	missChance := 0
+	skill := s.actor.Equipment.Main.ItemType
 	if s.actor.Class == config.MONK {
-		missChance = config.WeaponMissChance(s.actor.Skills[5].Value)
-	} else {
-		missChance = config.WeaponMissChance(s.actor.Skills[s.actor.Equipment.Main.ItemType].Value)
+		skill = 5
 	}
-	if !config.QuestMode {
-		if lvlDiff >= 2 {
-			missChance += lvlDiff * config.MissPerLevel
-		}
+	return missChance(s, config.WeaponMissChance(s.actor.Skills[skill].Value), config.MissPerLevel, lvlDiff)
+}
+
+// BackstabMissChance is the miss chance of a backstab: the stealth skill sets
+// the base and the shared modifiers do the rest.
+func BackstabMissChance(s *state, lvlDiff int) int {
+	stealth := config.StealthLevel(s.actor.Skills[11].Value)
+	return missChance(s, config.BackstabMissChance(stealth), config.BackstabMissPerLevel, lvlDiff)
+}
+
+// missChance builds a to-hit roll's miss chance from a skill-derived base.
+// Only the base and the per-level scalar differ between kinds of attack;
+// the level penalty (from two levels up, off in quest mode), dex, combat
+// flags such as bless and reckless, and the 5-95 clamp are shared.
+func missChance(s *state, baseMiss int, missPerLevel int, lvlDiff int) int {
+	missChance := baseMiss
+	if !config.QuestMode && lvlDiff >= 2 {
+		missChance += lvlDiff * missPerLevel
 	}
 	missChance -= s.actor.GetStat("dex") * config.HitPerDex
+	if s.actor.CheckFlag("reckless") {
+		missChance -= config.RecklessMissReduction
+	}
+	if s.actor.CheckFlag("bless") {
+		missChance -= config.BlessHitBonus
+	}
 	if missChance >= 100 {
 		missChance = 95
 	}

@@ -31,14 +31,43 @@ var MaxWeaponDamage = map[int]int{
 	26: 140,
 }
 
-func CanWield(tier int, class int, max int) bool {
-	if class == 0 {
+// CanWieldTwoHanded reports whether a class may wield two-handed weapons.
+func CanWieldTwoHanded(class int) bool {
+	return class == FIGHTER || class == BARBARIAN || class == PALADIN
+}
+
+// TwoHandedCapPercent is the share of the tier's weapon damage cap that a
+// two-handed weapon adds to it; TwoHandedCapStep is the multiple the bonus is
+// rounded to, and also the least it can be.
+const TwoHandedCapPercent = 15
+const TwoHandedCapStep = 5
+
+// TwoHandedCapBonus is how much higher the damage cap sits for a two-handed
+// weapon: TwoHandedCapPercent of the cap, rounded to the nearest
+// TwoHandedCapStep (halves up), never less than one step.
+func TwoHandedCapBonus(cap int) int {
+	steps := (cap*TwoHandedCapPercent + TwoHandedCapStep*50) / (TwoHandedCapStep * 100)
+	if steps < 1 {
+		steps = 1
+	}
+	return steps * TwoHandedCapStep
+}
+
+// WeaponDamageCap is the max roll a class at a tier must stay under to wield a
+// weapon.  Fighters read one tier ahead; two-handed weapons get TwoHandedCapBonus.
+func WeaponDamageCap(tier int, class int, twoHanded bool) int {
+	if class == FIGHTER {
 		tier += 1
 	}
-	if max < MaxWeaponDamage[tier] {
-		return true
+	cap := MaxWeaponDamage[tier]
+	if twoHanded {
+		cap += TwoHandedCapBonus(cap)
 	}
-	return false
+	return cap
+}
+
+func CanWield(tier int, class int, max int, twoHanded bool) bool {
+	return max < WeaponDamageCap(tier, class, twoHanded)
 }
 
 func CalculateLevel(exp int, expTable map[int]int) int {
@@ -222,6 +251,12 @@ func StealthExpNext(exp int) int {
 // MissileSkill is the skill slot for missile weapons (item type 4).
 const MissileSkill = 4
 
+// DivinitySkill is the skill slot for clerical healing skill.
+const DivinitySkill = 10
+
+// HandSkill is the skill slot for unarmed hand-to-hand fighting.
+const HandSkill = 5
+
 // RangerMeleeAdvancement is the ranger's weapon exp multiplier for anything
 // but a missile weapon; their class value applies to bows alone.
 const RangerMeleeAdvancement = .7
@@ -236,11 +271,17 @@ func WeaponAdvancementFor(class int, slot int) float64 {
 }
 
 // ReachesGrandmaster reports whether a class can reach skill level 10 in a
-// slot. Rangers get there with missile weapons only.
+// slot. Only clerics grandmaster divinity; with weapons it is fighters in
+// anything, monks with hand-to-hand, and rangers with missile weapons.
 func ReachesGrandmaster(class int, slot int) bool {
+	if slot == DivinitySkill {
+		return class == CLERIC
+	}
 	switch class {
-	case FIGHTER, MAGE, CLERIC, PALADIN, MONK:
+	case FIGHTER:
 		return true
+	case MONK:
+		return slot == HandSkill
 	case RANGER:
 		return slot == MissileSkill
 	}

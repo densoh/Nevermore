@@ -57,16 +57,21 @@ func Cast(caller interface{}, target interface{}, spell string, magnitude int) s
 func berserk(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
-		target.ApplyEffect("berserk", "60", 0, 0,
+		// The damage bonus is computed once when the rage starts and the same
+		// amount is removed when it ends, so a strength change mid-rage cannot
+		// leave a residue on the modifier.
+		bonus := 0
+		target.ApplyEffect("berserk", strconv.Itoa(config.BerserkDurationFor(target.Tier)), 0, 0,
 			func(triggers int) {
 				target.FlagOnAndMsg("berserk", "berserk", text.Red+"The red rage grips you!!!\n")
-				target.SetModifier("str", 5)
-				target.SetModifier("base_damage", target.GetStat("str")*config.CombatModifiers["berserk"])
+				target.SetModifier("str", config.BerserkStrBonus)
+				bonus = config.BerserkDamageBonus(target.GetStat("str"), target.Tier)
+				target.SetModifier("base_damage", bonus)
 			},
 			func() {
 				target.FlagOffAndMsg("berserk", "berserk", text.Cyan+"The tension releases and your rage fades...\n")
-				target.SetModifier("base_damage", -target.GetStat("str")*config.CombatModifiers["berserk"])
-				target.SetModifier("str", -5)
+				target.SetModifier("base_damage", -bonus)
+				target.SetModifier("str", -config.BerserkStrBonus)
 			})
 	case *Mob:
 		return ""
@@ -334,8 +339,8 @@ func healstam(caller interface{}, target interface{}, magnitude int) string {
 	case *Character:
 		damage := 0
 		if caller.CheckFlag("casting") {
-			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class, 10)]
-			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + float64(divinityLevel)*.01*config.MinorHealDivinityMod))
+			divinityLevel := caller.DivinityBonus()
+			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + divinityLevel*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
 			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
@@ -350,18 +355,7 @@ func healstam(caller interface{}, target interface{}, magnitude int) string {
 			}
 			data.StoreCombatMetric("vigor", 1, mode, damage, damage-healAmount, healAmount, 0, caller.CharId, caller.Tier, 0, target.CharId)
 			if utils.IntIn(caller.Class, []int{5, 6, 7}) {
-				/*
-					for _, mob := range Rooms[target.ParentId].Mobs.Contents {
-						if mob.Flags["hostile"] {
-							mob.AddThreatDamage(healAmount/10, caller)
-						}
-					}*/
-				if target.Victim != nil {
-					switch victim := target.Victim.(type) {
-					case *Mob:
-						victim.AddThreatDamage(healAmount/3, caller)
-					}
-				}
+				HealThreat(caller, target, healAmount)
 			}
 
 			return text.Info + "You now have " + strconv.Itoa(target.Stam.Current) + " stamina and " + strconv.Itoa(target.Vit.Current) + " vitality." + text.Reset + "\n"
@@ -390,8 +384,8 @@ func healvit(caller interface{}, target interface{}, magnitude int) string {
 	case *Character:
 		damage := 0
 		if caller.CheckFlag("casting") {
-			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class, 10)]
-			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + float64(divinityLevel)*.01*config.MinorHealDivinityMod))
+			divinityLevel := caller.DivinityBonus()
+			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + divinityLevel*.01*config.MinorHealDivinityMod))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
 			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
@@ -406,18 +400,7 @@ func healvit(caller interface{}, target interface{}, magnitude int) string {
 			}
 			data.StoreCombatMetric("mend", 1, mode, damage, damage-healAmount, healAmount, 0, caller.CharId, caller.Tier, 0, target.CharId)
 			if utils.IntIn(caller.Class, []int{5, 6, 7}) {
-				/*
-					for _, mob := range Rooms[target.ParentId].Mobs.Contents {
-						if mob.Flags["hostile"] {
-							mob.AddThreatDamage(healAmount/10, caller)
-						}
-					}*/
-				if target.Victim != nil {
-					switch victim := target.Victim.(type) {
-					case *Mob:
-						victim.AddThreatDamage(healAmount/3, caller)
-					}
-				}
+				HealThreat(caller, target, healAmount)
 			}
 			return text.Info + "You now have " + strconv.Itoa(target.Stam.Current) + " stamina and " + strconv.Itoa(target.Vit.Current) + " vitality." + text.Reset + "\n"
 		case *Mob:
@@ -443,8 +426,8 @@ func heal(caller interface{}, target interface{}, magnitude int) string {
 	case *Character:
 		if caller.CheckFlag("casting") {
 
-			divinityLevel := config.HealingSkill[config.WeaponLevel(caller.Skills[10].Value, caller.Class, 10)]
-			damage = int((float64(damage-config.MajorHealBaseCut+caller.Tier/config.MajorHealTierDiv) + (float64(caller.HealPiety()) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))) * (1 + float64(divinityLevel)*.01))
+			divinityLevel := caller.DivinityBonus()
+			damage = int((float64(damage-config.MajorHealBaseCut+caller.Tier/config.MajorHealTierDiv) + (float64(caller.HealPiety()) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))) * (1 + divinityLevel*.01))
 			damage = caller.CalcHealPenalty(damage)
 		} else {
 			damage += int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
@@ -459,16 +442,7 @@ func heal(caller interface{}, target interface{}, magnitude int) string {
 			}
 			data.StoreCombatMetric(action, 1, mode, damage, damage-(stam+vit), stam+vit, 0, caller.CharId, caller.Tier, 0, target.CharId)
 			if utils.IntIn(caller.Class, []int{5, 6, 7}) {
-				/*
-					for _, mob := range Rooms[target.ParentId].Mobs.Contents {
-						if mob.Flags["hostile"] {
-							mob.AddThreatDamage(healAmount/10, caller)
-						}
-					}*/
-				switch victim := target.Victim.(type) {
-				case *Mob:
-					victim.AddThreatDamage(stam+vit/3, caller)
-				}
+				HealThreat(caller, target, stam+vit)
 			}
 			return text.Info + "You now have " + strconv.Itoa(target.Stam.Current) + " stamina and " + strconv.Itoa(target.Vit.Current) + " vitality." + text.Reset + "\n"
 		case *Mob:
@@ -660,14 +634,14 @@ func elementalDamage(magnitude int, intel int) (damage int) {
 		power = utils.Roll(4, 10, 0)
 		damage = 84 + power
 	} else if magnitude == 5 {
-		power = utils.Roll(5, 16, 0)
+		power = utils.Roll(8, 8, 0)
 		damage = 175 + power
 	} else if magnitude == 6 {
-		power = utils.Roll(5, 18, 0)
-		damage = 280 + power
+		power = utils.Roll(9, 10, 0)
+		damage = 300 + power
 	} else if magnitude == 7 {
-		power = utils.Roll(6, 35, 0)
-		damage = 350 + power
+		power = utils.Roll(14, 10, 0)
+		damage = 400 + power
 	}
 	return damage
 }
@@ -885,7 +859,11 @@ func stun(caller interface{}, target interface{}, magnitude int) string {
 				if _, err := target.Write([]byte(text.Bad + caller.Name + " stunned you." + text.Reset + "\n")); err != nil {
 					log.Println("Error writing to player:", err)
 				}
-				target.SetTimer("global", 20)
+				// Stun blocks everything, including the healing and support
+				// spells/devices that are otherwise allowed through the global timer.
+				stunFor := config.MobStunDuration(caller.Level, target.Tier)
+				target.SetTimer("global", stunFor)
+				target.SetTimer("stun", stunFor)
 			}
 		case *Mob:
 			// Mobs stun mobs?
@@ -1233,6 +1211,54 @@ func resistpoison(caller interface{}, target interface{}, magnitude int) string 
 	return ""
 }
 
+// sealcourage is the paladin's shield stance: it grants armor and enables the
+// rescue command for as long as a shield stays in the offhand, which every
+// tick re-checks. It has no natural expiry.
+func sealcourage(caller interface{}, target interface{}, magnitude int) string {
+	switch target := target.(type) {
+	case *Character:
+		armor := 0
+		target.ApplyEffect("seal-courage", strconv.Itoa(config.SealDuration), 1, 0,
+			func(triggers int) {
+				if triggers == 0 {
+					armor = config.SealCourageArmorBase + config.SealCourageArmorPerLevel*target.Tier
+					target.FlagOnAndMsg("seal-courage", "seal", text.Info+"You invoke the seal of courage and steady yourself behind your shield.\n")
+					target.SetModifier("armor", armor)
+					return
+				}
+				if !target.HasShield() {
+					target.RemoveEffect("seal-courage")
+				}
+			},
+			func() {
+				target.FlagOffAndMsg("seal-courage", "seal", text.Cyan+"The seal of courage fades.\n")
+				target.SetModifier("armor", -armor)
+			})
+		return ""
+	case *Mob:
+		return ""
+	}
+	return ""
+}
+
+// sealFlag builds a paladin seal that is nothing but a persistent flag; the
+// mechanics that read it live where the bonus applies (DivinityBonus for
+// faith, InflictDamage for justice).
+func sealFlag(name string, onMsg string, offMsg string) func(caller interface{}, target interface{}, magnitude int) string {
+	return func(caller interface{}, target interface{}, magnitude int) string {
+		if target, ok := target.(*Character); ok {
+			target.ApplyEffect(name, strconv.Itoa(config.SealDuration), 0, 0,
+				func(triggers int) {
+					target.FlagOnAndMsg(name, "seal", text.Info+onMsg+"\n")
+				},
+				func() {
+					target.FlagOffAndMsg(name, "seal", text.Cyan+offMsg+"\n")
+				})
+		}
+		return ""
+	}
+}
+
 func resilientaura(caller interface{}, target interface{}, magnitude int) string {
 	duration := 300
 	switch caller := caller.(type) {
@@ -1544,6 +1570,9 @@ func init() {
 		"surge":            surge,
 		"resist-poison":    resistpoison,
 		"resilient-aura":   resilientaura,
+		"seal-courage":     sealcourage,
+		"seal-faith":       sealFlag("seal-faith", "You invoke the seal of faith and feel your devotion answered.", "The seal of faith fades."),
+		"seal-justice":     sealFlag("seal-justice", "You invoke the seal of justice and your blows carry holy weight.", "The seal of justice fades."),
 		"resist-disease":   resistdisease,
 		"disrupt-magic":    disruptmagic,
 		"reflection":       reflection,
@@ -1578,3 +1607,30 @@ func removecurse(caller interface{}, target interface{}, magnitude int) string {
 	return ""
 }
 */
+
+// HealThreat hands the healer threat for a heal: the full amount healed,
+// split evenly across every mob in the room currently attacking the
+// recipient. A heal on someone nothing is attacking draws no threat.
+func HealThreat(caller *Character, target *Character, healed int) {
+	room, ok := Rooms[target.ParentId]
+	if !ok {
+		return
+	}
+	splitHealThreat(caller, target.Name, healed, room.Mobs.Contents)
+}
+
+func splitHealThreat(caller *Character, recipient string, healed int, mobs []*Mob) {
+	var attackers []*Mob
+	for _, mob := range mobs {
+		if mob.CurrentTarget == recipient {
+			attackers = append(attackers, mob)
+		}
+	}
+	if len(attackers) == 0 || healed <= 0 {
+		return
+	}
+	share := healed / len(attackers)
+	for _, mob := range attackers {
+		mob.AddThreatDamage(share, caller)
+	}
+}

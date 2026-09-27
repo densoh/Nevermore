@@ -101,22 +101,9 @@ func (backstab) process(s *state) {
 			return
 		}
 
-		//curChance := config.BackStabChance + (s.actor.Dex.Current * config.BackStabChancePerPoint) + (config.BackStabChancePerLevel * (s.actor.Tier - whatMob.Level))
-
-		curChance := config.BackStabChance + (s.actor.Dex.Current * config.BackStabChancePerPoint) + (config.StealthLevel(s.actor.Skills[11].Value) * config.BackStabChancePerSkillLevel)
-		lvlDiff := float64(whatMob.Level - s.actor.Tier)
-		if lvlDiff > 1 {
-			lvlDiff = (lvlDiff - 1) * .125
-			curChance -= int(float64(curChance) * lvlDiff)
-		} else if lvlDiff == 1 {
-			curChance -= int(float64(curChance) * 0.05)
-		}
-
-		//s.msg.Actor.SendInfo("BS chance = " + strconv.Itoa(curChance))
-
-		if curChance > 95 {
-			curChance = 95
-		}
+		// Backstab rolls to hit like any other attack, with stealth standing
+		// in for the weapon skill; see BackstabMissChance.
+		curChance := 100 - BackstabMissChance(s, whatMob.Level-s.actor.Tier)
 
 		if s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 			curChance = 100
@@ -151,7 +138,7 @@ func (backstab) process(s *state) {
 		} else {
 			s.msg.Actor.SendBad("You failed to backstab ", whatMob.Name, ", and are vulnerable to attack!")
 			s.msg.Observers.SendBad(s.actor.Name+" failed to backstab ", whatMob.Name, ", and is vulnerable to attack!")
-			whatMob.AddThreatDamage(whatMob.Stam.Max/2, s.actor)
+			whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.FailedBackstabThreatPercent), s.actor)
 			s.actor.SetTimer("combat", config.CombatCooldown)
 			if utils.Roll(100, 1, 0) <= config.MobBSRevengeVitalChance {
 				whatMob.CurrentTarget = s.actor.Name

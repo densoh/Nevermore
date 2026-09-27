@@ -52,6 +52,7 @@ func (unequip) process(s *state) {
 			s.msg.Actor.SendGood("You unequip " + item.Name)
 			s.msg.Observer.SendInfo(s.actor.Name + " unequips " + item.Name)
 		}
+		dropSealWithoutShield(s.actor)
 		s.actor.SetTimer("combat", config.UnequipCooldown)
 		s.ok = true
 		return
@@ -62,6 +63,7 @@ func (unequip) process(s *state) {
 		s.actor.Inventory.Add(what)
 		s.msg.Actor.SendGood("You unequip " + what.Name)
 		s.msg.Observer.SendInfo(s.actor.Name + " unequips " + what.Name)
+		dropSealWithoutShield(s.actor)
 		s.actor.SetTimer("combat", config.UnequipCooldown)
 		s.ok = true
 		return
@@ -82,4 +84,12 @@ func (unequip) process(s *state) {
 
 	s.msg.Actor.SendInfo("What did you want to unequip?")
 	s.ok = true
+}
+
+// dropSealWithoutShield ends the seal of courage as soon as the shield is gone,
+// rather than waiting for the next tick to notice.
+func dropSealWithoutShield(c *objects.Character) {
+	if c.CheckFlag("seal-courage") && !c.HasShield() {
+		c.RemoveEffect("seal-courage")
+	}
 }

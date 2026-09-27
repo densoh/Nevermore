@@ -10,7 +10,7 @@ import (
 func init() {
 	addHandler(pray{},
 		"Usage:  pray \n\n Focus your attention on your faith and be overwhelmed with piousness.",
-		permissions.Cleric|permissions.Paladin,
+		permissions.Cleric,
 		"pray")
 }
 

@@ -370,15 +370,19 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 		if _, inList := mob.ThreatTable[char.Name]; !inList {
 			continue
 		}
-		if mob.CheckFlag("block_exit") && mob.Placement == char.Placement && mob.MobStunned == 0 && !mob.CheckFlag("run_away") {
+		// A stunned mob can't step in the way.
+		if mob.CheckFlag("block_exit") && mob.Placement == char.Placement && !mob.Stunned() && !mob.CheckFlag("run_away") {
 			evasive = 2
 			curChance := config.MobBlock - ((char.Tier - mob.Level) * config.MobBlockPerLevel)
 			if curChance > 85 {
 				curChance = 85
 			}
+			if mob.CheckFlag("crippled") {
+				curChance = config.CrippledChance(curChance)
+			}
 			if utils.Roll(100, 1, 0) <= curChance {
 				m.bad(mob.Name + " blocks your way.")
-				char.SetTimer("global", 8)
+				char.SetTimer("global", 4)
 				return false, 0, nil
 			}
 			break
@@ -396,6 +400,10 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 			continue
 		}
 		if !mob.CheckFlag("follows") || mob.CheckFlag("curious_canticle") {
+			continue
+		}
+		// A stunned mob can't give chase, so it earns the character no evade timer either.
+		if mob.Stunned() {
 			continue
 		}
 

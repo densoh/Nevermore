@@ -2,6 +2,7 @@ package objects
 
 import (
 	"encoding/json"
+	"github.com/ArcCS/Nevermore/utils"
 	"github.com/jinzhu/copier"
 	"log"
 	"math/rand"
@@ -398,9 +399,34 @@ func (e *Equipment) Search(alias string, nameNum int) *Item {
 	return nil
 }
 
+// offHandTypes are the item types that are held in the off hand.
+var offHandTypes = []int{6, 7, 8, 12, 13, 16, 17, 23}
+
+// IsTwoHanded reports whether the item is a weapon that takes both hands.
+func (i *Item) IsTwoHanded() bool {
+	return i.ItemType >= 0 && i.ItemType <= 4 && i.Flags["two_handed"]
+}
+
+// HandsFree reports whether the hands can take the item: a two-handed weapon
+// needs the off hand empty, and nothing goes in the off hand while a two-handed
+// weapon is wielded.  It says why not when they cannot.
+func (e *Equipment) HandsFree(item *Item) (bool, string) {
+	if item.IsTwoHanded() && e.Off != (*Item)(nil) {
+		return false, "You need both hands free to wield " + item.DisplayName() + "."
+	}
+	if utils.IntIn(item.ItemType, offHandTypes) && e.Main != (*Item)(nil) && e.Main.IsTwoHanded() {
+		return false, "Both of your hands are busy wielding " + e.Main.DisplayName() + "."
+	}
+	return true, ""
+}
+
 func (e *Equipment) Equip(item *Item, charClass int) (ok bool) {
 	ok = false
 	itemSlot := ""
+
+	if free, _ := e.HandsFree(item); !free {
+		return false
+	}
 
 	if item.ItemType == 5 && e.Chest == (*Item)(nil) {
 		e.Chest = item
@@ -1009,6 +1035,15 @@ func (e *Equipment) CheckEquipment() {
 	if e.Off != (*Item)(nil) {
 		if ok, _ := e.CanEquip(e.Off); !ok {
 			e.UnequipSpecific("off")
+		}
+	}
+	// A weapon that became two-handed since the gear was saved pushes the off
+	// hand item back into the pack.
+	if e.Off != (*Item)(nil) && e.Main != (*Item)(nil) && e.Main.IsTwoHanded() {
+		freed := e.Off
+		e.UnequipSpecific("off")
+		if e.ReturnToInventory != nil {
+			e.ReturnToInventory(freed)
 		}
 	}
 }

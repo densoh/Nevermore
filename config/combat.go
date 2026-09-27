@@ -12,9 +12,6 @@ var CombatModifiers = map[string]int{
 	"crushing": 10,
 	"thwomp":   2,
 
-	// Amount of damage per strength point
-	"berserk": 5,
-
 	// Sneaky Types
 	"backstab": 5,
 	"snipe":    4,
@@ -48,15 +45,19 @@ func MultiAttackMissPenaltyFor(skillLevel int) int {
 	return penalty
 }
 
+// MajorAbilityTier gates the tier 10 class abilities (berserk, flurry, touch
+// of death, the long leap, the meditate save). A const so other config
+// constants can build on it.
+const MajorAbilityTier = 10
+
 var (
 	MultiAttackMissPenalty        = 25 // Percentage points added to follow-up swing miss chance
 	MultiAttackMissReduction      = 5  // Points removed from the penalty per skill level past the threshold
-	MultiAttackMissReductionLevel = 6  // Skill level at which the penalty starts falling off
+	MultiAttackMissReductionLevel = 7  // Skill level at which the penalty starts falling off: 30% follow-up miss through Expert, then 25/20/15 at Specialist/Master/Grandmaster
 	BaselineStatValue             = 10
 	ProximityChance               = 80
 	ProximityStep                 = 10
 
-	BerserkCooldown = 60 * 5
 	CombatCooldown  = 8
 	UnequipCooldown = 2
 
@@ -69,8 +70,10 @@ var (
 	RoomEffectInvocation      = 18 // Seconds
 	RoomDefaultEncounterSpeed = 10 // Seconds
 	RoomMaxJigger             = 4
-	RoomEncNoDoubles          = 6
-	RoomEncNoTriples          = 5
+	// Crowding: once a room holds more hostile mobs than characters, double
+	// spawns stop and the spawn chance falls linearly, reaching half at
+	// chars + RoomEncCrowdHalfAt mobs and staying there.
+	RoomEncCrowdHalfAt = 4
 
 	BaseDevicePiety = 8.0
 
@@ -83,6 +86,7 @@ var (
 
 	SpecialAbilityTier = 7
 	MinorAbilityTier   = 5
+	SealJusticeTier    = 10 // Courage and faith open at MinorAbilityTier, justice here
 
 	MobVital       = 3
 	MobCritical    = 4
@@ -113,15 +117,15 @@ var (
 	SneakBonus                  = 10
 	StealChance                 = 20
 	StealChancePerSkillLevel    = 4
-	BackStabChance              = 20
+	BackStabChance              = 20 // starting hit chance before stealth, dex and level
 	BackstabDamageSkillModifier = .15
 	BackStabChancePerSkillLevel = 3
+	BackstabMissPerLevel        = 8 // points of miss per level the mob is above the thief, from level 2
 	SnipeChance                 = 15
 	HideChancePerPoint          = 3
 	SneakChancePerPoint         = 1
 	SneakChancePerTier          = 1
 	StealChancePerPoint         = 1
-	BackStabChancePerPoint      = 1
 	SnipeChancePerPoint         = 1
 	SnipeChancePerLevel         = 5
 	SnipeFumbleChance           = 20
@@ -140,8 +144,18 @@ var (
 	DisintegrateChance = 5
 	TurnTimer          = 60
 	SlamTimer          = 30
-	ShieldDamage       = 3
 	ShieldStun         = .4
+
+	// Paladin seals persist until dropped, so the effect gets a duration it
+	// will never reach.
+	SealDuration             = 10 * 365 * 24 * 60 * 60 // Seconds
+	SealTimer                = 10
+	SealCourageArmorBase     = 5
+	SealCourageArmorPerLevel = 1
+	// RescueWindow is how long attacks aimed at a rescued ally are drawn onto
+	// the paladin; RescueTimer is the cooldown between rescues.
+	RescueWindow = 8  // Seconds
+	RescueTimer  = 30 // Seconds
 
 	ScalePerPiety  = 1
 	DurationPerCon = 10
@@ -149,9 +163,23 @@ var (
 	ParryStuns  = 2
 	CircleStuns = 1
 	CircleTimer = 16
-	HamTimer    = 24
 	BashStuns   = 16
 	BashTimer   = 45
+
+	// Threat bumps, as a percent of the mob's max stamina, added on top of any
+	// damage the ability dealt. Taunts (circle, feint, hamstring, shield slam)
+	// use TauntThreatPercent; bash is a lighter taunt. A failed backstab hands
+	// the thief threat; a failed turn hands over the mob's current stamina,
+	// capped at FailedTurnThreatCapPercent.
+	TauntThreatPercent          = 50
+	BashThreatPercent           = 25
+	FailedBackstabThreatPercent = 25
+	FailedTurnThreatCapPercent  = 50
+
+	// MobThreatSwitchChance is the percent chance per mob tick (about 8s)
+	// that a mob turns on whoever tops its threat table when that is not its
+	// current target. Taunts set the target directly and skip this roll.
+	MobThreatSwitchChance = 10
 
 	MobBlock          = 35
 	MobBlockPerLevel  = 15
@@ -172,6 +200,7 @@ var (
 
 	HitPerDex        = 1
 	MissPerDex       = 1
+	BlessHitBonus    = 5 // percentage points off the miss chance while blessed
 	DexFallDamageMod = 1
 
 	FallDamage = .20
@@ -187,13 +216,21 @@ var (
 	BaseBroads             = 5
 	FizzleSave             = 25 // chance to fizzle per int below 9
 
-	PieRegenMod          = .4 // Regen Mana per tick
 	PieHealMod           = .7 // Per point
 	MinorPieHealMod      = .6 // Per point, vigor/mend only
 	MinorHealDivinityMod = .3 // Vigor/mend get 30% of the divinity bonus of detraumatize/renewal
-	MinorHealTierDiv     = 4  // Vigor/mend gain +1 base per this many tiers
-	MajorHealTierDiv     = 2  // Detraumatize/renewal gain +1 base per this many tiers
-	MajorHealBaseCut     = 5  // Subtracted from detraumatize/renewal base to offset the tier bonus
+	PaladinDivinityMod   = .5 // Paladins get this share of their divinity bonus without the seal of faith
+
+	// Seal of justice adds (base + pie/pieDiv + weaponLevel/weaponDiv) percent damage.
+	// Seal of justice damage bonus, in percent: base + tier/TierDiv +
+	// pie/PieDiv + weaponLevel/WeaponDiv. About 15% at tier 10 and 27% at 20.
+	SealJusticeBase      = 5.0
+	SealJusticeTierDiv   = 2.0
+	SealJusticePieDiv    = 4.0
+	SealJusticeWeaponDiv = 2.0
+	MinorHealTierDiv     = 4 // Vigor/mend gain +1 base per this many tiers
+	MajorHealTierDiv     = 2 // Detraumatize/renewal gain +1 base per this many tiers
+	MajorHealBaseCut     = 5 // Subtracted from detraumatize/renewal base to offset the tier bonus
 
 	ArmorReduction         = .007
 	ArmorReductionPoints   = 10
@@ -250,30 +287,6 @@ func CalcHaste(tier int) int {
 		return 4
 	}
 	return 0
-}
-
-var Parry = []int{
-	0,
-	2,
-	3,
-	5,
-	6,
-	8,
-	10,
-	14,
-	15,
-	18,
-	20,
-}
-
-func RollParry(skill int) bool {
-	if skill > 0 {
-		dRoll := utils.Roll(100, 1, 0)
-		if dRoll <= Parry[skill] {
-			return true
-		}
-	}
-	return false
 }
 
 var DoubleDamage = []int{
@@ -380,9 +393,15 @@ func RollBash(skill int) (damModifier int, stunModifier int, output string) {
 }
 
 func RollLethal(skill int) bool {
+	return RollLethalScaled(skill, 1)
+}
+
+// RollLethalScaled rolls a lethal blow with the table chance multiplied by
+// multiplier (see ExecuteMultiplier for the fighter's execute scaling).
+func RollLethalScaled(skill int, multiplier float64) bool {
 	if skill > 0 {
 		dRoll := utils.Roll(1000000, 1, 0)
-		if dRoll <= LethalDamage[skill] {
+		if float64(dRoll) <= float64(LethalDamage[skill])*multiplier {
 			return true
 		}
 	}
@@ -419,4 +438,48 @@ var XP_Modifiers = map[string]float64{
 	"ranged_attack": .03,
 	"invisible":     .03,
 	"steals":        .06,
+}
+
+// ThreatPercent is percent of a mob's max stamina, for the threat bumps above.
+func ThreatPercent(maxStam int, percent int) int {
+	return maxStam * percent / 100
+}
+
+// BackstabMissChance is the miss chance a backstab starts from, before dex,
+// level difference and combat flags are applied: the inverse of the base hit
+// chance plus the stealth bonus. Dex and the rest are shared with the
+// weapon miss chance, which is why they are not here.
+func BackstabMissChance(stealthLevel int) int {
+	return 100 - BackStabChance - stealthLevel*BackStabChancePerSkillLevel
+}
+
+// FailedTurnThreat is the threat a failed turn hands the caster: the mob's
+// current stamina, capped at FailedTurnThreatCapPercent of its max.
+func FailedTurnThreat(current int, max int) int {
+	cap := ThreatPercent(max, FailedTurnThreatCapPercent)
+	if current > cap {
+		return cap
+	}
+	return current
+}
+
+// MobStunBase is how long (seconds) a mob's stun spell holds a player, and
+// MobStunMin is the floor once level difference is subtracted.
+const (
+	MobStunBase = 20
+	MobStunMin  = 1
+)
+
+// MobStunDuration is how long a mob of mobLevel stuns a player of playerTier.
+// A lower-level mob loses one second per level it is below the player, down
+// to MobStunMin; a mob at or above the player's level stuns for the full duration.
+func MobStunDuration(mobLevel int, playerTier int) int {
+	duration := MobStunBase
+	if mobLevel < playerTier {
+		duration -= playerTier - mobLevel
+	}
+	if duration < MobStunMin {
+		duration = MobStunMin
+	}
+	return duration
 }

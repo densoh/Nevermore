@@ -13,7 +13,7 @@ import (
 func init() {
 	addHandler(slam{},
 		"Usage:  shield-slam target # \n\n Slam your shield into the target",
-		permissions.Paladin,
+		permissions.Paladin|permissions.Fighter,
 		"shield", "shield-slam", "slam")
 }
 
@@ -84,10 +84,11 @@ func (slam) process(s *state) {
 			return
 		}
 
-		actualDamage, _, resisted := whatMob.ReceiveDamage(s.actor.GetStat("str") * config.ShieldDamage)
+		shield := s.actor.Equipment.Off
+		actualDamage, _, resisted := whatMob.ReceiveDamage(config.ShieldSlamDamage(s.actor.GetStat("str"), s.actor.Tier, config.RollShieldArmor(shield.Armor)))
 		data.StoreCombatMetric("shieldslam", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
-		whatMob.AddThreatDamage(whatMob.Stam.Max/10, s.actor)
-		whatMob.Stun(int(config.ShieldStun * float64(s.actor.GetStat("pie"))))
+		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
+		whatMob.Stun(config.ShieldSlamStun(s.actor.Class, s.actor.GetStat("str"), s.actor.GetStat("pie")))
 		whatMob.CurrentTarget = s.actor.Name
 		s.msg.Actor.SendInfo("You slammed the " + whatMob.Name + " with your shield for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
 		s.msg.Observers.SendInfo(s.actor.Name + " slams " + config.TextPosPronoun[s.actor.Gender] + " shield into " + whatMob.Name)
