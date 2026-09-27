@@ -81,6 +81,10 @@ type Mob struct {
 	IsThinking bool
 	// StunnedUntil is when the current stun releases the mob's tick.
 	StunnedUntil time.Time
+	// NextTick is when the mob's ticker is due to fire next. Every reset of
+	// MobTicker goes through scheduleTick so this stays accurate; Stun reads
+	// it to decide whether a stun would actually delay the mob.
+	NextTick time.Time
 }
 
 func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
@@ -149,6 +153,7 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		false,
 		false,
 		time.Time{},
+		time.Time{},
 	}
 
 	for _, spellN := range strings.Split(mobData["spells"].(string), ",") {
@@ -192,7 +197,8 @@ func (m *Mob) StartTicking() {
 			m.TickModifier = 2
 		}
 	}
-	m.MobTicker = time.NewTicker(time.Duration(8-m.TickModifier) * time.Second)
+	m.MobTicker = time.NewTicker(m.tickPeriod())
+	m.NextTick = time.Now().Add(m.tickPeriod())
 	/* This allows a mob to cast beneficial spells on itself on load, but it also means that any mob with a heal in its spell list will heal on load, which is not desired.
 	for _, spell := range m.Spells {
 		if utils.StringIn(spell, MobSupportSpells) {
@@ -215,6 +221,8 @@ func (m *Mob) StartTicking() {
 				return
 			case <-m.MobTicker.C:
 				Rooms[m.ParentId].LockRoom(m.Name+" MobTick", false)
+				// The ticker keeps its current period unless Tick resets it.
+				m.NextTick = time.Now().Add(m.tickPeriod())
 				m.Tick()
 				Rooms[m.ParentId].UnlockRoom(m.Name+" MobTick", false)
 			}
@@ -254,7 +262,7 @@ func (m *Mob) Tick() {
 		return
 	}
 	if m.IsStunned {
-		m.MobTicker.Reset(time.Duration(8-m.TickModifier) * time.Second)
+		m.scheduleTick(m.tickPeriod())
 		m.IsStunned = false
 		m.MobStunned = 0
 	}
@@ -855,20 +863,36 @@ func (m *Mob) MobScript(inputStr string) {
 
 }
 
-// Stun holds the mob's next tick off for amt seconds. A stun landing on top
-// of a longer one is ignored so a short stun can never cut a long one short.
+// tickPeriod is how long the mob normally waits between ticks.
+func (m *Mob) tickPeriod() time.Duration {
+	return time.Duration(8-m.TickModifier) * time.Second
+}
+
+// scheduleTick makes the mob's next tick fire d from now and records when
+// that is. Always use this instead of resetting MobTicker directly.
+func (m *Mob) scheduleTick(d time.Duration) {
+	m.MobTicker.Reset(d)
+	m.NextTick = time.Now().Add(d)
+}
+
+// Stun holds the mob's next tick off until amt seconds from now. A stun is
+// a floor on the mob's next action, not an addition to it: if the mob was
+// already going to wait longer than amt (its normal tick is further out, or
+// a longer stun is running) the call is a no-op, and otherwise the next tick
+// moves out to exactly now+amt. Stuns can therefore never be chained to hold
+// a mob indefinitely; the longest single stun wins.
 func (m *Mob) Stun(amt int) {
 	if m.Flags["no_stun"] || amt <= 0 {
 		return
 	}
 	until := time.Now().Add(time.Duration(amt) * time.Second)
-	if m.IsStunned && until.Before(m.StunnedUntil) {
+	if !until.After(m.NextTick) {
 		return
 	}
 	m.IsStunned = true
 	m.MobStunned = amt
 	m.StunnedUntil = until
-	m.MobTicker.Reset(time.Until(until))
+	m.scheduleTick(time.Until(until))
 }
 
 // Stunned reports whether the mob is currently held by a stun. A stunned mob

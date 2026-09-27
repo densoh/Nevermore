@@ -161,7 +161,7 @@ var (
 	DurationPerCon = 10
 
 	ParryStuns  = 2
-	CircleStuns = 1
+	CircleStuns = 6
 	CircleTimer = 16
 	BashStuns   = 16
 	BashTimer   = 45

@@ -18,7 +18,9 @@ const (
 
 	// Circle stuns for CircleStuns seconds for everyone who has it. A fighter
 	// adds one second per CircleFighterLevelsPerSecond weapon skill levels on
-	// top, so a grandmaster fighter circles for a full combat round.
+	// top, so a grandmaster fighter circles for more than a full combat round.
+	// A mob stun is a floor on its next action, never additive (see Mob.Stun),
+	// so circling repeatedly cannot hold a mob down indefinitely.
 	CircleFighterLevelsPerSecond = 2
 
 	// Execute: from ExecuteTier, a fighter with at least ExecuteWeaponLevel
