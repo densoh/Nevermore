@@ -378,15 +378,21 @@ func (c *Character) GainChi(amount int, force bool) int {
 	return c.Mana.Current - before
 }
 
-// tickChi bleeds chi away once the monk has been out of combat long enough.
+// tickChi bleeds chi away once the monk has been out of combat long enough,
+// never taking the pool below config.ChiDecayFloor.
 func (c *Character) tickChi() {
-	if c.Mana.Current <= 0 || c.CheckFlag("meditate") {
+	floor := config.ChiDecayFloor(c.Tier)
+	if c.Mana.Current <= floor || c.CheckFlag("meditate") {
 		return
 	}
 	if time.Since(c.LastCombat) < time.Duration(config.ChiDecayGraceSeconds)*time.Second {
 		return
 	}
-	c.Mana.Subtract(config.ChiDecayAmount(c.Mana.Max))
+	amount := config.ChiDecayAmount(c.Mana.Max)
+	if c.Mana.Current-amount < floor {
+		amount = c.Mana.Current - floor
+	}
+	c.Mana.Subtract(amount)
 }
 
 // ConsumeFeintCharge spends one feint charge; the flag drops with the last
@@ -991,8 +997,14 @@ func (c *Character) Tick() {
 	blessed := c.CheckFlag("bless") || c.CheckFlag("seal-faith")
 	c.Heal(config.HealthRegen(c.GetStat("con"), roomMod, inCombat, blessed))
 	if c.Class == config.MONK {
-		// Chi never regenerates on its own; it only comes from fighting.
-		c.tickChi()
+		// Chi regenerates only while meditating; otherwise it comes from
+		// fighting and bleeds away between fights.
+		if c.CheckFlag("meditate") {
+			regen := config.ManaRegen(c.GetStat("pie"), c.GetStat("int"), c.Tier, roomMod, inCombat, blessed)
+			c.RestoreMana(int(math.Ceil(float64(regen) * config.MeditateChiRegenMod)))
+		} else {
+			c.tickChi()
+		}
 	} else {
 		c.RestoreMana(config.ManaRegen(c.GetStat("pie"), c.GetStat("int"), c.Tier, roomMod, inCombat, blessed))
 	}

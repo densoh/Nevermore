@@ -79,6 +79,7 @@ func (circle) process(s *state) {
 			return
 		}
 
+		recklessAttack(s)
 		// Check for a miss
 		if utils.Roll(100, 1, 0) <= DetermineMissChance(s, whatMob.Level-s.actor.Tier) {
 			s.msg.Actor.SendBad("You missed!!")

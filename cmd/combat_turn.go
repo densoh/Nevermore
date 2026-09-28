@@ -109,7 +109,7 @@ func (turn) process(s *state) {
 			// The enraged mob gets a free swing at twice its damage, scaled to the
 			// mob rather than to the player. Resolved as a normal-style strike so
 			// the player sees the vulnerability text rather than a double banner.
-			whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, float64(config.CombatModifiers["double"]), objects.StrikeOpts{
+			whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, config.CombatModifiers["double"], objects.StrikeOpts{
 				Metric:    "turn_fail_retaliate",
 				Mode:      0,
 				HitPrefix: "Exposed!! ",

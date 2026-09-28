@@ -6,12 +6,11 @@ import (
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
-	"github.com/ArcCS/Nevermore/text"
 )
 
 func init() {
 	addHandler(reckless{},
-		"Usage:  reckless target # \n\n Throw everything into one swing: it lands more often and hits harder, but costs stamina.",
+		"Usage:  reckless \n\n Toggle a reckless stance.  While it lasts every melee attack you throw lands more often and hits harder, but each one costs stamina.  It drops on its own when you run too low to keep it up or draw a ranged weapon.",
 		permissions.Barbarian,
 		"reckless", "reck")
 }
@@ -19,70 +18,54 @@ func init() {
 type reckless cmd
 
 func (reckless) process(s *state) {
-	if len(s.input) < 1 {
-		s.msg.Actor.SendBad("Swing recklessly at what exactly?")
-		return
-	}
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
-		return
-	}
-	if s.actor.Tier < config.RecklessTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.RecklessTier) + " to use this skill.")
-		return
-	}
-	cost := config.RecklessStamCost(s.actor.Stam.Max)
-	if s.actor.Stam.Current <= 0 || s.actor.Stam.Current < cost {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
-		return
-	}
-	ready, msg := s.actor.TimerReady("combat")
-	if !ready {
-		s.msg.Actor.SendBad(msg)
-		return
-	}
-
-	name := s.input[0]
-	nameNum := 1
-	if len(s.words) > 1 {
-		if val, err := strconv.Atoi(s.words[1]); err == nil {
-			nameNum = val
-		}
-	}
-
-	whatMob := s.where.Mobs.Search(name, nameNum, s.actor)
-	if whatMob == nil {
-		s.msg.Actor.SendInfo("Swing recklessly at what?")
+	if s.actor.CheckFlag("reckless") {
+		s.actor.RemoveEffect("reckless")
 		s.ok = true
 		return
 	}
 
+	if s.actor.Tier < config.RecklessTier {
+		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.RecklessTier) + " to use this skill.")
+		return
+	}
 	if s.actor.Equipment.Main == (*objects.Item)(nil) {
-		s.msg.Actor.SendBad("You have no weapon to attack with.")
+		s.msg.Actor.SendBad("You have no weapon to swing.")
 		return
 	}
 	if s.actor.Equipment.Main.ItemType == 4 {
 		s.msg.Actor.SendBad("You can only swing recklessly with a melee weapon.")
 		return
 	}
-	if inRange, rangeMsg := weaponInRange(s, s.actor.Equipment.Main, whatMob); !inRange {
-		s.msg.Actor.SendBad(rangeMsg)
+	cost := config.RecklessStamCost(s.actor.Stam.Max)
+	if s.actor.Stam.Current < cost {
+		s.msg.Actor.SendBad("You are far too tired to do that.")
 		return
 	}
 
-	s.actor.Victim = whatMob
-	s.actor.RunHook("combat")
-	if _, engaged := whatMob.ThreatTable[s.actor.Name]; !engaged {
-		s.msg.Actor.Send(text.White + "You engaged " + whatMob.Name + " #" + strconv.Itoa(s.where.Mobs.GetNumber(whatMob)) + " in combat.")
-		whatMob.AddThreatDamage(0, s.actor)
+	objects.Effects["reckless"](s.actor, s.actor, 0)
+	s.msg.Observers.SendInfo(s.actor.Name + " throws caution aside and swings with everything they have.")
+	s.ok = true
+}
+
+// recklessAttack charges the reckless stance for one attack. Every attack
+// that rolls to hit while the stance is up pays RecklessStamCost first, so
+// the miss and damage rolls that read the flag never get the bonus for free.
+// The stance drops on its own when the barbarian cannot cover the cost or is
+// holding a ranged weapon; the flag is then already down before the roll.
+func recklessAttack(s *state) {
+	if !s.actor.CheckFlag("reckless") {
+		return
 	}
-
+	if s.actor.Equipment.Main != (*objects.Item)(nil) && s.actor.Equipment.Main.ItemType == 4 {
+		s.actor.RemoveEffect("reckless")
+		s.msg.Actor.SendBad("You can't swing recklessly with a ranged weapon.")
+		return
+	}
+	cost := config.RecklessStamCost(s.actor.Stam.Max)
+	if s.actor.Stam.Current < cost {
+		s.actor.RemoveEffect("reckless")
+		s.msg.Actor.SendBad("You are too tired to keep swinging recklessly.")
+		return
+	}
 	s.actor.Stam.Subtract(cost)
-	s.msg.Actor.SendInfo("You throw everything into the swing!")
-
-	// The flag is only up for this one swing; the damage roll and the miss
-	// roll both read it.
-	s.actor.FlagOn("reckless", "reckless")
-	defer s.actor.FlagOff("reckless", "reckless")
-	performAttack(s, whatMob)
 }

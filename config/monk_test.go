@@ -64,11 +64,12 @@ func TestTodReferenceGrows(t *testing.T) {
 			prev = r
 		}
 	}
-	// R equals a low-piety monk's full bar, so a full-chi touch is at c = 1
-	// with nothing to spare; a typical monk keeps a small surplus for flurry.
+	// R sits TodReferenceBase - MonkChiPerPie*10 below a low-piety monk's
+	// full bar (10 chi since 2026-09-27), so even they keep a little back
+	// after a full-chi touch; a typical monk keeps a larger surplus for flurry.
 	for tier := MonkTodTier; tier <= 25; tier++ {
-		if MonkMaxChi(tier, 10) != TodReference(tier) {
-			t.Errorf("tier %d: low-piety max chi %d should equal R %d", tier, MonkMaxChi(tier, 10), TodReference(tier))
+		if got, want := MonkMaxChi(tier, 10)-TodReference(tier), MonkChiPerPie*10-TodReferenceBase; got != want {
+			t.Errorf("tier %d: low-piety surplus over R = %d, want %d", tier, got, want)
 		}
 		if MonkMaxChi(tier, 12+tier/4) <= TodReference(tier) {
 			t.Errorf("tier %d: typical monk has no chi surplus over R", tier)
@@ -152,12 +153,12 @@ func TestChiHelpers(t *testing.T) {
 	if ChiDecayAmount(100) != 100*ChiDecayPercent/100 {
 		t.Errorf("decay on 100 = %d", ChiDecayAmount(100))
 	}
-	// The piety share is floored at 1, so low piety still earns 3.
-	if ChiPerHitFor(0) != 3 || ChiPerHitFor(7) != 3 {
-		t.Errorf("chi per hit at low piety = %d / %d, want 3", ChiPerHitFor(0), ChiPerHitFor(7))
+	// The piety share is floored at 1, so low piety still earns 4.
+	if ChiPerHitFor(0) != 4 || ChiPerHitFor(4) != 4 {
+		t.Errorf("chi per hit at low piety = %d / %d, want 4", ChiPerHitFor(0), ChiPerHitFor(4))
 	}
-	if ChiPerHitFor(16) != 4 || ChiPerHitFor(24) != 5 {
-		t.Errorf("chi per hit at pie 16 / 24 = %d / %d, want 4 / 5", ChiPerHitFor(16), ChiPerHitFor(24))
+	if ChiPerHitFor(15) != 6 || ChiPerHitFor(25) != 8 {
+		t.Errorf("chi per hit at pie 15 / 25 = %d / %d, want 6 / 8", ChiPerHitFor(15), ChiPerHitFor(25))
 	}
 	if ChiGainCap(5) != 1 {
 		t.Errorf("gain cap on a tiny pool = %d, want 1", ChiGainCap(5))
@@ -301,5 +302,14 @@ func TestMeditateSaveChance(t *testing.T) {
 	}
 	if got := MeditateSaveChance(10, 40, 0); got != 0 {
 		t.Errorf("chance not floored: %d", got)
+	}
+}
+
+func TestChiDecayFloorIsTierCappedAtTen(t *testing.T) {
+	cases := map[int]int{1: 1, 5: 5, 10: 10, 15: 10, 25: 10}
+	for tier, want := range cases {
+		if got := ChiDecayFloor(tier); got != want {
+			t.Errorf("ChiDecayFloor(%d) = %d, want %d", tier, got, want)
+		}
 	}
 }
