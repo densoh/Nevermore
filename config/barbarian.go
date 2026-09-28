@@ -23,16 +23,20 @@ const (
 	BloodlustStamPercent   = 10 // of max stamina, per kill
 	BerserkMaxExtension    = 60
 
-	// Reckless: a single melee swing that trades stamina for accuracy and
-	// damage. The damage bonus scales the weapon roll only, before the
-	// berserk flat bonus is added, so it is worth the same in and out of rage.
+	// Reckless: a toggled melee stance that trades stamina for accuracy and
+	// damage. Every attack thrown while it is up costs RecklessStamPercent of
+	// max stamina; the stance drops on its own when the barbarian cannot cover
+	// the cost or draws a ranged weapon. The damage bonus scales the weapon
+	// roll only, before the berserk flat bonus is added, so it is worth the
+	// same in and out of rage.
 	RecklessTier          = 5
-	RecklessStamPercent   = 5  // of max stamina, per swing, minimum 1
-	RecklessDamagePercent = 25 // added to the weapon roll
-	RecklessMissReduction = 10 // percentage points off the miss chance
+	RecklessStamPercent   = 5    // of max stamina, per attack, minimum 1
+	RecklessDamagePercent = 25   // added to the weapon roll
+	RecklessMissReduction = 10   // percentage points off the miss chance
+	RecklessMaxDuration   = 3600 // safety expiry for the stance, seconds
 )
 
-// RecklessStamCost is the stamina one reckless swing costs at the given max.
+// RecklessStamCost is the stamina one reckless attack costs at the given max.
 func RecklessStamCost(maxStam int) int {
 	cost := (maxStam*RecklessStamPercent + 99) / 100
 	if cost < 1 {

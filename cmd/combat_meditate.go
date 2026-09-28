@@ -11,7 +11,7 @@ import (
 
 func init() {
 	addHandler(meditate{},
-		"Usage:  meditate \n\n Center yourself, restoring some of your health, stamina and chi and purging any poison, disease, blindness or drink, then enter a trance during which your chi does not fade and every gain is heightened.  A seasoned monk in a trance may shrug off afflictions that reach them.  Usable in or out of combat.",
+		"Usage:  meditate \n\n Center yourself, restoring some of your health, stamina and chi and purging any poison, disease, blindness or drink, then enter a trance during which your chi slowly regenerates instead of fading and every gain is heightened.  A seasoned monk in a trance may shrug off afflictions that reach them.  Usable in or out of combat.",
 		permissions.Monk,
 		"meditate")
 }
@@ -19,12 +19,9 @@ func init() {
 type meditate cmd
 
 func (meditate) process(s *state) {
-	ready, msg := s.actor.TimerReady("combat_meditate")
-	if !ready {
-		s.msg.Actor.SendBad(msg)
-		return
-	}
-	ready, msg = s.actor.TimerReady("combat")
+	// Like a restorative spell, meditate waits only on its own cooldown and
+	// on stun; the global and combat timers do not gate it.
+	ready, msg := s.actor.TimerReadyIgnoreGlobal("combat_meditate")
 	if !ready {
 		s.msg.Actor.SendBad(msg)
 		return
@@ -44,8 +41,9 @@ func (meditate) process(s *state) {
 	s.msg.Actor.SendGood("You slow your breathing and center yourself, restoring " +
 		strconv.Itoa(vit) + " health, " + strconv.Itoa(stam) + " stamina and " + strconv.Itoa(chi) + " chi.")
 	s.msg.Observers.SendInfo(s.actor.Name + " meditates!")
+	// Meditate is a free action: it has its own cooldown but does not
+	// consume the combat round.
 	s.actor.SetTimer("combat_meditate", config.MeditateTime)
-	s.actor.SetTimer("combat", config.CombatCooldown)
 
 	s.ok = true
 }

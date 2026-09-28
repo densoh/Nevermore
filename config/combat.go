@@ -2,7 +2,8 @@ package config
 
 import "github.com/ArcCS/Nevermore/utils"
 
-var CombatModifiers = map[string]int{
+// CombatModifiers are damage multipliers for special attack results.
+var CombatModifiers = map[string]float64{
 	// Attack Modifiers
 	"critical": 5,
 	"double":   2,
@@ -11,6 +12,7 @@ var CombatModifiers = map[string]int{
 	"thunk":    100,
 	"crushing": 10,
 	"thwomp":   2,
+	"thump":    1.5,
 
 	// Sneaky Types
 	"backstab": 5,
@@ -369,14 +371,9 @@ var BashChances = map[int][]int{
 	9: {3000 * 4, 12000 * 4, 24000 * 4, 48000 * 4},
 }
 
-func RollBash(skill int) (damModifier int, stunModifier int, output string) {
-	/*
-		var ThumpRoll = 10
-		var ThwompRoll = 50
-		var CrushingRoll = 500
-		var ThunkRoll = 1000
-
-	*/
+// RollBash rolls for a special bash result. damModifier multiplies the bash
+// damage and stunModifier multiplies BashStuns; both are 1 on a plain bash.
+func RollBash(skill int) (damModifier float64, stunModifier int, output string) {
 	damModifier = 1
 	stunModifier = 1
 	bashRoll := utils.Roll(1000000, 1, 0)
@@ -390,7 +387,8 @@ func RollBash(skill int) (damModifier int, stunModifier int, output string) {
 		damModifier = CombatModifiers["thwomp"]
 		output = "Thwomp!!"
 	} else if bashRoll <= BashChances[skill][3] { // Thump
-		stunModifier = 3
+		damModifier = CombatModifiers["thump"]
+		stunModifier = 2
 		output = "Thump!!"
 	}
 	return

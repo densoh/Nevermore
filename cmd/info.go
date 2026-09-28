@@ -71,6 +71,7 @@ func (information) process(s *state) {
 		"{{if .Blind}}" + text.Blue + "You have been blinded!!\n{{end}}" + text.Good +
 		"{{if .Meditating}}" + text.Cyan + "You are in a meditative trance.\n{{end}}" + text.Good +
 		"{{if .Flurry}}" + text.Yellow + "You are unleashing a flurry of blows.\n{{end}}" + text.Good +
+		"{{if .Reckless}}" + text.Yellow + "You are swinging recklessly.\n{{end}}" + text.Good +
 		"{{if .Feinting}}" + text.Cyan + "You are poised to evade ({{.FeintCharges}} more attacks).\n{{end}}" + text.Good +
 		"{{if .DarkVision}}You can see in the dark naturally. \n{{end}}" +
 		"You have {{.Broadcasts}} broadcasts remaining today.\n" +
@@ -133,6 +134,7 @@ func (information) process(s *state) {
 		Rerolls         int
 		Meditating      bool
 		Flurry          bool
+		Reckless        bool
 		Feinting        bool
 		FeintCharges    int
 	}{
@@ -185,6 +187,7 @@ func (information) process(s *state) {
 		s.actor.Rerolls,
 		s.actor.CheckFlag("meditate"),
 		s.actor.CheckFlag("flurry"),
+		s.actor.CheckFlag("reckless"),
 		s.actor.CheckFlag("feint"),
 		s.actor.FeintCharges,
 	}

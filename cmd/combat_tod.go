@@ -118,7 +118,7 @@ func (tod) process(s *state) {
 		// A botched touch hands the mob a free swing at twice its damage,
 		// resolved as a normal-style strike so the player sees the
 		// vulnerability text rather than a double banner.
-		whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, float64(config.CombatModifiers["double"]), objects.StrikeOpts{
+		whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, config.CombatModifiers["double"], objects.StrikeOpts{
 			Metric:    "tod_fail_retaliate",
 			Mode:      0,
 			HitPrefix: "Exposed!! ",
@@ -141,10 +141,13 @@ func (tod) process(s *state) {
 		return
 	}
 
-	// The kill didn't take: the touch still tears at what's left. Chi goes
+	// The kill didn't take: the touch still tears out a share of the target's
+	// full hit points, more of it the more chi was committed. It is measured
+	// against max rather than remaining so the blow doesn't shrink as the
+	// target weakens; on a low target it is usually lethal anyway. Chi goes
 	// straight through armor.
-	percent := utils.Roll(config.TodFailMaxPercent-config.TodFailMinPercent+1, 1, config.TodFailMinPercent-1)
-	damage := whatMob.Stam.Current * percent / 100
+	percent := config.TodFailPercent(commitment)
+	damage := whatMob.Stam.Max * percent / 100
 	for i := 0; i < config.TodFailHits; i++ {
 		damage += s.actor.InflictDamage()
 	}

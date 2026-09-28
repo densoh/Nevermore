@@ -87,6 +87,7 @@ func (bash) process(s *state) {
 			return
 		}
 
+		recklessAttack(s)
 		// Check for a miss
 		if utils.Roll(100, 1, 0) <= DetermineMissChance(s, whatMob.Level-s.actor.Tier) {
 			s.msg.Actor.SendBad("You missed!!")
@@ -100,7 +101,7 @@ func (bash) process(s *state) {
 		// Check the rolls in reverse order from hardest to lowest for bash rolls.
 		damageModifier, stunModifier, bashMsg := config.RollBash(config.WeaponLevel(s.actor.Skills[2].Value, s.actor.Class, 2))
 		whatMob.Stun(config.BashStuns * stunModifier)
-		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * float64(damageModifier))))
+		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * damageModifier)))
 		data.StoreCombatMetric("bash", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.BashThreatPercent), s.actor)
 		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))

@@ -148,6 +148,7 @@ func weaponInRange(s *state, weapon *objects.Item, whatMob *objects.Mob) (bool, 
 // swing connects first always takes the full damage slot and any critical or double
 // roll rides on it.
 func performAttack(s *state, whatMob *objects.Mob) {
+	recklessAttack(s)
 	// use a list of attacks,  so we can expand this later if other classes get multi style attacks
 	attacks := []float64{
 		1.0,
@@ -179,7 +180,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 		if utils.Roll(1000, 1, 0) == 1 {
 			// Throw a snipe
 			whatMob.AddThreatDamage(whatMob.Stam.Max/10, s.actor)
-			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * float64(config.CombatModifiers["snipe"]))))
+			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * config.CombatModifiers["snipe"])))
 			data.StoreCombatMetric("snipe", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			s.msg.Actor.SendInfo("You sniped the " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
 			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
@@ -306,12 +307,12 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 		action := metric
 		if hit == 0 {
 			if config.RollCritical(skillLevel) || alwaysCrit {
-				mult *= float64(config.CombatModifiers["critical"])
+				mult *= config.CombatModifiers["critical"]
 				s.msg.Actor.SendGood("Critical Strike!")
 				result.weaponDamage = 10
 				action = metric + "-critical"
 			} else if config.RollDouble(skillLevel) {
-				mult *= float64(config.CombatModifiers["double"])
+				mult *= config.CombatModifiers["double"]
 				s.msg.Actor.SendGood("Double Damage!")
 				action = metric + "-double"
 			}

@@ -113,7 +113,7 @@ func (backstab) process(s *state) {
 		s.actor.RunHook("combat")
 		if curChance >= 100 || utils.Roll(100, 1, 0) <= curChance {
 
-			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * float64(config.CombatModifiers["backstab"]))))
+			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * config.CombatModifiers["backstab"])))
 			data.StoreCombatMetric("backstab", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
 			s.actor.AdvanceStealthExp(int(float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))

@@ -1378,6 +1378,25 @@ func flurry(caller interface{}, target interface{}, magnitude int) string {
 	return ""
 }
 
+// reckless is the barbarian's all-out stance. The per-attack stamina cost
+// and the auto-toggle when stamina runs dry live in the attack code; the long
+// duration here is only a safety net so the stance never lingers forever.
+func reckless(caller interface{}, target interface{}, magnitude int) string {
+	switch target := target.(type) {
+	case *Character:
+		target.ApplyEffect("reckless", strconv.Itoa(config.RecklessMaxDuration), 0, 0,
+			func(triggers int) {
+				target.FlagOnAndMsg("reckless", "reckless", text.Yellow+"You throw caution aside and swing with everything you have.\n")
+			},
+			func() {
+				target.FlagOffAndMsg("reckless", "reckless", text.Cyan+"You collect yourself and stop swinging recklessly.\n")
+			})
+	case *Mob:
+		return ""
+	}
+	return ""
+}
+
 // feint primes the monk's passive dodge for the next few incoming attacks.
 // magnitude is the charge count so it survives a save/load; the charges are
 // spent in Mob.RollMiss.
@@ -1585,6 +1604,7 @@ func init() {
 		"dodge":            dodge,
 		"meditate":         meditate,
 		"flurry":           flurry,
+		"reckless":         reckless,
 		"feint":            feint,
 		"resist-acid":      resistacid,
 		//"embolden":         embolden,
