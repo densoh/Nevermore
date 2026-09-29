@@ -18,8 +18,15 @@ func init() {
 type flurry cmd
 
 func (flurry) process(s *state) {
+	// The stance answers to its own cooldown only; no other timer holds it.
+	if ready, msg := s.actor.StanceReady(); !ready {
+		s.msg.Actor.SendBad(msg)
+		return
+	}
+
 	if s.actor.CheckFlag("flurry") {
 		s.actor.RemoveEffect("flurry")
+		s.actor.SetStanceTimer()
 		s.msg.Actor.SendInfo("You let the flurry subside.")
 		s.ok = true
 		return
@@ -42,6 +49,7 @@ func (flurry) process(s *state) {
 	}
 
 	objects.Effects["flurry"](s.actor, s.actor, 0)
+	s.actor.SetStanceTimer()
 	s.msg.Observers.SendInfo(s.actor.Name + "'s hands blur into a flurry of blows.")
 	s.ok = true
 }

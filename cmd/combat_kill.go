@@ -209,7 +209,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 
 	result := resolveHits(s, whatMob, attacks, skillLevel, "kill")
 	if s.actor.Class == config.MONK && result.hits > 0 && !flurried {
-		gainChiFromHits(s, result.hits)
+		gainChiFromHits(s, result.chiHits())
 	}
 	DeathCheck(s, whatMob)
 	if s.actor.Class != config.MONK {
@@ -220,6 +220,16 @@ func performAttack(s *state, whatMob *objects.Mob) {
 	}
 
 	s.actor.SetTimer("combat", config.CombatCooldown)
+}
+
+// canCrush reports whether the actor's regular attacks can land a crushing
+// blow: barbarians wielding a blunt or two-handed melee weapon.
+func canCrush(s *state) bool {
+	main := s.actor.Equipment.Main
+	if s.actor.Class != config.BARBARIAN || main == nil || main.ItemType == 4 {
+		return false
+	}
+	return main.ItemType == 2 || main.IsTwoHanded()
 }
 
 // attackSkillLevel is the weapon skill level behind the actor's attacks:
@@ -258,25 +268,37 @@ func gainChiFromHits(s *state, hits int) {
 }
 
 // hitResult is what resolveHits reports back: how many swings landed, the
-// damage dealt, and how much wear the weapon took (10 on a critical).
+// damage dealt, how much wear the weapon took (10 on a critical), and whether
+// the round landed a critical strike.
 type hitResult struct {
 	hits         int
 	totalDamage  int
 	weaponDamage int
+	critical     bool
+}
+
+// chiHits is the number of hits' worth of chi the round builds: a critical
+// strike counts config.CritChiMultiplier times.
+func (r hitResult) chiHits() int {
+	if r.critical {
+		return r.hits + config.CritChiMultiplier - 1
+	}
+	return r.hits
 }
 
 // resolveHits runs the swings of one attack round against the mob and reports
 // the outcome. metric names the combat metric family ("kill", "leap", ...).
 //
 // It resolves in two passes. Every swing rolls to hit first, with the first
-// swing at the normal miss chance and follow-ups at a penalised one. The damage
+// swing at the normal miss chance and follow-ups at a penalised one (a monk's
+// extra swings are always a flurry, which has its own penalty). The damage
 // multipliers are then handed out to the landed hits in order, so whichever
 // swing connects first always takes the full damage slot and any critical or
 // double roll rides on it. Damage and reflection are totalled and reported once.
 func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel int, metric string) hitResult {
 	result := hitResult{weaponDamage: 1}
 	baseMiss := DetermineMissChance(s, whatMob.Level-s.actor.Tier)
-	followUpMiss := baseMiss + config.MultiAttackMissPenaltyFor(skillLevel)
+	followUpMiss := baseMiss + followUpMissPenalty(s, skillLevel)
 	if followUpMiss > 95 {
 		followUpMiss = 95
 	}
@@ -301,15 +323,22 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 	if s.actor.Class != config.MONK {
 		alwaysCrit = s.actor.Equipment.Main.Flags["always_crit"]
 	}
+	crushing := false
 	totalReflect := 0
 	for hit := 0; hit < result.hits; hit++ {
 		mult := attacks[hit]
 		action := metric
 		if hit == 0 {
-			if config.RollCritical(skillLevel) || alwaysCrit {
+			if canCrush(s) && config.RollCrushing(skillLevel) {
+				crushing = true
+				mult *= config.CombatModifiers["crushing"]
+				s.msg.Actor.SendGood("Craaackk!! A crushing blow!")
+				action = metric + "-crushing"
+			} else if config.RollCritical(skillLevel) || alwaysCrit {
 				mult *= config.CombatModifiers["critical"]
 				s.msg.Actor.SendGood("Critical Strike!")
 				result.weaponDamage = 10
+				result.critical = true
 				action = metric + "-critical"
 			} else if config.RollDouble(skillLevel) {
 				mult *= config.CombatModifiers["double"]
@@ -335,12 +364,24 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 	} else {
 		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " " + strconv.Itoa(result.hits) + " times for " + strconv.Itoa(result.totalDamage) + " damage!" + text.Reset)
 	}
+	if crushing {
+		whatMob.Stun(config.CrushingStuns)
+		s.msg.Observers.SendInfo(s.actor.Name + " lands a crushing blow on " + whatMob.Name + "!")
+	}
 	if totalReflect > 0 {
 		s.msg.Actor.Send("The " + whatMob.Name + " reflects " + strconv.Itoa(totalReflect) + " damage back at you!")
 		s.actor.DeathCheck(" was killed by reflection!")
 	}
 	warnTouchVulnerable(s, whatMob)
 	return result
+}
+
+// followUpMissPenalty is the extra miss chance on every swing after the first.
+func followUpMissPenalty(s *state, skillLevel int) int {
+	if s.actor.Class == config.MONK {
+		return config.FlurryMissPenaltyFor(skillLevel)
+	}
+	return config.MultiAttackMissPenaltyFor(skillLevel)
 }
 
 // DeathCheck Universal death check for mobs on whatever the current state is
@@ -473,7 +514,7 @@ func missChance(s *state, baseMiss int, missPerLevel int, lvlDiff int) int {
 	if missChance >= 100 {
 		missChance = 95
 	}
-	if missChance <= 0 {
+	if missChance < 5 {
 		missChance = 5
 	}
 	return missChance

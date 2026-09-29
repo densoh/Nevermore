@@ -1,5 +1,7 @@
 package config
 
+import "math"
+
 // Barbarian tuning. Everything the berserk kit reads lives here so the class
 // can be rebalanced from one file.
 const (
@@ -34,7 +36,17 @@ const (
 	RecklessDamagePercent = 25   // added to the weapon roll
 	RecklessMissReduction = 10   // percentage points off the miss chance
 	RecklessMaxDuration   = 3600 // safety expiry for the stance, seconds
+
+	// Bash adds BashDamagePerTier per tier on top of its hit, after the
+	// special-roll multiplier so a Thunk does not amplify it.
+	BashDamagePerTier = 3
 )
+
+// BashDamage is a bash's damage before mob armor: the weapon hit times the
+// special-roll multiplier, plus the flat tier bonus.
+func BashDamage(hit int, multiplier float64, tier int) int {
+	return int(math.Ceil(float64(hit)*multiplier)) + tier*BashDamagePerTier
+}
 
 // RecklessStamCost is the stamina one reckless attack costs at the given max.
 func RecklessStamCost(maxStam int) int {

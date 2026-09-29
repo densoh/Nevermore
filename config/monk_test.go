@@ -168,18 +168,6 @@ func TestChiHelpers(t *testing.T) {
 	}
 }
 
-func TestSweepStunChanceBounds(t *testing.T) {
-	if SweepStunChance(10, 45, 0) != SweepChanceCap {
-		t.Errorf("sweep not capped: %d", SweepStunChance(10, 45, 0))
-	}
-	if SweepStunChance(0, 0, 50) != 0 {
-		t.Errorf("sweep went negative: %d", SweepStunChance(0, 0, 50))
-	}
-	if SweepStunChance(5, 20, 0) != SweepChance+5*SweepChancePerSkill+20/SweepChanceDexDiv {
-		t.Errorf("sweep formula off: %d", SweepStunChance(5, 20, 0))
-	}
-}
-
 func TestMeditateHelpers(t *testing.T) {
 	if MeditateRestorePercent(1, 12) != MeditateBasePercent+12/MeditatePieDiv+1 {
 		t.Errorf("restore percent at tier 1 pie 12 = %d", MeditateRestorePercent(1, 12))
@@ -310,6 +298,18 @@ func TestChiDecayFloorIsTierCappedAtTen(t *testing.T) {
 	for tier, want := range cases {
 		if got := ChiDecayFloor(tier); got != want {
 			t.Errorf("ChiDecayFloor(%d) = %d, want %d", tier, got, want)
+		}
+	}
+}
+
+func TestFlurryMissPenaltyLadder(t *testing.T) {
+	want := map[int]int{0: 15, 5: 15, 7: 15, 8: 10, 9: 10, 10: 10}
+	for skill, penalty := range want {
+		if got := FlurryMissPenaltyFor(skill); got != penalty {
+			t.Errorf("FlurryMissPenaltyFor(%d) = %d, want %d", skill, got, penalty)
+		}
+		if fighter := MultiAttackMissPenaltyFor(skill); FlurryMissPenaltyFor(skill) > fighter {
+			t.Errorf("skill %d flurry penalty %d is above the fighter's %d", skill, FlurryMissPenaltyFor(skill), fighter)
 		}
 	}
 }

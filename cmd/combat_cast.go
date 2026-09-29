@@ -249,6 +249,7 @@ func (cast) process(s *state) {
 		s.actor.RunHook("combat")
 		if utils.StringIn(spellInstance.Name, objects.OffensiveSpells) {
 			s.actor.Victim = whatMob
+			whatMob.MarkAttackedBy(s.actor)
 		}
 		noteSingingCast(s)
 		s.actor.FlagOn("casting", "cast")

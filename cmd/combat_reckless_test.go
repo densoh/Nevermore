@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/message"
@@ -89,5 +90,66 @@ func TestDetermineMissChanceReckless(t *testing.T) {
 	got := DetermineMissChance(s, 0)
 	if got != base-config.RecklessMissReduction {
 		t.Errorf("reckless miss chance = %d, want %d (base %d)", got, base-config.RecklessMissReduction, base)
+	}
+}
+
+// The toggle ignores every other timer, so the stance drops mid-round or
+// while stunned, and starts the stance cooldown.
+func TestRecklessToggleIgnoresTimers(t *testing.T) {
+	s := recklessState(&objects.Item{ItemType: 1}, 200)
+	s.actor.Timers = map[string]time.Time{
+		"global": time.Now().Add(10 * time.Second),
+		"combat": time.Now().Add(10 * time.Second),
+		"stun":   time.Now().Add(10 * time.Second),
+	}
+
+	reckless{}.process(s)
+
+	if s.actor.CheckFlag("reckless") {
+		t.Fatal("stance stayed up though only the stance cooldown can block the toggle")
+	}
+	if ready, _ := s.actor.StanceReady(); ready {
+		t.Error("toggling the stance did not start the stance cooldown")
+	}
+}
+
+// A second toggle inside the cooldown is refused and leaves the stance alone.
+func TestRecklessToggleBlockedByStanceCooldown(t *testing.T) {
+	s := recklessState(&objects.Item{ItemType: 1}, 200)
+	s.actor.Timers = map[string]time.Time{}
+	s.actor.SetStanceTimer()
+
+	reckless{}.process(s)
+
+	if !s.actor.CheckFlag("reckless") {
+		t.Fatal("stance dropped inside the stance cooldown")
+	}
+	if s.ok {
+		t.Error("a refused toggle should not report success")
+	}
+}
+
+// Flurry shares the same rule: only the stance cooldown gates the toggle.
+func TestFlurryToggleStanceCooldown(t *testing.T) {
+	s := attackerState(config.MONK, nil)
+	s.actor.FlagProviders = map[string][]string{}
+	s.actor.Effects = map[string]*objects.Effect{}
+	s.actor.Timers = map[string]time.Time{
+		"global": time.Now().Add(10 * time.Second),
+		"combat": time.Now().Add(10 * time.Second),
+		"stun":   time.Now().Add(10 * time.Second),
+	}
+	s.msg.Actor = &message.Buffer{}
+	objects.Effects["flurry"](s.actor, s.actor, 0)
+
+	flurry{}.process(s)
+	if s.actor.CheckFlag("flurry") {
+		t.Fatal("flurry stayed up though only the stance cooldown can block the toggle")
+	}
+
+	objects.Effects["flurry"](s.actor, s.actor, 0)
+	flurry{}.process(s)
+	if !s.actor.CheckFlag("flurry") {
+		t.Fatal("flurry dropped inside the stance cooldown")
 	}
 }

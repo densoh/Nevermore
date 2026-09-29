@@ -98,7 +98,7 @@ func (feint) process(s *state) {
 	}
 
 	if !flurried {
-		gainChiFromHits(s, result.hits)
+		gainChiFromHits(s, result.chiHits())
 	}
 
 	whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)

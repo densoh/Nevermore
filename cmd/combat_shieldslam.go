@@ -12,7 +12,7 @@ import (
 
 func init() {
 	addHandler(slam{},
-		"Usage:  shield-slam target # \n\n Slam your shield into the target",
+		"Usage:  shield-slam target # \n\n Slam your shield into the target to stun and taunt it.  Shield slam is an opener: it only works on a target you have not yet attacked.",
 		permissions.Paladin|permissions.Fighter,
 		"shield", "shield-slam", "slam")
 }
@@ -84,11 +84,18 @@ func (slam) process(s *state) {
 			return
 		}
 
+		// Shield slam is an opener, like bash: once you have attacked a mob
+		// in any way, you cannot slam it.
+		if whatMob.AttackedBy(s.actor.Name) {
+			s.msg.Actor.SendBad("You've already engaged " + whatMob.Name + "; shield slam only works as an opener.")
+			return
+		}
+
 		shield := s.actor.Equipment.Off
-		actualDamage, _, resisted := whatMob.ReceiveDamage(config.ShieldSlamDamage(s.actor.GetStat("str"), s.actor.Tier, config.RollShieldArmor(shield.Armor)))
+		actualDamage, _, resisted := whatMob.ReceiveDamage(config.ShieldSlamDamage(config.ShieldSlamStat(s.actor.Class, s.actor.GetStat("str"), s.actor.GetStat("pie")), s.actor.Tier, config.RollShieldArmor(shield.Armor)))
 		data.StoreCombatMetric("shieldslam", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
-		whatMob.Stun(config.ShieldSlamStun(s.actor.Class, s.actor.GetStat("str"), s.actor.GetStat("pie")))
+		whatMob.Stun(config.ShieldSlamStuns)
 		whatMob.CurrentTarget = s.actor.Name
 		s.msg.Actor.SendInfo("You slammed the " + whatMob.Name + " with your shield for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
 		s.msg.Observers.SendInfo(s.actor.Name + " slams " + config.TextPosPronoun[s.actor.Gender] + " shield into " + whatMob.Name)
