@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/ArcCS/Nevermore/data"
-	"math"
 	"strconv"
 
 	"github.com/ArcCS/Nevermore/config"
@@ -14,7 +13,7 @@ import (
 
 func init() {
 	addHandler(bash{},
-		"Usage:  bash target # \n\n Bash the target",
+		"Usage:  bash target # \n\n Bash the target to stun it.  Bash is an opener: it only works on a target you have not yet attacked, and a miss uses it up.",
 		permissions.Barbarian,
 		"bash")
 }
@@ -87,6 +86,14 @@ func (bash) process(s *state) {
 			return
 		}
 
+		// Bash is an opener: once you have attacked a mob in any way,
+		// including a missed bash, you cannot bash it.
+		if whatMob.AttackedBy(s.actor.Name) {
+			s.msg.Actor.SendBad("You've already engaged " + whatMob.Name + "; bash only works as an opener.")
+			return
+		}
+		whatMob.MarkAttackedBy(s.actor)
+
 		recklessAttack(s)
 		// Check for a miss
 		if utils.Roll(100, 1, 0) <= DetermineMissChance(s, whatMob.Level-s.actor.Tier) {
@@ -98,10 +105,10 @@ func (bash) process(s *state) {
 		}
 
 		s.actor.Victim = whatMob
-		// Check the rolls in reverse order from hardest to lowest for bash rolls.
-		damageModifier, stunModifier, bashMsg := config.RollBash(config.WeaponLevel(s.actor.Skills[2].Value, s.actor.Class, 2))
+		// The special roll uses the skill of the weapon in hand, blunt or two-handed.
+		damageModifier, stunModifier, bashMsg := config.RollBash(attackSkillLevel(s))
 		whatMob.Stun(config.BashStuns * stunModifier)
-		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * damageModifier)))
+		actualDamage, _, resisted := whatMob.ReceiveDamage(config.BashDamage(s.actor.InflictDamage(), damageModifier, s.actor.Tier))
 		data.StoreCombatMetric("bash", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.BashThreatPercent), s.actor)
 		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))

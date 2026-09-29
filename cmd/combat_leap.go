@@ -101,7 +101,7 @@ func (leap) process(s *state) {
 
 	result := resolveHits(s, whatMob, []float64{1.0}, attackSkillLevel(s), "leap")
 	if result.hits > 0 {
-		gained := s.actor.GainChi(config.ChiPerHitFor(s.actor.GetStat("pie")), true)
+		gained := s.actor.GainChi(config.ChiPerHitFor(s.actor.GetStat("pie"))*result.chiHits(), true)
 		if gained > 0 {
 			s.msg.Actor.Send(text.Cyan + "Your chi rises by " + strconv.Itoa(gained) + "." + text.Reset)
 		}

@@ -461,6 +461,26 @@ func (c *Character) TimerReadyIgnoreGlobal(timer string) (bool, string) {
 	return c.timerReady(timer, false)
 }
 
+// SetStanceTimer starts the cooldown between stance toggles. It is a fixed
+// anti-spam delay, so unlike SetTimer haste does not shorten it.
+func (c *Character) SetStanceTimer() {
+	if c.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+		return
+	}
+	c.Timers["stance"] = time.Now().Add(time.Duration(config.StanceCooldown) * time.Second)
+}
+
+// StanceReady reports whether the stance cooldown has expired. A stance can
+// be changed at any time, so nothing else is checked: not the global or
+// combat timers, and not a stun.
+func (c *Character) StanceReady() (bool, string) {
+	remaining := time.Until(c.Timers["stance"])
+	if remaining <= 0 {
+		return true, ""
+	}
+	return false, text.Gray + "You have " + strconv.Itoa(int(math.Ceil(remaining.Seconds()))) + " seconds before you can perform this action. (stance)"
+}
+
 func (c *Character) timerReady(timer string, checkGlobal bool) (bool, string) {
 	remaining := 0.0
 	globalRemaining := 0.0

@@ -39,15 +39,6 @@ func TestCircleStunFor(t *testing.T) {
 	}
 }
 
-func TestShieldSlamStun(t *testing.T) {
-	if got := ShieldSlamStun(PALADIN, 40, 20); got != 8 {
-		t.Errorf("paladin ShieldSlamStun = %d, want 8 (piety)", got)
-	}
-	if got := ShieldSlamStun(FIGHTER, 40, 20); got != 16 {
-		t.Errorf("fighter ShieldSlamStun = %d, want 16 (strength)", got)
-	}
-}
-
 func TestExecuteMultiplier(t *testing.T) {
 	cases := []struct {
 		tier, level int
@@ -119,10 +110,10 @@ func TestRollFighterParryShieldBlocksNeverRiposte(t *testing.T) {
 
 func TestShieldSlamDamage(t *testing.T) {
 	cases := []struct{ str, tier, roll, want int }{
-		{20, 5, 0, 45},    // no shield armor
-		{20, 5, 10, 50},   // half the roll
-		{20, 5, 11, 50},   // odd rolls round down
-		{40, 20, 60, 130}, // strong fighter, heavy shield max roll (2d30)
+		{20, 5, 0, 42},    // no shield armor; half the tier, rounded down
+		{20, 5, 10, 47},   // half the roll
+		{20, 5, 11, 47},   // odd rolls round down
+		{40, 20, 60, 120}, // strong fighter, heavy shield max roll (2d30)
 	}
 	for _, c := range cases {
 		if got := ShieldSlamDamage(c.str, c.tier, c.roll); got != c.want {
@@ -159,6 +150,19 @@ func TestMultiAttackMissPenaltyLadder(t *testing.T) {
 	for level, penalty := range want {
 		if got := MultiAttackMissPenaltyFor(level); got != penalty {
 			t.Errorf("MultiAttackMissPenaltyFor(%d) = %d, want %d", level, got, penalty)
+		}
+	}
+}
+
+func TestShieldSlamStat(t *testing.T) {
+	cases := []struct{ class, str, pie, want int }{
+		{PALADIN, 20, 30, 30}, // paladin takes piety when it is higher
+		{PALADIN, 30, 20, 30}, // and strength when that is higher
+		{FIGHTER, 20, 30, 20}, // fighters always use strength
+	}
+	for _, c := range cases {
+		if got := ShieldSlamStat(c.class, c.str, c.pie); got != c.want {
+			t.Errorf("ShieldSlamStat(%d, %d, %d) = %d, want %d", c.class, c.str, c.pie, got, c.want)
 		}
 	}
 }

@@ -18,8 +18,15 @@ func init() {
 type reckless cmd
 
 func (reckless) process(s *state) {
+	// The stance answers to its own cooldown only; no other timer holds it.
+	if ready, msg := s.actor.StanceReady(); !ready {
+		s.msg.Actor.SendBad(msg)
+		return
+	}
+
 	if s.actor.CheckFlag("reckless") {
 		s.actor.RemoveEffect("reckless")
+		s.actor.SetStanceTimer()
 		s.ok = true
 		return
 	}
@@ -43,6 +50,7 @@ func (reckless) process(s *state) {
 	}
 
 	objects.Effects["reckless"](s.actor, s.actor, 0)
+	s.actor.SetStanceTimer()
 	s.msg.Observers.SendInfo(s.actor.Name + " throws caution aside and swings with everything they have.")
 	s.ok = true
 }

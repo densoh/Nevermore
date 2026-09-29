@@ -7,12 +7,13 @@ var CombatModifiers = map[string]float64{
 	// Attack Modifiers
 	"critical": 5,
 	"double":   2,
+	// A barbarian's crushing blow on a regular attack; it also stuns.
+	"crushing": 5,
 
 	// Bash
-	"thunk":    100,
-	"crushing": 10,
-	"thwomp":   2,
-	"thump":    1.5,
+	"thunk":  10,
+	"thwomp": 2,
+	"thump":  1.5,
 
 	// Sneaky Types
 	"backstab": 5,
@@ -62,6 +63,9 @@ var (
 
 	CombatCooldown  = 8
 	UnequipCooldown = 2
+	// StanceCooldown is the wait between stance toggles (flurry, reckless).
+	// Stances ignore every other timer, so this only stops toggle spam.
+	StanceCooldown = 1
 
 	// ResumeGraceSeconds is how long after resuming a session a death still
 	// counts as a lag death, so a fight that ran while the player was
@@ -107,7 +111,7 @@ var (
 	InertialDamageIgnore = .20 // Percentage ignored when using inertial barrier
 	ReflectDamagePerInt  = .02 // Percentage of damage reflected per int point
 	ReflectDamageFromMob = .15 // Percentage of damage reflected from mob
-	LethalSkillFloor     = .25 // Minimum fraction of a mob's exp granted as weapon skill on a lethal
+	LethalSkillFloor     = .25 // Minimum fraction of a mob's exp granted as weapon skill on a lethal or touch of death kill
 
 	DodgeDamagePerDex     = .01
 	FullDodgeChancePerDex = 1.0
@@ -146,7 +150,7 @@ var (
 	DisintegrateChance = 5
 	TurnTimer          = 60
 	SlamTimer          = 30
-	ShieldStun         = .4
+	ShieldSlamStuns    = 16 // seconds
 
 	// Paladin seals persist until dropped, so the effect gets a duration it
 	// will never reach.
@@ -162,11 +166,11 @@ var (
 	ScalePerPiety  = 1
 	DurationPerCon = 10
 
-	ParryStuns  = 2
+	ParryStuns  = 16
 	CircleStuns = 6
 	CircleTimer = 16
 	BashStuns   = 16
-	BashTimer   = 45
+	BashTimer   = 30
 
 	// Threat bumps, as a percent of the mob's max stamina, added on top of any
 	// damage the ability dealt. Taunts (circle, feint, hamstring, shield slam)
@@ -343,6 +347,35 @@ func RollCritical(skill int) bool {
 	return false
 }
 
+// CrushingChance is a barbarian's chance, out of 1000, that the first hit of
+// a regular attack round with a blunt or two-handed weapon is a crushing
+// blow, by weapon skill level: twice the critical chance.
+var CrushingChance = []int{
+	0,
+	2,
+	4,
+	6,
+	8,
+	10,
+	12,
+	14,
+	16,
+	20,
+	24,
+}
+
+// CrushingStuns is how long (seconds) a crushing blow stuns the mob.
+const CrushingStuns = 8
+
+func RollCrushing(skill int) bool {
+	if skill > 0 {
+		if utils.Roll(1000, 1, 0) <= CrushingChance[skill] {
+			return true
+		}
+	}
+	return false
+}
+
 var LethalDamage = []int{ // Lethals are 1000000 chance rolls.
 	0,
 	125,
@@ -357,18 +390,20 @@ var LethalDamage = []int{ // Lethals are 1000000 chance rolls.
 	3125,
 }
 
-// BashChances Skill = Thunk, Crushing, Thwomp, Thump
+// BashChances holds cumulative thresholds out of 1,000,000 for each bash
+// result by skill level: Thunk, Thwomp, Thump. Thunk carries the chance the
+// old Crushing result had before crushing moved to regular attacks.
 var BashChances = map[int][]int{
-	0: {0, 0, 0, 0},
-	1: {125 * 4, 600 * 4, 1200 * 4, 2400 * 4},
-	2: {250 * 4, 1000 * 4, 2000 * 4, 4000 * 4},
-	3: {500 * 4, 2000 * 4, 4000 * 4, 8000 * 4},
-	4: {750 * 4, 3000 * 4, 6000 * 4, 12000 * 4},
-	5: {1000 * 4, 4000 * 4, 8000 * 4, 16000 * 4},
-	6: {1250 * 4, 5000 * 4, 10000 * 4, 20000 * 4},
-	7: {1500 * 4, 6000 * 4, 12000 * 4, 24000 * 4},
-	8: {1875 * 4, 7500 * 4, 15000 * 4, 30000 * 4},
-	9: {3000 * 4, 12000 * 4, 24000 * 4, 48000 * 4},
+	0: {0, 0, 0},
+	1: {1900, 4300, 9100},
+	2: {3000, 7000, 15000},
+	3: {6000, 14000, 30000},
+	4: {9000, 21000, 45000},
+	5: {12000, 28000, 60000},
+	6: {15000, 35000, 75000},
+	7: {18000, 42000, 90000},
+	8: {22500, 52500, 112500},
+	9: {36000, 84000, 180000},
 }
 
 // RollBash rolls for a special bash result. damModifier multiplies the bash
@@ -376,17 +411,18 @@ var BashChances = map[int][]int{
 func RollBash(skill int) (damModifier float64, stunModifier int, output string) {
 	damModifier = 1
 	stunModifier = 1
+	row, ok := BashChances[skill]
+	if !ok {
+		return
+	}
 	bashRoll := utils.Roll(1000000, 1, 0)
-	if bashRoll <= BashChances[skill][0] { // Thunk
+	if bashRoll <= row[0] { // Thunk
 		damModifier = CombatModifiers["thunk"]
 		output = "Thunk!!"
-	} else if bashRoll <= BashChances[skill][1] { // Crushing
-		damModifier = CombatModifiers["crushing"]
-		output = "Craaackk!!"
-	} else if bashRoll <= BashChances[skill][2] { // Thwomp
+	} else if bashRoll <= row[1] { // Thwomp
 		damModifier = CombatModifiers["thwomp"]
 		output = "Thwomp!!"
-	} else if bashRoll <= BashChances[skill][3] { // Thump
+	} else if bashRoll <= row[2] { // Thump
 		damModifier = CombatModifiers["thump"]
 		stunModifier = 2
 		output = "Thump!!"
@@ -484,4 +520,28 @@ func MobStunDuration(mobLevel int, playerTier int) int {
 		duration = MobStunMin
 	}
 	return duration
+}
+
+// A player's stun spell holds a mob for StunSpellBase seconds plus one second
+// per StunSpellIntPerSecond points of int, so 15s at 12 int. It lands
+// StunSpellChance percent of the time against a mob of equal level and int,
+// plus StunSpellChancePerLevel per level the caster is above the mob and one
+// point per StunSpellIntPerChance int the caster has over the mob.
+const (
+	StunSpellBase           = 12
+	StunSpellIntPerSecond   = 4
+	StunSpellChance         = 70
+	StunSpellChancePerLevel = 10
+	StunSpellIntPerChance   = 2
+)
+
+// StunSpellDuration is how long a player's stun spell holds a mob.
+func StunSpellDuration(intel int) int {
+	return StunSpellBase + intel/StunSpellIntPerSecond
+}
+
+// StunSpellSuccessChance is the percent chance a player's stun spell lands on a mob.
+// Results outside 0-100 are left as-is; the roll treats them as never/always.
+func StunSpellSuccessChance(tier int, mobLevel int, intel int, mobInt int) int {
+	return StunSpellChance + (tier-mobLevel)*StunSpellChancePerLevel + (intel-mobInt)/StunSpellIntPerChance
 }

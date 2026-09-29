@@ -43,13 +43,13 @@ const (
 	ParryPerWeaponLevel      = 1.5
 	ShieldParryTiersPerPoint = 2.0
 
-	// Shield slam is shared with the paladin (see ShieldStun and SlamTimer in
-	// combat.go). Damage is str*ShieldSlamStrMult + tier*ShieldSlamTierMult
-	// plus half of a 2d(shield armor) roll, so a heavier shield hits harder.
-	// The paladin's stun scales on piety; the fighter's scales on strength
-	// with the same multiplier.
-	ShieldSlamStrMult  = 2
-	ShieldSlamTierMult = 1
+	// Shield slam is shared with the paladin (see ShieldSlamStuns and
+	// SlamTimer in combat.go). Like bash it is an opener: it only works on a
+	// mob the slammer has not yet attacked. Damage is
+	// stat*ShieldSlamStrMult (see ShieldSlamStat) + tier/ShieldSlamTierDiv plus half of a
+	// 2d(shield armor) roll, so a heavier shield hits harder.
+	ShieldSlamStrMult = 2
+	ShieldSlamTierDiv = 2
 )
 
 // HamstringDamage is the damage a hamstring does from the given weapon roll.
@@ -73,11 +73,20 @@ func CircleStunFor(class int, weaponLevel int) int {
 	return stun
 }
 
-// ShieldSlamDamage is a shield slam's damage before mob armor: strength
-// times ShieldSlamStrMult, tier times ShieldSlamTierMult, plus half the
+// ShieldSlamStat is the stat a shield slam's damage scales on: strength,
+// or the better of strength and piety for a paladin.
+func ShieldSlamStat(class int, str int, pie int) int {
+	if class == PALADIN && pie > str {
+		return pie
+	}
+	return str
+}
+
+// ShieldSlamDamage is a shield slam's damage before mob armor: the slam stat
+// times ShieldSlamStrMult, tier divided by ShieldSlamTierDiv, plus half the
 // shield roll, which the caller makes with RollShieldArmor.
-func ShieldSlamDamage(str int, tier int, shieldRoll int) int {
-	return str*ShieldSlamStrMult + tier*ShieldSlamTierMult + shieldRoll/2
+func ShieldSlamDamage(stat int, tier int, shieldRoll int) int {
+	return stat*ShieldSlamStrMult + tier/ShieldSlamTierDiv + shieldRoll/2
 }
 
 // RollShieldArmor rolls 2d(armor) for a shield's contribution to a slam. A
@@ -87,16 +96,6 @@ func RollShieldArmor(armor int) int {
 		return 0
 	}
 	return utils.Roll(armor, 2, 0)
-}
-
-// ShieldSlamStun is how long a shield slam stuns the mob. Paladins scale on
-// piety, fighters on strength.
-func ShieldSlamStun(class int, str int, pie int) int {
-	stat := pie
-	if class == FIGHTER {
-		stat = str
-	}
-	return int(ShieldStun * float64(stat))
 }
 
 // ExecuteMultiplier is the factor applied to a fighter's lethal chance against

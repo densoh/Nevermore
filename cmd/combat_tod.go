@@ -133,7 +133,9 @@ func (tod) process(s *state) {
 	killChance := config.TodKillChance(s.actor.Tier, commitment, remaining)
 	if utils.Roll(100, 1, 0) <= int(math.Round(killChance*100)) {
 		whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
-		s.actor.AdvanceSkillExp(float64(whatMob.Experience))
+		// Skill is credited the same way as a fighter's lethal: the share of
+		// the mob that was still standing, never less than the floor.
+		s.actor.AdvanceSkillExp(math.Max(remaining, config.LethalSkillFloor) * float64(whatMob.Experience))
 		whatMob.Stam.Current = 0
 		data.StoreCombatMetric("tod_whole", 0, 0, whatMob.Stam.Max, 0, whatMob.Stam.Max, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		todKillMessage(s, whatMob)

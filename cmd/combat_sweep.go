@@ -6,12 +6,11 @@ import (
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/data"
 	"github.com/ArcCS/Nevermore/permissions"
-	"github.com/ArcCS/Nevermore/utils"
 )
 
 func init() {
 	addHandler(sweep{},
-		"Usage:  sweep target # \n\n Strike low to knock a target off its feet, stunning it if the sweep takes.  Throws extra strikes while flurrying, though a flurried sweep builds no chi.",
+		"Usage:  sweep target # \n\n Strike low to knock a target off its feet, stunning it if the sweep lands.  Throws extra strikes while flurrying, though a flurried sweep builds no chi.",
 		permissions.Monk,
 		"sweep")
 }
@@ -83,33 +82,14 @@ func (sweep) process(s *state) {
 	}
 
 	if !flurried {
-		gainChiFromHits(s, result.hits)
+		gainChiFromHits(s, result.chiHits())
 	}
 
-	levelOver := whatMob.Level - s.actor.Tier
-	if levelOver < 0 {
-		levelOver = 0
-	}
-	stunChance := config.SweepStunChance(skillLevel, s.actor.GetStat("dex"), levelOver)
-	rolls := 1
-	if config.SweepStunEveryStrike {
-		rolls = result.hits
-	}
-	stunned := false
-	for i := 0; i < rolls && !stunned; i++ {
-		if utils.Roll(100, 1, 0) <= stunChance {
-			stunned = true
-		}
-	}
-	if stunned {
-		whatMob.Stun(config.SweepStuns)
-		data.StoreCombatMetric("sweep-stun", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
-		s.msg.Actor.SendGood("You sweep " + whatMob.Name + " off its feet!")
-		s.msg.Observers.SendInfo(s.actor.Name + " sweeps " + whatMob.Name + " off its feet!")
-	} else {
-		s.msg.Actor.SendInfo(whatMob.Name + " keeps its footing.")
-		s.msg.Observers.SendInfo(s.actor.Name + " sweeps at " + whatMob.Name)
-	}
+	// A landed sweep always stuns, like circle and bash.
+	whatMob.Stun(config.SweepStuns)
+	data.StoreCombatMetric("sweep-stun", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+	s.msg.Actor.SendGood("You sweep " + whatMob.Name + " off its feet!")
+	s.msg.Observers.SendInfo(s.actor.Name + " sweeps " + whatMob.Name + " off its feet!")
 	whatMob.CurrentTarget = s.actor.Name
 
 	DeathCheck(s, whatMob)

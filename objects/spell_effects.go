@@ -822,13 +822,9 @@ func teleport(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func stun(caller interface{}, target interface{}, magnitude int) string {
-	duration := 15
 	switch caller := caller.(type) {
 	case *Character:
-		duration += config.IntSpellEffectDuration * caller.Int.Current
-	}
-	switch caller := caller.(type) {
-	case *Character:
+		duration := config.StunSpellDuration(caller.GetStat("int"))
 		switch target := target.(type) {
 		case *Character:
 			return "No PVP yet"
@@ -839,8 +835,7 @@ func stun(caller interface{}, target interface{}, magnitude int) string {
 				}
 			*/
 		case *Mob:
-			diff := (caller.Tier - target.Level) * 5
-			chance := 10 + diff
+			chance := config.StunSpellSuccessChance(caller.Tier, target.Level, caller.GetStat("int"), target.Int.Current)
 			if utils.Roll(100, 1, 0) > chance {
 				return "You failed to stun " + target.Name
 			} else {
@@ -1662,6 +1657,6 @@ func splitHealThreat(caller *Character, recipient string, healed int, mobs []*Mo
 		share = cap
 	}
 	for _, mob := range attackers {
-		mob.AddThreatDamage(share, caller)
+		mob.addThreat(share, caller)
 	}
 }

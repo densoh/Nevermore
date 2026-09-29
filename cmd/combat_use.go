@@ -117,6 +117,9 @@ func (use) process(s *state) {
 				if whatMob != nil {
 					s.actor.RunHook("use")
 					s.actor.SetTimer("use", 8)
+					if utils.StringIn(spellInstance.Name, objects.OffensiveSpells) {
+						whatMob.MarkAttackedBy(s.actor)
+					}
 					msg = objects.Cast(s.actor, whatMob, spellInstance.Effect, spellInstance.Magnitude)
 					s.msg.Actor.SendGood("You use a  " + what.Name + " on " + whatMob.Name)
 					s.msg.Observers.SendGood(s.actor.Name + " used a " + what.Name + " on " + whatMob.Name)

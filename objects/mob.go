@@ -85,6 +85,11 @@ type Mob struct {
 	// MobTicker goes through scheduleTick so this stays accurate; Stun reads
 	// it to decide whether a stun would actually delay the mob.
 	NextTick time.Time
+
+	// Attackers holds the names of characters who have taken an offensive
+	// action against this mob, hit or miss. Unlike ThreatTable it ignores
+	// threat from heals, rescues and the mob picking its own target.
+	Attackers map[string]bool
 }
 
 func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
@@ -154,6 +159,7 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		false,
 		time.Time{},
 		time.Time{},
+		nil,
 	}
 
 	for _, spellN := range strings.Split(mobData["spells"].(string), ",") {
@@ -189,6 +195,7 @@ func (m *Mob) StartTicking() {
 	m.IsActive = true
 	m.CalculateInventory()
 	m.ThreatTable = make(map[string]int)
+	m.Attackers = make(map[string]bool)
 	m.MobTickerUnload = make(chan bool)
 	m.MobCommands = make(chan string)
 	m.TickModifier = 0
@@ -528,11 +535,11 @@ func (m *Mob) Tick() {
 				if m.DeathCheck(target) {
 					return
 				}
-				m.Stun(config.ParryStuns * 8)
+				m.Stun(config.ParryStuns)
 				return
 			} else {
 				target.writeCombat(text.Green + "You parry the attack from " + m.Name + "\n" + text.Reset)
-				m.Stun(config.ParryStuns * 8)
+				m.Stun(config.ParryStuns)
 				return
 			}
 		}
@@ -572,7 +579,7 @@ func (m *Mob) Charge(rescuer *Character, rescued *Character) {
 		}
 	}
 	if m.ThreatTable[rescuer.Name] <= top {
-		m.AddThreatDamage(top-m.ThreatTable[rescuer.Name]+1, rescuer)
+		m.addThreat(top-m.ThreatTable[rescuer.Name]+1, rescuer)
 	}
 	if m.Placement != rescuer.Placement {
 		if m.CheckFlag("immobile") {
@@ -744,7 +751,7 @@ func (m *Mob) PickTarget() {
 				if len(potentials) > 0 {
 					if utils.Roll(100, 1, 0) <= config.ProximityChance-(i*config.ProximityStep) {
 						potential := utils.RandListSelection(potentials)
-						m.AddThreatDamage(1, Rooms[m.ParentId].Chars.MobSearch(potential, m))
+						m.addThreat(1, Rooms[m.ParentId].Chars.MobSearch(potential, m))
 						Rooms[m.ParentId].MessageAll(m.Name + " attacks " + m.CurrentTarget + text.Reset + "\n")
 						break
 					}
@@ -1004,7 +1011,29 @@ func (m *Mob) DropInventory() string {
 	}
 }
 
+// AddThreatDamage adds threat for an offensive action and records the
+// attacker as having attacked this mob.
 func (m *Mob) AddThreatDamage(damage int, attacker *Character) {
+	m.MarkAttackedBy(attacker)
+	m.addThreat(damage, attacker)
+}
+
+// MarkAttackedBy records that the character has attacked this mob.
+func (m *Mob) MarkAttackedBy(attacker *Character) {
+	if m.Attackers == nil {
+		m.Attackers = make(map[string]bool)
+	}
+	m.Attackers[attacker.Name] = true
+}
+
+// AttackedBy reports whether the named character has attacked this mob.
+func (m *Mob) AttackedBy(name string) bool {
+	return m.Attackers[name]
+}
+
+// addThreat adds threat without marking the character as an attacker, for
+// heals, rescues and the mob choosing its own target.
+func (m *Mob) addThreat(damage int, attacker *Character) {
 	attacker.MarkCombat()
 	if !attacker.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 		m.ThreatTable[attacker.Name] += damage

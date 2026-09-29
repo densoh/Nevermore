@@ -62,3 +62,32 @@ func TestIsRestorativeSpell(t *testing.T) {
 		}
 	}
 }
+
+// A stance toggle answers to its own cooldown only: global, combat and stun
+// timers do not hold it back.
+func TestStanceReadyIgnoresOtherTimers(t *testing.T) {
+	c := timerChar()
+	c.Timers["combat"] = time.Now().Add(10 * time.Second)
+	c.Timers["stun"] = time.Now().Add(10 * time.Second)
+	if ready, msg := c.StanceReady(); !ready {
+		t.Errorf("StanceReady should ignore global, combat and stun timers, got %q", msg)
+	}
+}
+
+// Toggling a stance starts the cooldown, and haste does not shorten it.
+func TestSetStanceTimerBlocksUntilExpired(t *testing.T) {
+	c := timerChar()
+	c.Flags["haste"] = true
+	c.SetStanceTimer()
+	ready, msg := c.StanceReady()
+	if ready {
+		t.Fatal("StanceReady should block right after a toggle")
+	}
+	if msg == "" {
+		t.Error("expected a wait message while the stance cooldown is running")
+	}
+	c.Timers["stance"] = time.Now().Add(-1 * time.Millisecond)
+	if ready, _ := c.StanceReady(); !ready {
+		t.Error("StanceReady should be ready once the cooldown expires")
+	}
+}

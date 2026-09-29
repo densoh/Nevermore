@@ -61,3 +61,72 @@ func TestDetermineMissChanceWeaponSkill(t *testing.T) {
 		t.Errorf("fighter miss chance = %d, want %d (weapon skill)", got, want)
 	}
 }
+
+// A monk's follow-up swings are a flurry and take the flurry penalty; every
+// other class keeps the multi attack penalty.
+func TestFollowUpMissPenaltyByClass(t *testing.T) {
+	monk := attackerState(config.MONK, nil)
+	fighter := attackerState(config.FIGHTER, &objects.Item{ItemType: 1})
+	for skill := 5; skill <= 10; skill++ {
+		if got, want := followUpMissPenalty(monk, skill), config.FlurryMissPenaltyFor(skill); got != want {
+			t.Errorf("monk skill %d penalty = %d, want %d", skill, got, want)
+		}
+		if got, want := followUpMissPenalty(fighter, skill), config.MultiAttackMissPenaltyFor(skill); got != want {
+			t.Errorf("fighter skill %d penalty = %d, want %d", skill, got, want)
+		}
+	}
+}
+
+// The miss chance never falls below 5, including when the raw value lands
+// between 1 and 4.
+func TestMissChanceFloor(t *testing.T) {
+	for dex := 15; dex <= 40; dex++ {
+		s := attackerState(config.MONK, nil)
+		s.actor.Skills[config.HandSkill].Value = config.WeaponExpLevels[3] // base 24
+		s.actor.Dex.Current = dex
+		want := 24 - dex*config.HitPerDex
+		if want < 5 {
+			want = 5
+		}
+		if got := DetermineMissChance(s, 0); got != want {
+			t.Errorf("dex %d miss chance = %d, want %d", dex, got, want)
+		}
+	}
+}
+
+func TestCanCrush(t *testing.T) {
+	item := func(itemType int, twoHanded bool) *objects.Item {
+		return &objects.Item{ItemType: itemType, Flags: map[string]bool{"two_handed": twoHanded}}
+	}
+	cases := []struct {
+		name  string
+		class int
+		main  *objects.Item
+		want  bool
+	}{
+		{"barbarian blunt", config.BARBARIAN, item(2, false), true},
+		{"barbarian two-handed sword", config.BARBARIAN, item(0, true), true},
+		{"barbarian one-handed sword", config.BARBARIAN, item(0, false), false},
+		{"barbarian two-handed bow", config.BARBARIAN, item(4, true), false},
+		{"barbarian unarmed", config.BARBARIAN, nil, false},
+		{"fighter blunt", config.FIGHTER, item(2, false), false},
+	}
+	for _, c := range cases {
+		if got := canCrush(attackerState(c.class, c.main)); got != c.want {
+			t.Errorf("%s: canCrush = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestChiHitsTriplesCritical(t *testing.T) {
+	if got := (hitResult{hits: 1}).chiHits(); got != 1 {
+		t.Errorf("plain hit: got %d chi hits, want 1", got)
+	}
+	if got := (hitResult{hits: 1, critical: true}).chiHits(); got != 3 {
+		t.Errorf("critical hit: got %d chi hits, want 3", got)
+	}
+	// Only the first landed hit can crit; the rest count once each.
+	if got := (hitResult{hits: 3, critical: true}).chiHits(); got != 5 {
+		t.Errorf("critical plus two hits: got %d chi hits, want 5", got)
+	}
+}

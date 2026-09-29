@@ -32,6 +32,7 @@ const (
 	ChiPerHitPieDiv      = 5 // ... plus pie/5, never less than ChiPerHitPieMin (was pie/8)
 	ChiPerHitPieMin      = 1
 	DodgeChiGain         = 3 // chi per successful passive dodge
+	CritChiMultiplier    = 3 // a critical hit builds this many hits' worth of chi
 	// Character ticks are 8s apart. The grace covers the first two ticks
 	// after the last hit as a reprieve, so a short walk to the next fight
 	// keeps its chi; the bleed starts on the third tick.
@@ -69,6 +70,13 @@ const (
 	FlurryChiCostExpert = 10
 	FlurryExpertSkill   = 7
 	FlurryMaxDuration   = 3600 // safety expiry for the stance, seconds
+	// Flurry swings after the first miss more often, but by less than a
+	// fighter's multi attack (25 falling to 10) because the monk pays chi for
+	// them. The penalty is FlurryMissPenalty through Expert and drops to
+	// FlurryMissPenaltyFloor from FlurryMissFloorSkill up.
+	FlurryMissPenalty      = 15 // percentage points, through Expert
+	FlurryMissPenaltyFloor = 10 // percentage points, Specialist and above
+	FlurryMissFloorSkill   = 8
 
 	// Leap strike.
 	LeapFreeDistance = 2  // squares closable at no chi cost
@@ -76,14 +84,8 @@ const (
 	LeapTimer        = 30 // cooldown seconds; 0 means none beyond the combat round
 
 	// Sweep.
-	SweepTimer              = 30
-	SweepStuns              = 12 // seconds
-	SweepChance             = 40
-	SweepChancePerSkill     = 3
-	SweepChanceDexDiv       = 2
-	SweepChancePerLevelOver = 4
-	SweepChanceCap          = 90
-	SweepStunEveryStrike    = false // when flurried, roll the stun on every strike instead of just the first
+	SweepTimer = 30
+	SweepStuns = 12 // seconds
 
 	// Touch of death. The cooldown starts at TodTimerBase and drops
 	// TodTimerPerTier seconds for every tier past TodTimerScaleTier, never
@@ -214,6 +216,15 @@ func FlurryChiCost(skill int) int {
 		return FlurryChiCostExpert
 	}
 	return FlurryChiCostBase
+}
+
+// FlurryMissPenaltyFor returns the extra miss chance, in percentage points,
+// on every flurry swing after the first at an unarmed skill level.
+func FlurryMissPenaltyFor(skill int) int {
+	if skill >= FlurryMissFloorSkill {
+		return FlurryMissPenaltyFloor
+	}
+	return FlurryMissPenalty
 }
 
 // FlurryMaxSwings caps how many swings a flurry throws. Monks have touch of
@@ -355,18 +366,6 @@ func TodKillChance(tier int, c float64, h float64) float64 {
 	chance := gap * gap * TodChanceScaleFor(tier)
 	if chance > TodMaxChance {
 		return TodMaxChance
-	}
-	return chance
-}
-
-// SweepStunChance is the percent chance a landed sweep stuns.
-func SweepStunChance(skill int, dex int, levelOver int) int {
-	chance := SweepChance + skill*SweepChancePerSkill + dex/SweepChanceDexDiv - levelOver*SweepChancePerLevelOver
-	if chance > SweepChanceCap {
-		return SweepChanceCap
-	}
-	if chance < 0 {
-		return 0
 	}
 	return chance
 }
