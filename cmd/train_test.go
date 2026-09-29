@@ -9,11 +9,11 @@ import (
 	"github.com/ArcCS/Nevermore/objects"
 )
 
-// trainState builds a tier 1 human standing at a trainer with the experience
+// trainState builds a tier 1 sprite standing at a trainer with the experience
 // and gold for tier 2, asking to train the two given stats.
 func trainState(str, dex, con, intel, pie int, picks ...string) *state {
 	s := attackerState(config.FIGHTER, nil)
-	s.actor.Race = config.HUMAN
+	s.actor.Race = config.SPRITE
 	s.actor.Tier = 1
 	s.actor.Str = objects.Meter{Max: 30, Current: str}
 	s.actor.Dex = objects.Meter{Max: 30, Current: dex}
@@ -34,15 +34,15 @@ func trainState(str, dex, con, intel, pie int, picks ...string) *state {
 // A character rolled before a minimum was raised can still train, but not
 // into stats other than the one that is short.
 func TestTrainRefusesPicksThatSkipShortStat(t *testing.T) {
-	s := trainState(20, 10, 10, 5, 5, "dex", "con")
+	s := trainState(9, 20, 10, 7, 4, "con", "int")
 
 	train{}.process(s)
 
 	if s.actor.Tier != 1 {
 		t.Fatalf("tier = %d, trained without covering piety", s.actor.Tier)
 	}
-	if s.actor.Dex.Current != 10 || s.actor.Con.Current != 10 || s.actor.Pie.Current != 5 {
-		t.Errorf("stats changed on a refused train: dex %d con %d pie %d", s.actor.Dex.Current, s.actor.Con.Current, s.actor.Pie.Current)
+	if s.actor.Con.Current != 10 || s.actor.Int.Current != 7 || s.actor.Pie.Current != 4 {
+		t.Errorf("stats changed on a refused train: con %d int %d pie %d", s.actor.Con.Current, s.actor.Int.Current, s.actor.Pie.Current)
 	}
 	if s.actor.Gold.Value != config.GoldPerLevel[2] {
 		t.Errorf("gold charged on a refused train: %d left", s.actor.Gold.Value)
@@ -51,36 +51,36 @@ func TestTrainRefusesPicksThatSkipShortStat(t *testing.T) {
 
 // One point short owes one pick, the other is the player's to spend.
 func TestTrainAcceptsPickCoveringShortStat(t *testing.T) {
-	s := trainState(20, 10, 10, 5, 5, "dex", "pie")
+	s := trainState(9, 20, 10, 7, 4, "con", "pie")
 
 	train{}.process(s)
 
 	if s.actor.Tier != 2 {
 		t.Fatalf("tier = %d, want 2", s.actor.Tier)
 	}
-	if s.actor.Dex.Current != 11 || s.actor.Pie.Current != 6 {
-		t.Errorf("dex %d pie %d, want 11 and 6", s.actor.Dex.Current, s.actor.Pie.Current)
+	if s.actor.Con.Current != 11 || s.actor.Pie.Current != 5 {
+		t.Errorf("con %d pie %d, want 11 and 5", s.actor.Con.Current, s.actor.Pie.Current)
 	}
 }
 
 // Short in two stats takes both picks.
 func TestTrainNeedsBothPicksWhenTwoStatsShort(t *testing.T) {
-	s := trainState(20, 15, 5, 5, 5, "pie", "int")
+	s := trainState(16, 20, 3, 7, 4, "pie", "int")
 	train{}.process(s)
 	if s.actor.Tier != 1 {
 		t.Fatalf("tier = %d, trained with constitution still short", s.actor.Tier)
 	}
 
-	s = trainState(20, 15, 5, 5, 5, "con", "pie")
+	s = trainState(16, 20, 3, 7, 4, "con", "pie")
 	train{}.process(s)
-	if s.actor.Tier != 2 || s.actor.Con.Current != 6 || s.actor.Pie.Current != 6 {
-		t.Errorf("tier %d con %d pie %d, want 2, 6 and 6", s.actor.Tier, s.actor.Con.Current, s.actor.Pie.Current)
+	if s.actor.Tier != 2 || s.actor.Con.Current != 4 || s.actor.Pie.Current != 5 {
+		t.Errorf("tier %d con %d pie %d, want 2, 4 and 5", s.actor.Tier, s.actor.Con.Current, s.actor.Pie.Current)
 	}
 }
 
 // With every stat on or over its minimum the picks are free.
 func TestTrainUnrestrictedAtMinimums(t *testing.T) {
-	s := trainState(20, 8, 6, 10, 6, "dex", "int")
+	s := trainState(9, 20, 8, 8, 5, "con", "int")
 
 	train{}.process(s)
 
@@ -91,11 +91,12 @@ func TestTrainUnrestrictedAtMinimums(t *testing.T) {
 
 // Reroll still has to land on or over every minimum.
 func TestRerollRefusesStatsUnderMinimum(t *testing.T) {
-	s := trainState(20, 10, 10, 5, 5)
-	if validateStats(s, 20, 10, 10, 5, 5) {
+	s := trainState(9, 20, 10, 7, 4)
+	// validateStats takes str, con, dex, int, pie
+	if validateStats(s, 9, 10, 20, 7, 4) {
 		t.Error("reroll accepted piety under the minimum")
 	}
-	if !validateStats(s, 19, 10, 10, 5, 6) {
+	if !validateStats(s, 8, 10, 20, 7, 5) {
 		t.Error("reroll refused stats on the minimum")
 	}
 }

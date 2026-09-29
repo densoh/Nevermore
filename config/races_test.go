@@ -20,21 +20,21 @@ func TestRaceMinsFitCreation(t *testing.T) {
 }
 
 func TestStatShortfalls(t *testing.T) {
-	// rolled when the human floor was 5 across the board
-	short := StatShortfalls(HUMAN, 20, 10, 20, 5, 5)
+	// rolled when the sprite piety floor was 2
+	short := StatShortfalls(SPRITE, 9, 20, 10, 7, 4)
 	if len(short) != 1 || short["pie"] != 1 {
-		t.Errorf("fighter with pie 5 shortfalls = %v, want pie 1", short)
+		t.Errorf("sprite with pie 4 shortfalls = %v, want pie 1", short)
 	}
-	short = StatShortfalls(HUMAN, 5, 5, 5, 15, 20)
-	if len(short) != 1 || short["con"] != 1 {
-		t.Errorf("mage with con 5 shortfalls = %v, want con 1", short)
+	short = StatShortfalls(SPRITE, 16, 20, 3, 7, 2)
+	if len(short) != 2 || short["con"] != 1 || short["pie"] != 3 {
+		t.Errorf("sprite with con 3 and pie 2 shortfalls = %v, want con 1 and pie 3", short)
 	}
-	if short = StatShortfalls(HUMAN, 5, 5, 6, 28, 6); len(short) != 0 {
+	if short = StatShortfalls(SPRITE, 1, 17, 4, 7, 5); len(short) != 0 {
 		t.Errorf("stats on the minimum shortfalls = %v, want none", short)
 	}
 	// the same stats are fine on a race with lower floors
-	if short = StatShortfalls(HALF_ORC, 20, 10, 20, 5, 5); len(short) != 0 {
-		t.Errorf("half-orc shortfalls = %v, want none", short)
+	if short = StatShortfalls(HUMAN, 9, 20, 10, 7, 5); len(short) != 0 {
+		t.Errorf("human shortfalls = %v, want none", short)
 	}
 }
 
