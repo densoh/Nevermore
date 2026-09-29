@@ -217,8 +217,7 @@ var (
 
 	IntResistMagicBase     = 10
 	IntResistMagicPerPoint = 1
-	IntManaPool            = 2  // Number of points of mana to add
-	IntManaPoolDiv         = 5  // Number to divide by
+	ManaPerStatPerTier     = .3 // Mana per point of the pool stat (int, or pie for divine casters and monks), per tier
 	IntSpellEffectDuration = 30 // Seconds to add
 	IntBroad               = 1  // Number of broadcasts per int point
 	IntEvalDivInt          = 3  //Divide int by this number to get eval
@@ -282,10 +281,16 @@ func CalcMana(tier int, intel int, pie int, class int) int {
 	if class >= 99 {
 		return 800
 	}
-	if class == MONK {
-		return MonkMaxChi(tier, pie)
+	return (tier * Classes[AvailableClasses[class]].Mana) + int(float64(tier)*float64(ManaPoolStat(intel, pie, class))*ManaPerStatPerTier)
+}
+
+// ManaPoolStat is the stat a class's mana pool scales from: piety for the
+// divine casters and monks, intelligence for everyone else.
+func ManaPoolStat(intel int, pie int, class int) int {
+	if class == CLERIC || class == PALADIN || class == MONK {
+		return pie
 	}
-	return (tier * Classes[AvailableClasses[class]].Mana) + int(float64(tier)*(float64(intel)/float64(IntManaPoolDiv))*float64(IntManaPool))
+	return intel
 }
 
 func CalcHaste(tier int) int {

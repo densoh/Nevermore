@@ -97,12 +97,14 @@ func CalculateLevel(exp int, expTable map[int]int) int {
 	}
 }
 
-var WeaponExpLevels = map[int]int{
+// SkillExpLevels is the exp needed for each level of every skill: weapons,
+// elemental affinity, divinity and stealth.
+var SkillExpLevels = map[int]int{
 	0:  0,
 	1:  3000,
-	2:  30000,
-	3:  250000,
-	4:  600000,
+	2:  20000,
+	3:  100000,
+	4:  500000,
 	5:  1000000,
 	6:  1600000,
 	7:  2400000,
@@ -165,21 +167,6 @@ var StealthTitles = []string{
 	"Phantom Blade",
 	"Assassin",
 	"Master Assassin",
-	"Moonshadow",
-}
-
-var StealthExpLevels = map[int]int{
-	0:  0,
-	1:  3000,
-	2:  30000,
-	3:  250000,
-	4:  600000,
-	5:  1000000,
-	6:  1600000,
-	7:  2400000,
-	8:  6000000,
-	9:  12000000,
-	10: 36000000,
 }
 
 var HealingSkill = map[int]int{
@@ -196,22 +183,44 @@ var HealingSkill = map[int]int{
 	10: 200,
 }
 
+// SpellTierDamagePercent is the damage bonus, in percent per caster tier,
+// every player's damage spells get; a mage's affinity bonus adds to it.
+const SpellTierDamagePercent = 1
+
+// SpellIntDamagePercent is the damage bonus, in percent per point of int above
+// BaselineStatValue, every player's damage spells get.
+const SpellIntDamagePercent = 1
+
+// SpellDamageBonus is the percent a player's damage spell is raised by: the
+// int and tier bonuses, plus the affinity bonus for mages. They add together
+// rather than compounding.
+func SpellDamageBonus(tier int, intel int, class int, affinityExp int, slot int) int {
+	bonus := tier * SpellTierDamagePercent
+	if intel > BaselineStatValue {
+		bonus += (intel - BaselineStatValue) * SpellIntDamagePercent
+	}
+	if class == MAGE {
+		bonus += SpellDmgSkill[WeaponLevel(affinityExp, class, slot)]
+	}
+	return bonus
+}
+
 var SpellDmgSkill = map[int]int{
 	0:  0,
 	1:  5,
 	2:  10,
 	3:  15,
-	4:  25,
-	5:  35,
-	6:  45,
-	7:  70,
-	8:  85,
-	9:  100,
-	10: 120,
+	4:  20,
+	5:  30,
+	6:  40,
+	7:  50,
+	8:  60,
+	9:  70,
+	10: 80,
 }
 
 func WeaponExpTitle(exp int, class int, slot int) string {
-	var weaponLevel = CalculateLevel(exp, WeaponExpLevels)
+	var weaponLevel = CalculateLevel(exp, SkillExpLevels)
 	if weaponLevel == 10 {
 		if ReachesGrandmaster(class, slot) {
 			return WeaponTitles[10]
@@ -224,27 +233,27 @@ func WeaponExpTitle(exp int, class int, slot int) string {
 }
 
 func AffinityExpTitle(exp int) string {
-	return AffinityTitles[CalculateLevel(exp, WeaponExpLevels)]
+	return AffinityTitles[CalculateLevel(exp, SkillExpLevels)]
 }
 
 func DivinityExpTitle(exp int) string {
-	return DivinityTitles[CalculateLevel(exp, WeaponExpLevels)]
+	return DivinityTitles[CalculateLevel(exp, SkillExpLevels)]
 }
 
 func StealthExpTitle(exp int) string {
-	return StealthTitles[CalculateLevel(exp, StealthExpLevels)]
+	return StealthTitles[CalculateLevel(exp, SkillExpLevels)]
 }
 
 func StealthLevel(exp int) int {
-	return CalculateLevel(exp, StealthExpLevels)
+	return CalculateLevel(exp, SkillExpLevels)
 }
 
 func StealthExpNext(exp int) int {
-	var currentLevel = CalculateLevel(exp, StealthExpLevels)
+	var currentLevel = CalculateLevel(exp, SkillExpLevels)
 	if currentLevel == 10 {
 		return 0
 	} else {
-		return StealthExpLevels[currentLevel+1]
+		return SkillExpLevels[currentLevel+1]
 	}
 }
 
@@ -270,12 +279,20 @@ func WeaponAdvancementFor(class int, slot int) float64 {
 	return Classes[AvailableClasses[class]].WeaponAdvancement
 }
 
+// FirstElementSkill and LastElementSkill bound the elemental affinity skill
+// slots (fire, air, earth, water).
+const FirstElementSkill, LastElementSkill = 6, 9
+
 // ReachesGrandmaster reports whether a class can reach skill level 10 in a
-// slot. Only clerics grandmaster divinity; with weapons it is fighters in
-// anything, monks with hand-to-hand, and rangers with missile weapons.
+// slot. Only clerics grandmaster divinity and only mages an elemental
+// affinity; with weapons it is fighters in anything, monks with hand-to-hand,
+// and rangers with missile weapons.
 func ReachesGrandmaster(class int, slot int) bool {
 	if slot == DivinitySkill {
 		return class == CLERIC
+	}
+	if slot >= FirstElementSkill && slot <= LastElementSkill {
+		return class == MAGE
 	}
 	switch class {
 	case FIGHTER:
@@ -289,7 +306,7 @@ func ReachesGrandmaster(class int, slot int) bool {
 }
 
 func WeaponLevel(exp int, class int, slot int) int {
-	var currentLevel = CalculateLevel(exp, WeaponExpLevels)
+	var currentLevel = CalculateLevel(exp, SkillExpLevels)
 	if currentLevel == 10 {
 		if ReachesGrandmaster(class, slot) {
 			return 10
@@ -302,20 +319,20 @@ func WeaponLevel(exp int, class int, slot int) int {
 }
 
 func WeaponExpNext(exp int, class int, slot int) int {
-	var currentLevel = CalculateLevel(exp, WeaponExpLevels)
+	var currentLevel = CalculateLevel(exp, SkillExpLevels)
 	if currentLevel >= 9 {
 		if currentLevel == 9 && ReachesGrandmaster(class, slot) {
-			return WeaponExpLevels[10]
+			return SkillExpLevels[10]
 		} else {
 			return 0
 		}
 	} else {
-		return WeaponExpLevels[currentLevel+1]
+		return SkillExpLevels[currentLevel+1]
 	}
 }
 
 func WeaponMissChance(exp int) int {
-	var currentLevel = CalculateLevel(exp, WeaponExpLevels)
+	var currentLevel = CalculateLevel(exp, SkillExpLevels)
 	switch {
 	case currentLevel == 0:
 		return 30

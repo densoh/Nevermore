@@ -15,9 +15,24 @@ jobs:
         os: [ubuntu-latest]
 
     steps:
+      - name: Strip user names from commit message
+        id: note
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          # Drop "from user/branch" on merge commits and any author trailers
+          clean=$(printf '%s\n' "$MSG" \
+            | sed -E 's/^(Merge pull request #[0-9]+) from [^ ]+/\1/' \
+            | grep -viE '^[[:space:]]*(co-authored-by|signed-off-by):' || true)
+          {
+            echo 'text<<PATCH_NOTE_EOF'
+            printf '%s\n' "$clean"
+            echo 'PATCH_NOTE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Discord notification
         env:
           DISCORD_WEBHOOK: ${{ secrets.WEBHOOK_URL }}
         uses: Ilshidur/action-discord@master
         with:
-          args: 'Patch Notes: ${{ github.event.head_commit.message }}'
+          args: 'Patch Notes: ${{ steps.note.outputs.text }}'

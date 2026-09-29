@@ -24,9 +24,6 @@ const (
 	// From this tier, afflictions aimed at a meditating monk must beat a save.
 	MonkMeditateSaveTier = MajorAbilityTier
 
-	// Chi meter: max = tier*MonkChiPerTier + pie*MonkChiPerPie.
-	MonkChiPerTier       = 4
-	MonkChiPerPie        = 2
 	MonkSpellCostDivisor = 2 // monk spells cost mana/2, minimum 1
 	ChiPerHit            = 3 // flat chi per landed hit ... (2 until 2026-09-27)
 	ChiPerHitPieDiv      = 5 // ... plus pie/5, never less than ChiPerHitPieMin (was pie/8)
@@ -251,9 +248,10 @@ func MonkFlurryFor(skill int) []float64 {
 	return mults
 }
 
-// MonkMaxChi is the monk's chi pool at a tier and piety.
+// MonkMaxChi is the monk's chi pool at a tier and piety: the shared mana
+// pool formula, keyed on piety.
 func MonkMaxChi(tier int, pie int) int {
-	return tier*MonkChiPerTier + pie*MonkChiPerPie
+	return CalcMana(tier, 0, pie, MONK)
 }
 
 // ChiPerHitFor is the chi a monk with the given piety earns per landed hit.
