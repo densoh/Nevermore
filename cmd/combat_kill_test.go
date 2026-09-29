@@ -27,10 +27,10 @@ func attackerState(class int, main *objects.Item) *state {
 // "kill" for every monk before the hand-to-hand skill was read first.
 func TestDetermineMissChanceUnarmedMonk(t *testing.T) {
 	s := attackerState(config.MONK, nil)
-	s.actor.Skills[config.HandSkill].Value = config.WeaponExpLevels[3]
+	s.actor.Skills[config.HandSkill].Value = config.SkillExpLevels[3]
 
 	got := DetermineMissChance(s, 0)
-	want := config.WeaponMissChance(config.WeaponExpLevels[3])
+	want := config.WeaponMissChance(config.SkillExpLevels[3])
 	if got != want {
 		t.Errorf("unarmed monk miss chance = %d, want %d (hand skill)", got, want)
 	}
@@ -39,11 +39,11 @@ func TestDetermineMissChanceUnarmedMonk(t *testing.T) {
 // A monk holding a weapon still fights with the hand-to-hand skill.
 func TestDetermineMissChanceArmedMonkUsesHandSkill(t *testing.T) {
 	s := attackerState(config.MONK, &objects.Item{ItemType: 0})
-	s.actor.Skills[config.HandSkill].Value = config.WeaponExpLevels[5]
+	s.actor.Skills[config.HandSkill].Value = config.SkillExpLevels[5]
 	s.actor.Skills[0].Value = 0
 
 	got := DetermineMissChance(s, 0)
-	want := config.WeaponMissChance(config.WeaponExpLevels[5])
+	want := config.WeaponMissChance(config.SkillExpLevels[5])
 	if got != want {
 		t.Errorf("armed monk miss chance = %d, want %d (hand skill)", got, want)
 	}
@@ -52,11 +52,11 @@ func TestDetermineMissChanceArmedMonkUsesHandSkill(t *testing.T) {
 // Everyone else reads the wielded weapon's skill.
 func TestDetermineMissChanceWeaponSkill(t *testing.T) {
 	s := attackerState(config.FIGHTER, &objects.Item{ItemType: 1})
-	s.actor.Skills[1].Value = config.WeaponExpLevels[4]
-	s.actor.Skills[config.HandSkill].Value = config.WeaponExpLevels[9]
+	s.actor.Skills[1].Value = config.SkillExpLevels[4]
+	s.actor.Skills[config.HandSkill].Value = config.SkillExpLevels[9]
 
 	got := DetermineMissChance(s, 0)
-	want := config.WeaponMissChance(config.WeaponExpLevels[4])
+	want := config.WeaponMissChance(config.SkillExpLevels[4])
 	if got != want {
 		t.Errorf("fighter miss chance = %d, want %d (weapon skill)", got, want)
 	}
@@ -82,7 +82,7 @@ func TestFollowUpMissPenaltyByClass(t *testing.T) {
 func TestMissChanceFloor(t *testing.T) {
 	for dex := 15; dex <= 40; dex++ {
 		s := attackerState(config.MONK, nil)
-		s.actor.Skills[config.HandSkill].Value = config.WeaponExpLevels[3] // base 24
+		s.actor.Skills[config.HandSkill].Value = config.SkillExpLevels[3] // base 24
 		s.actor.Dex.Current = dex
 		want := 24 - dex*config.HitPerDex
 		if want < 5 {

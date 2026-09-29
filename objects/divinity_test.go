@@ -10,7 +10,7 @@ func divinityCaster(class int) *Character {
 	return &Character{
 		Class:  class,
 		Flags:  map[string]bool{},
-		Skills: map[int]*Accumulator{config.DivinitySkill: {Value: config.WeaponExpLevels[5]}},
+		Skills: map[int]*Accumulator{config.DivinitySkill: {Value: config.SkillExpLevels[5]}},
 	}
 }
 

@@ -106,7 +106,7 @@ var Spells = map[string]Spell{
 	"dustgust": {
 		Name:        "dustgust",
 		Description: "this spell creates a small whirlwind of stinging sand and dust to surround and strike the target. this spell is the second-tier offensive spell of the air realm. to cast this spell, the caster motions his hands in vertical circles while speaking the spell Chant. a small whirlwind will appear around the caster, who must then blow the whirlwind to the victim. if the caster does not do so in time, the whirlwind will engulf him instead of the target... a bad thing to happen in combat. ",
-		Cost:        9,
+		Cost:        12,
 		Chant:       "Arise stinging mists, strike my foe.",
 		Magnitude:   2,
 		Effect:      "air-damage",
@@ -115,7 +115,7 @@ var Spells = map[string]Spell{
 	"stonecrush": {
 		Name:        "stonecrush",
 		Description: "the spell, crush, short for stonecrush, is the second tier offensive spell of the earth realm. the stonecrush spell causes the surrounding stones and earth to fly at the target, impacting and crushing the target. to cast this spell, the caster holds their hands in front of themselves, staring at them, while speaking the spell Chant. as he nears the end of the spell Chant, the caster then pulls their hands apart and then grinds them together. stones in the area will begin to swirl about, waiting only for the caster to direct them to their target. should the target not direct the stones to the target in time, they will home in on the caster, striking them will the full force of the spell. ",
-		Cost:        9,
+		Cost:        12,
 		Chant:       "The stones of earth, smite thee!",
 		Magnitude:   2,
 		Effect:      "earth-damage",
@@ -124,7 +124,7 @@ var Spells = map[string]Spell{
 	"fireball": {
 		Name:        "fireball",
 		Description: "the second-level offensive spell of the fire realm, fireball causes the caster to reach into the fire realm and throw a handful of fiery matter at the target. when casting the spell, the caster's hand begins to glow bright red as they whisper the spell Chant. the caster then pulls back their hand as if preparing to throw a stone, at which point the fireball appears in the caster's hand. the caster must then throw the fireball at the target before the red, protective glow fades from their hand, else the destructive energies will strike them instead. ",
-		Cost:        9,
+		Cost:        12,
 		Chant:       "Fiery missile strike thy target!",
 		Magnitude:   2,
 		Effect:      "fire-damage",
@@ -133,7 +133,7 @@ var Spells = map[string]Spell{
 	"waterbolt": {
 		Name:        "waterbolt",
 		Description: "waterbolt is the second-tier offensive spell of the water realm. this spell fires a wave of cold force, which condenses the moisture in the air into a bludgeoning bolt of water. the target is then pounded by the sheer force of the water, which contains several small ice crystals to compound the damage. in order to cast this spell, the caster puts their hands together, palms outward, with their arms fully extended toward the target. the caster then pulls their arms as far back as they will reach while speaking the spell Chant. the cold force begins to gather around the caster, who must then push their arms (and the cold) out toward the target. as with many offensive spells, the timing of directing the force is critical, as the cold will eventually strike the caster should it not be directed outward in time. ",
-		Cost:        9,
+		Cost:        12,
 		Chant:       "The force of waves, crash into thee!",
 		Magnitude:   2,
 		Effect:      "water-damage",
@@ -142,7 +142,7 @@ var Spells = map[string]Spell{
 	"shockbolt": {
 		Name:        "shockbolt",
 		Description: "this spell, the third tier attack spell in the air realm, causes a bolt of shocking static electricity to be fired at the target. to cast this spell, the caster rubs the sleeve of their robe on their hair while speaking the spell Chant. the static built from this rubbing is absorbed into the caster's hand, and can then be fired by pointing at the target. a blue arcing bolt fires, striking the target for moderate damage. it is imporrtant to direct this energy quickly however, as the spell's protection from the magically enhanced static does not last long... many a young mage has died from the static discharge of not releasing the spell in time. ",
-		Cost:        14,
+		Cost:        18,
 		Chant:       "Static bolt, shock my foe!",
 		Magnitude:   3,
 		Effect:      "air-damage",
@@ -151,7 +151,7 @@ var Spells = map[string]Spell{
 	"shatterstone": {
 		Name:        "shatterstone",
 		Description: "shatterstone is the third tier offensive spell of the earth realm. this spell causes the stone around the target to explode, hurling sharp shards of rock at the target, inflicting strong damage upon them. to cast this spell, the caster places their right hand in a fist and opens it most forcefully while speaking the spell Chant. the caster then directs the explosive force with their other hand. should the caster delay too much before directing the force, the spell will ground through the caster, causing the stone around the caster to explode, harming them. ",
-		Cost:        14,
+		Cost:        18,
 		Chant:       "Stones explode and shrapnel strike!",
 		Magnitude:   3,
 		Effect:      "earth-damage",
@@ -160,7 +160,7 @@ var Spells = map[string]Spell{
 	"burstflame": {
 		Name:        "burstflame",
 		Description: "burstflame is the third tier attack spell of the fire realm. this spell causes a fiery explosion to engulf the target briefly, causing the target great harm. to cast this spell, the caster speaks the spell Chant, while keeping their right hand turned up, fingers dancing like licking flames while pointing the other hand at the target. flames will burst from the ground below the target, and engulf the target. the caster is warned to ensure a proper target for the spell, else the spell's effects will ground out at the caster's location, greatly harming the caster instead. ",
-		Cost:        14,
+		Cost:        18,
 		Chant:       "Flameburst, strike, burn!",
 		Magnitude:   3,
 		Effect:      "fire-damage",
@@ -169,7 +169,7 @@ var Spells = map[string]Spell{
 	"steamblast": {
 		Name:        "steamblast",
 		Description: "the steamblast spell is the third tier offensive spell of the water realm. steamblast causes a hot jet of water and steam to fire from the the caster to the target, scalding them. steamblast follows a similar magical principle as waterbolt, however, the magic that condenss the water then heats it to boiling as it fires at the target. to cast the spell, the caster forces their left hand forward, palm facing the target, while speaking the spell Chant, and making a wave motion with the right hand. as the spell Chant is completed, the caster's right hand should reach the right, palm open toward the target. as with all attack spells, there is a good chance that this spell will ground out through the caster, should it be miscast. ",
-		Cost:        14,
+		Cost:        18,
 		Chant:       "Scalding vapors parbroil thee!",
 		Magnitude:   3,
 		Effect:      "water-damage",
@@ -178,7 +178,7 @@ var Spells = map[string]Spell{
 	"lightning": {
 		Name:        "lightning",
 		Description: "the fourth level spell of the air realm, lightning is a powerful offensive spell. to cast this spell, the caster rubs the sleeves of their robes together while speaking the spell Chant. as the  Chant is spoken, arcs of electrical energy will crackle up and down the caster's arms, and a small cloud will appear within the space around the caster's arms. the caster then speaks the last word of the  Chant and throws both hands towards the target. lightning will fire from the cloud into the mage's arms, and then be directed toward the target. if the caster is slow in selecting a target, the electrical energies will ground through the caster, inflicting the full damage of the lightning strike upon the caster. ",
-		Cost:        20,
+		Cost:        25,
 		Chant:       "Ions, energy, storm...discharge!",
 		Magnitude:   4,
 		Effect:      "air-damage",
@@ -187,7 +187,7 @@ var Spells = map[string]Spell{
 	"engulf": {
 		Name:        "engulf",
 		Description: "the fourth tier spell of the earth realm, engulf is a powerful offensive spell. casting the spell causes the earth itself to reach up, and engulf the target, causing damage from crushing and suffocation. to cast the spell, the caster mutters the spell Chant, while placing the palms of their hands together. as the caster completes the  Chant, they must then pull their hands apart, palms touching still, and bend all their fingers, and close their hands together. the earth itself will beging to shake, and the caster must then point their closed hands at the target, and open them to direct the spell. as is common with attack spells, if the target of the spell is not quickly identified, the energies will discharge at the caster, causing them a severe penalty in combat.",
-		Cost:        20,
+		Cost:        25,
 		Chant:       "Be held in Mother Earth's embrace",
 		Magnitude:   4,
 		Effect:      "earth-damage",
@@ -196,7 +196,7 @@ var Spells = map[string]Spell{
 	"immolate": {
 		Name:        "immolate",
 		Description: "the immolate spell is the fourth tier offensive spell of the fire realm. immolate causes the target to suddenly begin to blaze, being completely immolated by fire. mercifully for the target, the spell duration is not long, however, having every part of ones body ignite, even briefly, causes severe damage to the target. the caster speaks the spell Chant while bringing their hands together, as fists. as the spell Chant ends, the caster opens their hands, keeping the heels together, while motioning their fingers like dancing flames. the caster will then be surrounded by a nimbus of fire, which they must then direct, by pointing anc concentration, out to the target. the flaming sheath flies through the air from caster to target, and adjusts itself for the target's size in flight. should the caser lose concentration in directing the flight of the sheath, it will return and strike the caster for full effect.",
-		Cost:        20,
+		Cost:        25,
 		Chant:       "Fiery aura consume thee in a warm embrace.",
 		Magnitude:   4,
 		Effect:      "fire-damage",
@@ -205,7 +205,7 @@ var Spells = map[string]Spell{
 	"bloodboil": {
 		Name:        "bloodboil",
 		Description: "the bloodboil spell is the fourth-tier attack spell of the water realm. this spell is quite appropriately named, for it causes the ambient moisture and water within the target to begin to heat, and boil, causing immense damage to the target. to cast this spell, the caster begins to shudder, as if having a fit, while stammering out the spell Chant. an aura of waterheat begins to surround the caster as the  Chant progresses. when the  Chant is completed, the caster points with both hands at the target, who then begins to act in a similar fashion as their internal liquids boil. the caster must direct the waterheat force quickly after summoning it, else the force will penetrate the caster, boiling their blood instead. more than one mage has lost life this way. ",
-		Cost:        20,
+		Cost:        25,
 		Chant:       "Lifeblood scald, blister and boil!",
 		Magnitude:   4,
 		Effect:      "water-damage",
@@ -214,7 +214,7 @@ var Spells = map[string]Spell{
 	"thunderbolt": {
 		Name:        "thunderbolt",
 		Description: "thunderbolt is the fifth tier offensive spell in the air realm, and the most powerful known spell of that realm. to cast this spell, the caster speaks the spell Chant, while forming and shaping a stormcloud with their hands. as the cloud is completed, and the  Chant spoken, the caster then drives both hands through the cloud to point at the victim. a massive thunderbolt will arc from the cloud, as directed by the caster's hands, to strike the target. the impact from this spell alone is enough to kill smaller targets, and knock giants from their feet. when combined with the hellish power of the electrical discharge, thunderbolt is a terribly powerful offensive force. skilled casters of this spell have been known to use it to blast down stone fortresses that are not magically protected in as few as 3 strokes. casters of thunderbolt are warned to be quick in directing the energies of the spell, as the cloud will discharge soon after its formation, sending the thunderbolt to the nearest target, which is nearly always the caster. ",
-		Cost:        45,
+		Cost:        50,
 		Chant:       "Thunderbolt, lightning-strike, destruction!",
 		Magnitude:   5,
 		Effect:      "air-damage",
@@ -223,7 +223,7 @@ var Spells = map[string]Spell{
 	"earthquake": {
 		Name:        "earthquake",
 		Description: "earthquake is the fifth-tier offensive spell of the earth realm, and is the most powerful known spell in that realm. earthquake causes the earth to open up and attempt to swallow the spell's target. while the spell is rarely completely successful, the opening and closing of the magical fault is quick enough to trap a portion of the target, effectively amputating the sections sealed in the earth, often leaving only the target's head behind. to cast this spell, the caster places their hands open and together, quickly opening and closing them as the spell Chant is spoken. the earth will then begin to shake, and the caster must then throw their open hands out to direct th earth to the target. should the caster be slow in directing the energy, the earth will open up beneath them, as if they were the intended target. fortunately for such mages, clerical magic allows the regeneration of lost members. this spell is often used in seiges, allowing the instant destruction of a fortresses walls in a few quick castings. ",
-		Cost:        45,
+		Cost:        50,
 		Chant:       "Mother Earth swallow thee into an instant grave...",
 		Magnitude:   5,
 		Effect:      "earth-damage",
@@ -232,7 +232,7 @@ var Spells = map[string]Spell{
 	"flamefill": {
 		Name:        "flamefill",
 		Description: "flamefill is the fifth-tier offensive spell of the fire realm, and is the most powerful known spell of that realm. it is also considered one of the most cruel spells known. simply put, flamefill completely fills the inside of the target with flames, burning and charring their internal organs. this spell will instantly slay most targets, consuming them in fire as would a funeral pyre, leaving only the most rugged or magically shielded targets alive. to cast flamefill, the mage speaks the spell Chant, while wiping their forehead as if very warm. as the spell energies are forming, the caster becomes uncomfortably warm, and just as the spell is about to burn them, they must direct the hellish heat from themselves to the target. the struck target's internal system is instantly filled with flames. casters of this spell are warned not to wait too long before directing the effects of this spell to the target, as it is often a fatal mistake. ",
-		Cost:        45,
+		Cost:        50,
 		Chant:       "Be thou consumed by inner fire!",
 		Magnitude:   5,
 		Effect:      "fire-damage",
@@ -241,7 +241,7 @@ var Spells = map[string]Spell{
 	"iceblade": {
 		Name:        "iceblade",
 		Description: "iceblade is the most powerful spell of the water realm. this spell causes the ambient moisture in the victim itself to condense and solidify into the form of a large blade within the vitals of the target. as water expands when it freezes, the iceblade will cause the target massive internal damage, from a pierced lung up to completely impaling the victim. to cast this spell, the caster shivers, as if extremely cold, then points at the victim's chest cavity while speaking the spell Chant. frost forms on the caster's fingertips as an invisible bolt of numbing cold strikes the victim. the iceblade quickly becomes visible, usually covered in blood and gore. ",
-		Cost:        45,
+		Cost:        50,
 		Chant:       "I impale thee on thy frozen blood!",
 		Magnitude:   5,
 		Effect:      "water-damage",

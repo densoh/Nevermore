@@ -15,7 +15,7 @@ func justicePaladin(tier int, pie int, weaponLevel int) *Character {
 		Modifiers: map[string]int{},
 		Pie:       Meter{Current: pie},
 		Equipment: &Equipment{Main: &Item{ItemType: 1}},
-		Skills:    map[int]*Accumulator{1: {Value: config.WeaponExpLevels[weaponLevel]}},
+		Skills:    map[int]*Accumulator{1: {Value: config.SkillExpLevels[weaponLevel]}},
 	}
 }
 

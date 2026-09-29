@@ -6,18 +6,18 @@ import (
 )
 
 func TestCalcManaMonkScalesOnPiety(t *testing.T) {
-	if got := CalcMana(1, 30, 10, MONK); got != 24 {
-		t.Errorf("tier 1 pie 10 = %d, want 24", got)
+	if got := CalcMana(1, 30, 10, MONK); got != 7 {
+		t.Errorf("tier 1 pie 10 = %d, want 7", got)
 	}
-	if got := CalcMana(25, 5, 25, MONK); got != 150 {
-		t.Errorf("tier 25 pie 25 = %d, want 150", got)
+	if got := CalcMana(25, 5, 25, MONK); got != 287 {
+		t.Errorf("tier 25 pie 25 = %d, want 287", got)
 	}
 	// Intelligence must not matter for monks.
 	if CalcMana(10, 5, 15, MONK) != CalcMana(10, 40, 15, MONK) {
 		t.Error("monk chi changed with intelligence")
 	}
 	// Other classes keep the old formula and ignore piety.
-	want := (10 * Classes["mage"].Mana) + int(float64(10)*(float64(20)/float64(IntManaPoolDiv))*float64(IntManaPool))
+	want := (10 * Classes["mage"].Mana) + int(10*20*ManaPerStatPerTier)
 	if got := CalcMana(10, 20, 99, MAGE); got != want {
 		t.Errorf("mage mana = %d, want %d", got, want)
 	}
@@ -64,13 +64,16 @@ func TestTodReferenceGrows(t *testing.T) {
 			prev = r
 		}
 	}
-	// R sits TodReferenceBase - MonkChiPerPie*10 below a low-piety monk's
-	// full bar (10 chi since 2026-09-27), so even they keep a little back
-	// after a full-chi touch; a typical monk keeps a larger surplus for flurry.
+	// R sits below even a low-piety monk's full bar, so they keep a little
+	// back after a full-chi touch, and the surplus never shrinks as they
+	// level; a typical monk keeps a larger surplus for flurry.
+	prevSurplus := 0
 	for tier := MonkTodTier; tier <= 25; tier++ {
-		if got, want := MonkMaxChi(tier, 10)-TodReference(tier), MonkChiPerPie*10-TodReferenceBase; got != want {
-			t.Errorf("tier %d: low-piety surplus over R = %d, want %d", tier, got, want)
+		surplus := MonkMaxChi(tier, 10) - TodReference(tier)
+		if surplus <= 0 || surplus < prevSurplus {
+			t.Errorf("tier %d: low-piety surplus over R = %d (previous %d)", tier, surplus, prevSurplus)
 		}
+		prevSurplus = surplus
 		if MonkMaxChi(tier, 12+tier/4) <= TodReference(tier) {
 			t.Errorf("tier %d: typical monk has no chi surplus over R", tier)
 		}
@@ -178,16 +181,16 @@ func TestMeditateHelpers(t *testing.T) {
 }
 
 func TestMonkReachesGrandmaster(t *testing.T) {
-	if WeaponLevel(WeaponExpLevels[10], MONK, HandSkill) != 10 {
+	if WeaponLevel(SkillExpLevels[10], MONK, HandSkill) != 10 {
 		t.Error("monk capped below weapon level 10")
 	}
-	if WeaponExpTitle(WeaponExpLevels[10], MONK, HandSkill) != WeaponTitles[10] {
+	if WeaponExpTitle(SkillExpLevels[10], MONK, HandSkill) != WeaponTitles[10] {
 		t.Error("monk denied the grandmaster title")
 	}
-	if WeaponExpNext(WeaponExpLevels[9], MONK, HandSkill) != WeaponExpLevels[10] {
+	if WeaponExpNext(SkillExpLevels[9], MONK, HandSkill) != SkillExpLevels[10] {
 		t.Error("monk next-level lookup stops at 9")
 	}
-	if WeaponLevel(WeaponExpLevels[10], THIEF, 0) != 9 {
+	if WeaponLevel(SkillExpLevels[10], THIEF, 0) != 9 {
 		t.Error("thief unexpectedly reaches level 10")
 	}
 }
@@ -255,10 +258,10 @@ func TestMonkIronBody(t *testing.T) {
 }
 
 func TestRangerWeaponRules(t *testing.T) {
-	if WeaponLevel(WeaponExpLevels[10], RANGER, MissileSkill) != 10 {
+	if WeaponLevel(SkillExpLevels[10], RANGER, MissileSkill) != 10 {
 		t.Error("ranger denied grandmaster with a bow")
 	}
-	if WeaponLevel(WeaponExpLevels[10], RANGER, 0) != 9 {
+	if WeaponLevel(SkillExpLevels[10], RANGER, 0) != 9 {
 		t.Error("ranger reached grandmaster with a sword")
 	}
 	if WeaponAdvancementFor(RANGER, MissileSkill) != Classes["ranger"].WeaponAdvancement {

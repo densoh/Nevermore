@@ -241,13 +241,11 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 			time.Time{},
 		}
 
-		// Chi scales on piety, and the pool formula may have changed since the
-		// character was last saved, so rebuild it rather than trusting the DB.
-		if FilledCharacter.Class == config.MONK {
-			FilledCharacter.Mana.Max = config.CalcMana(FilledCharacter.Tier, FilledCharacter.Int.Current, FilledCharacter.Pie.Current, config.MONK)
-			if FilledCharacter.Mana.Current > FilledCharacter.Mana.Max {
-				FilledCharacter.Mana.Current = FilledCharacter.Mana.Max
-			}
+		// The pool formula may have changed since the character was last
+		// saved, so rebuild max mana (chi for monks) rather than trusting the DB.
+		FilledCharacter.Mana.Max = config.CalcMana(FilledCharacter.Tier, FilledCharacter.Int.Current, FilledCharacter.Pie.Current, FilledCharacter.Class)
+		if FilledCharacter.Mana.Current > FilledCharacter.Mana.Max {
+			FilledCharacter.Mana.Current = FilledCharacter.Mana.Max
 		}
 
 		for _, spellN := range strings.Split(charData["spells"].(string), ",") {

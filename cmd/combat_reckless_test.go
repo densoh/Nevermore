@@ -82,9 +82,9 @@ func TestRecklessAttackFreeWhenOff(t *testing.T) {
 // The stance takes RecklessMissReduction points off the miss chance.
 func TestDetermineMissChanceReckless(t *testing.T) {
 	plain := attackerState(config.BARBARIAN, &objects.Item{ItemType: 1})
-	plain.actor.Skills[1].Value = config.WeaponExpLevels[2]
+	plain.actor.Skills[1].Value = config.SkillExpLevels[2]
 	s := recklessState(&objects.Item{ItemType: 1}, 200)
-	s.actor.Skills[1].Value = config.WeaponExpLevels[2]
+	s.actor.Skills[1].Value = config.SkillExpLevels[2]
 
 	base := DetermineMissChance(plain, 0)
 	got := DetermineMissChance(s, 0)

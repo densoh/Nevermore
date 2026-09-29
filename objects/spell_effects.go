@@ -2,7 +2,6 @@ package objects
 
 import (
 	"log"
-	"math"
 	"math/rand"
 	"strconv"
 
@@ -528,11 +527,8 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 			spellType = 3
 		}
 		actualDamage = elementalDamage(magnitude, intel)
-		damage = int(float64(actualDamage) + float64(actualDamage)*float64(math.Max(float64(caller.Int.Current-config.BaselineStatValue), 0)*config.StatDamageMod))
-		if caller.Class == 4 {
-			affinityLevel := config.SpellDmgSkill[config.WeaponLevel(caller.Skills[magicSkillMap[magicType]].Value, caller.Class, magicSkillMap[magicType])]
-			damage = int(float64(damage) * (1 + float64(affinityLevel)*.01))
-		}
+		bonus := config.SpellDamageBonus(caller.Tier, caller.Int.Current, caller.Class, caller.Skills[magicSkillMap[magicType]].Value, magicSkillMap[magicType])
+		damage = int(float64(actualDamage) * (1 + float64(bonus)*.01))
 		if caller.CheckFlag("casting") {
 			damage = int(float64(damage) * caller.SingCastMod())
 		}
@@ -632,22 +628,22 @@ func elementalDamage(magnitude int, intel int) (damage int) {
 		damage = 7 + power
 	} else if magnitude == 2 {
 		power = utils.Roll(3, 4, 0)
-		damage = 21 + power
+		damage = 25 + power
 	} else if magnitude == 3 {
-		power = utils.Roll(3, 7, 0)
-		damage = 42 + power
+		power = utils.Roll(4, 6, 0)
+		damage = 45 + power
 	} else if magnitude == 4 {
-		power = utils.Roll(4, 10, 0)
-		damage = 84 + power
+		power = utils.Roll(5, 8, 0)
+		damage = 85 + power
 	} else if magnitude == 5 {
 		power = utils.Roll(8, 8, 0)
-		damage = 175 + power
+		damage = 170 + power
 	} else if magnitude == 6 {
-		power = utils.Roll(9, 10, 0)
-		damage = 300 + power
+		power = utils.Roll(8, 10, 0)
+		damage = 250 + power
 	} else if magnitude == 7 {
 		power = utils.Roll(14, 10, 0)
-		damage = 400 + power
+		damage = 320 + power
 	}
 	return damage
 }
