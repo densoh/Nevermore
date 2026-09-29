@@ -76,9 +76,24 @@ func TestBashDamage(t *testing.T) {
 
 func TestRollBashUnknownSkillIsPlain(t *testing.T) {
 	for _, skill := range []int{-1, 10, 42} {
-		dmg, stun, msg := RollBash(skill)
+		dmg, stun, msg := RollBash(skill, 10)
 		if dmg != 1 || stun != 1 || msg != "" {
 			t.Errorf("RollBash(%d) = %v, %d, %q; want a plain bash", skill, dmg, stun, msg)
+		}
+	}
+}
+
+func TestThunkMultiplier(t *testing.T) {
+	cases := []struct {
+		tier int
+		want float64
+	}{
+		{1, 5}, {5, 5}, // flat through tier 5
+		{6, 5.5}, {15, 10}, {25, 15}, // +0.5 per tier after
+	}
+	for _, c := range cases {
+		if got := ThunkMultiplier(c.tier); got != c.want {
+			t.Errorf("ThunkMultiplier(%d) = %v, want %v", c.tier, got, c.want)
 		}
 	}
 }

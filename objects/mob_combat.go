@@ -176,11 +176,11 @@ func (m *Mob) ApplyStrike(target *Character, baseDamage int, style AttackStyle, 
 	} else {
 		switch style {
 		case StyleVital:
-			target.writeCombat(text.Red + "Vital Strike!!!\n" + text.Reset)
+			target.writeCombat(text.LightYellow + "Vital Strike!!!\n" + text.Reset)
 		case StyleCritical:
-			target.writeCombat(text.Red + "Critical Strike!!!\n" + text.Reset)
+			target.writeCombat(text.LightYellow + "Critical Strike!!!\n" + text.Reset)
 		case StyleDouble:
-			target.writeCombat(text.Red + "Double Damage!!!\n" + text.Reset)
+			target.writeCombat(text.LightYellow + "Double Damage!!!\n" + text.Reset)
 		}
 		buildString := ""
 		if stamDamage != 0 {

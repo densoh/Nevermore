@@ -41,40 +41,40 @@ var RaceDefs = map[string]raceDef{
 	"dark-elf": {
 		Desc: "Dark-Elves tend to be split between Drow, the underdark dwelling-typically evil worshipping elves, and the Grey-Elves, those who have moved to the surface and keep the traits of their former lineage but typically worship good entities.  They are frequently scorned by the other breeds of elves and many consider it a disgrace to even be seen with them.  Physically drow tend to have gray dark skin, white hair, and red eyes.  Grey-elves tend to have pale skin, white hair, and blue eyes.  Variations in tones are present with blueish undertones and even sometimes being born with traits from their original ancient elven ancestry. Like elves and dwarves, they have long life spans.",
 		// StrShift: -2, DexShift: 1, ConShift: -1, IntShift: 1, PieShift: 1,
-		StrMin: 4, StrMax: 28,
+		StrMin: 4, StrMax: 26,
 		DexMin: 12, DexMax: 40,
-		ConMin: 5, ConMax: 20,
-		IntMin: 12, IntMax: 34,
-		PieMin: 4, PieMax: 28,
+		ConMin: 4, ConMax: 22,
+		IntMin: 10, IntMax: 32,
+		PieMin: 4, PieMax: 30,
 		Darkvision: true,
 	},
 	"dwarf": {
 		Desc: "A dwarf is a stocky and short demihuman, standing about 4 feet tall.  Dwarves are sturdy fighters, and are known to be stubborn and practical.  Their unground dwelling kin tend to be known as greedy for their obsession with precious gems and metals. However this may be a misrepresentation of their true nature as they are known to be loyal and trustworthy friends.  Dwarves skin tones come in a variety of colors from pale to dark brown, with hair colors ranging from black to red to white.  They have long life spans.",
 		// StrShift: 2, DexShift: -2, ConShift: 2, IntShift: -2, PieShift: 0,
-		StrMin: 10, StrMax: 34,
-		DexMin: 3, DexMax: 24,
+		StrMin: 9, StrMax: 32,
+		DexMin: 3, DexMax: 25,
 		ConMin: 12, ConMax: 38,
-		IntMin: 4, IntMax: 24,
-		PieMin: 8, PieMax: 30,
+		IntMin: 3, IntMax: 25,
+		PieMin: 7, PieMax: 30,
 		Darkvision: true,
 	},
 	"elf": {
 		Desc: "Somewhat shorter than humans, elves tend to be brilliant and agile.  They are known to be very wise and are often found in the magical arts.  They are also known to be very good rangers. Their skin tones tend to be lighter, with multiple variations of hair color and eye color. They have long life spans.",
 		// StrShift: -3, DexShift: 2, ConShift: -3, IntShift: 2, PieShift: 2,
 		StrMin: 4, StrMax: 26,
-		DexMin: 12, DexMax: 40,
-		ConMin: 5, ConMax: 22,
+		DexMin: 10, DexMax: 38,
+		ConMin: 4, ConMax: 22,
 		IntMin: 12, IntMax: 36,
-		PieMin: 4, PieMax: 26,
+		PieMin: 4, PieMax: 28,
 		Darkvision: true,
 	},
 	"gnome": {
-		Desc: "A cousin of the dwarf, gnomes are small and more agile than their dwarf counterparts.  They tend to be more intelligent and inclined to magical studies especially in the craft of artificing.   They have multiple variations of skin tones, eye colors, and hair colors. They have long life spans. ",
+		Desc: "A cousin of the dwarf, gnomes are small and more agile than their dwarf counterparts.  They tend to be more intelligent and inclined to magical studies especially in the craft of artificing.  They are known for their remarkable clarity of mind and focus.  They have multiple variations of skin tones, eye colors, and hair colors. They have long life spans. ",
 		// StrShift: -3, DexShift: 2, ConShift: -3, IntShift: 1, PieShift: 3,
-		StrMin: 5, StrMax: 20,
-		DexMin: 4, DexMax: 23,
-		ConMin: 6, ConMax: 20,
-		IntMin: 12, IntMax: 42,
+		StrMin: 3, StrMax: 19,
+		DexMin: 4, DexMax: 26,
+		ConMin: 4, ConMax: 20,
+		IntMin: 12, IntMax: 40,
 		PieMin: 12, PieMax: 45,
 		Darkvision: false,
 	},
@@ -83,7 +83,7 @@ var RaceDefs = map[string]raceDef{
 		// StrShift: 4, DexShift: -2, ConShift: 4, IntShift: -4, PieShift: -2,
 		StrMin: 18, StrMax: 45,
 		DexMin: 2, DexMax: 16,
-		ConMin: 14, ConMax: 42,
+		ConMin: 12, ConMax: 42,
 		IntMin: 2, IntMax: 22,
 		PieMin: 2, PieMax: 25,
 		Darkvision: false,
@@ -103,19 +103,19 @@ var RaceDefs = map[string]raceDef{
 		// StrShift: -3, DexShift: 3, ConShift: -2, IntShift: 1, PieShift: 1,
 		StrMin: 4, StrMax: 24,
 		DexMin: 14, DexMax: 43,
-		ConMin: 4, ConMax: 23,
+		ConMin: 4, ConMax: 25,
 		IntMin: 5, IntMax: 30,
-		PieMin: 5, PieMax: 30,
+		PieMin: 5, PieMax: 28,
 		Darkvision: false,
 	},
 	"half-orc": {
 		Desc: "Half orcs are an interbreed between either an orc and an elf or an orc and a human.  They can display traits from either side of their blood but do tend to have a more orcish appearance.  They are typically not as intelligent as their elven or human counterparts, but are more agile and stronger.  Human-Orcs tend to have a short lifespan, no longer than 80-90 years, while elven-orcs tend to have a medium lifespan up to 200 years.",
 		// StrShift: 2, DexShift: 1, ConShift: 1, IntShift: -2, PieShift: -2,
-		StrMin: 8, StrMax: 32,
-		DexMin: 4, DexMax: 34,
+		StrMin: 8, StrMax: 34,
+		DexMin: 6, DexMax: 32,
 		ConMin: 8, ConMax: 32,
-		IntMin: 5, IntMax: 32,
-		PieMin: 2, PieMax: 20,
+		IntMin: 5, IntMax: 30,
+		PieMin: 2, PieMax: 22,
 		Darkvision: false,
 	},
 	"human": {
@@ -123,16 +123,16 @@ var RaceDefs = map[string]raceDef{
 		// StrShift: 0, DexShift: 0, ConShift: 0, IntShift: 0, PieShift: 0,
 		StrMin: 5, StrMax: 30,
 		DexMin: 5, DexMax: 30,
-		ConMin: 5, ConMax: 30,
+		ConMin: 6, ConMax: 30,
 		IntMin: 5, IntMax: 30,
-		PieMin: 5, PieMax: 30,
+		PieMin: 6, PieMax: 30,
 		Darkvision: false,
 	},
 	"ogre": {
 		Desc: "Large and strong, this powerful race can also excel at physical combat but are generally not well versed in the magical arts.  Ogres are not known for their intellectual prowess, dexterity or piety.  The ogres were welcomed to the city of all races long ago as their people grew more social and involved with the people of Nexus. They are a short lived people with the oldest of their living to no more than 80 years old.",
 		//StrShift: 3, DexShift: -1, ConShift: 3, IntShift: -4, PieShift: -1,
 		StrMin: 17, StrMax: 43,
-		DexMin: 3, DexMax: 28,
+		DexMin: 4, DexMax: 28,
 		ConMin: 14, ConMax: 43,
 		IntMin: 1, IntMax: 16,
 		PieMin: 1, PieMax: 20,
@@ -153,7 +153,7 @@ var RaceDefs = map[string]raceDef{
 		// StrShift: -3, DexShift: 0, ConShift: -3, IntShift: 5, PieShift: 1,
 		StrMin: 3, StrMax: 20,
 		DexMin: 4, DexMax: 25,
-		ConMin: 3, ConMax: 20,
+		ConMin: 3, ConMax: 22,
 		IntMin: 17, IntMax: 45,
 		PieMin: 8, PieMax: 38,
 		Darkvision: true,
@@ -161,11 +161,11 @@ var RaceDefs = map[string]raceDef{
 	"troll": {
 		Desc: "Trolls used to be considered an evil race of people, typically known for hoarding treasure and killing for pleasure and eat raw flesh.  Overtime they have grown more social and contribute to the collective goals of society in altin. Despite their involvement in society trolls still1 generally prefer to travel alone, but can sometimes be found in groups of three or more.  They tend to be very strong, but not very intelligent.  Their skin comes in various hues of green.  They have a short life spans, typically no more than 50 years.",
 		// StrShift: 3, DexShift: 0, ConShift: 3, IntShift: -3, PieShift: -3,
-		StrMin: 15, StrMax: 40,
+		StrMin: 14, StrMax: 40,
 		DexMin: 2, DexMax: 22,
 		ConMin: 17, ConMax: 45,
 		IntMin: 2, IntMax: 20,
-		PieMin: 3, PieMax: 23,
+		PieMin: 2, PieMax: 23,
 		Darkvision: true,
 	},
 	"sprite": {
@@ -175,7 +175,63 @@ var RaceDefs = map[string]raceDef{
 		DexMin: 17, DexMax: 45,
 		ConMin: 4, ConMax: 18,
 		IntMin: 7, IntMax: 38,
-		PieMin: 2, PieMax: 33,
+		PieMin: 5, PieMax: 33,
 		Darkvision: true,
 	},
+}
+
+// TrainableStats are the stat names the train command accepts, in the order
+// the race definitions list them.
+var TrainableStats = []string{"str", "dex", "con", "int", "pie"}
+
+// StatMins returns the minimums for the race keyed by the names in
+// TrainableStats.
+func StatMins(race int) map[string]int {
+	def := RaceDefs[AvailableRaces[race]]
+	return map[string]int{
+		"str": def.StrMin,
+		"dex": def.DexMin,
+		"con": def.ConMin,
+		"int": def.IntMin,
+		"pie": def.PieMin,
+	}
+}
+
+// StatShortfalls returns how many points each stat sits below the minimum for
+// the race, keyed by the names in TrainableStats. Stats at or above their
+// minimum are left out. A character ends up short when a racial minimum is
+// raised after they were rolled.
+func StatShortfalls(race int, str int, dex int, con int, intel int, pie int) map[string]int {
+	current := map[string]int{"str": str, "dex": dex, "con": con, "int": intel, "pie": pie}
+	short := map[string]int{}
+	for stat, min := range StatMins(race) {
+		if current[stat] < min {
+			short[stat] = min - current[stat]
+		}
+	}
+	return short
+}
+
+// TrainingCoversShortfalls reports whether the stats picked for a tier put
+// every point they can into the stats that are short. A pick only counts
+// while its stat still has a shortfall left, so a character one point short
+// in piety owes one pick to piety and keeps the other.
+func TrainingCoversShortfalls(short map[string]int, picks []string) bool {
+	owed := 0
+	left := map[string]int{}
+	for stat, points := range short {
+		owed += points
+		left[stat] = points
+	}
+	if owed > len(picks) {
+		owed = len(picks)
+	}
+	paid := 0
+	for _, pick := range picks {
+		if left[pick] > 0 {
+			left[pick]--
+			paid++
+		}
+	}
+	return paid >= owed
 }

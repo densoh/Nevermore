@@ -40,7 +40,21 @@ const (
 	// Bash adds BashDamagePerTier per tier on top of its hit, after the
 	// special-roll multiplier so a Thunk does not amplify it.
 	BashDamagePerTier = 3
+
+	// A Thunk multiplies the bash hit by ThunkBaseMultiplier through
+	// ThunkBaseTier, then ThunkMultiplierPerTier more for every tier above it.
+	ThunkBaseMultiplier    = 5.0
+	ThunkBaseTier          = 5
+	ThunkMultiplierPerTier = 0.5
 )
+
+// ThunkMultiplier is the damage multiplier on a Thunk bash at the given tier.
+func ThunkMultiplier(tier int) float64 {
+	if tier <= ThunkBaseTier {
+		return ThunkBaseMultiplier
+	}
+	return ThunkBaseMultiplier + float64(tier-ThunkBaseTier)*ThunkMultiplierPerTier
+}
 
 // BashDamage is a bash's damage before mob armor: the weapon hit times the
 // special-roll multiplier, plus the flat tier bonus.

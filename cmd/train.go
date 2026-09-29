@@ -40,13 +40,26 @@ func (train) process(s *state) {
 	}
 	message := ""
 
-	if !validateStats(s, s.actor.Str.Current, s.actor.Con.Current, s.actor.Dex.Current, s.actor.Int.Current, s.actor.Pie.Current) {
+	if !validateStatCaps(s, s.actor.Str.Current, s.actor.Con.Current, s.actor.Dex.Current, s.actor.Int.Current, s.actor.Pie.Current) {
 		s.msg.Actor.SendBad("Stats are not valid, you cannot train this character")
 		return
 	}
 
 	if !utils.StringIn(strings.ToLower(s.words[0]), []string{"str", "dex", "con", "int", "pie"}) || !utils.StringIn(strings.ToLower(s.words[1]), []string{"str", "dex", "con", "int", "pie"}) {
 		s.msg.Actor.SendBad("You must enter a valid stat to train. (pie, int, con, dex, str)")
+		return
+	}
+	// Stats under the racial minimum have to be trained before anything else
+	short := config.StatShortfalls(s.actor.Race, s.actor.Str.Current, s.actor.Dex.Current, s.actor.Con.Current, s.actor.Int.Current, s.actor.Pie.Current)
+	if !config.TrainingCoversShortfalls(short, []string{strings.ToLower(s.words[0]), strings.ToLower(s.words[1])}) {
+		mins := config.StatMins(s.actor.Race)
+		owed := make([]string, 0, len(short))
+		for _, stat := range config.TrainableStats {
+			if short[stat] > 0 {
+				owed = append(owed, stat+" (minimum "+strconv.Itoa(mins[stat])+")")
+			}
+		}
+		s.msg.Actor.SendBad("You are below the minimum for your race and must train those stats first: " + strings.Join(owed, ", "))
 		return
 	}
 	validateVal := 1
