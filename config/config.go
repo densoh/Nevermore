@@ -15,10 +15,7 @@ var Server = struct {
 	NEOUname          string  // The Username for the neo4j instance
 	NEOPword          string  // The Password for the neo4j instance
 	NEOAddress        string  // The address of the neo4j server
-	PGUname           string  // The Username for the neo4j instance
-	PGPword           string  // The Password for the neo4j instance
-	PGAddress         string  // The address of the neo4j server
-	PGPort            int     // The port of the postgres server
+	MetricsDB         string  // Path to the SQLite file for combat metrics, chat logs and item sales
 	Port              string  // Port for server to listen on
 	IdleTimeout       float64 // Idle connection disconnect time in seconds
 	AFKTimeout        float64
@@ -37,10 +34,7 @@ var Server = struct {
 	NEOPword:          "PASSWORD",
 	NEOAddress:        "127.0.0.1",
 	Port:              "4001",
-	PGUname:           "USERNAME",
-	PGPword:           "PASSWORD",
-	PGAddress:         "127.0.0.1",
-	PGPort:            5432,
+	MetricsDB:         "metrics.db",
 	IdleTimeout:       15, // Minutes
 	AFKTimeout:        30,
 	OOCTimeout:        20,
@@ -161,11 +155,10 @@ func init() {
 	Server.NEOUname = viper.GetString("neouname")
 	Server.NEOPword = viper.GetString("neopword")
 	Server.NEOAddress = viper.GetString("neoaddress")
-	Server.PGUname = viper.GetString("pguname")
-	Server.PGPword = viper.GetString("pgpword")
-	Server.PGAddress = viper.GetString("pgaddress")
 	Server.Port = viper.GetString("port")
-	Server.PGPort = viper.GetInt("pgport")
+	if viper.IsSet("metricsdb") {
+		Server.MetricsDB = viper.GetString("metricsdb")
+	}
 	Server.RestToken = viper.GetString("resttoken")
 	// Setup global logging format
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile | log.Lmicroseconds)

@@ -10,8 +10,7 @@ var CombatModifiers = map[string]float64{
 	// A barbarian's crushing blow on a regular attack; it also stuns.
 	"crushing": 5,
 
-	// Bash
-	"thunk":  10,
+	// Bash (Thunk scales with tier, see ThunkMultiplier)
 	"thwomp": 2,
 	"thump":  1.5,
 
@@ -243,7 +242,9 @@ var (
 
 	ArmorReduction         = .007
 	ArmorReductionPoints   = 10
-	ArmorReductionConstant = 1100
+	// Player damage taken = constant / (constant + armor). 1000 matches the
+	// old linear formula through tier 14 at optimized gear.
+	ArmorReductionConstant = 1000
 
 	MobArmorReduction = .5
 
@@ -413,7 +414,8 @@ var BashChances = map[int][]int{
 
 // RollBash rolls for a special bash result. damModifier multiplies the bash
 // damage and stunModifier multiplies BashStuns; both are 1 on a plain bash.
-func RollBash(skill int) (damModifier float64, stunModifier int, output string) {
+// tier sets the size of a Thunk.
+func RollBash(skill int, tier int) (damModifier float64, stunModifier int, output string) {
 	damModifier = 1
 	stunModifier = 1
 	row, ok := BashChances[skill]
@@ -422,7 +424,7 @@ func RollBash(skill int) (damModifier float64, stunModifier int, output string) 
 	}
 	bashRoll := utils.Roll(1000000, 1, 0)
 	if bashRoll <= row[0] { // Thunk
-		damModifier = CombatModifiers["thunk"]
+		damModifier = ThunkMultiplier(tier)
 		output = "Thunk!!"
 	} else if bashRoll <= row[1] { // Thwomp
 		damModifier = CombatModifiers["thwomp"]

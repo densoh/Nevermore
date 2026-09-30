@@ -3,26 +3,17 @@
 package data
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/ArcCS/Nevermore/config"
-	_ "github.com/lib/pq"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"log"
 	"strings"
-	"time"
 )
 
 var (
-	NEOURI    = fmt.Sprintf("bolt://%s:7687", config.Server.NEOAddress)
-	DRIVER    neo4j.Driver
-	err       error
-	PGCONNSTR = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		config.Server.PGAddress,
-		config.Server.PGPort,
-		config.Server.PGUname,
-		config.Server.PGPword,
-		config.Server.PGUname)
+	NEOURI               = fmt.Sprintf("bolt://%s:7687", config.Server.NEOAddress)
+	DRIVER               neo4j.Driver
+	err                  error
 	ChatLogsCapture      []ChatLog
 	ItemSalesCapture     []ItemSales
 	ItemTotalsCapture    map[int]ItemTotals
@@ -40,30 +31,6 @@ func init() {
 	ItemTotalsCapture = make(map[int]ItemTotals)
 	CombatMetricsCapture = make([]CombatMetric, 0)
 
-}
-
-func StoreChatLog(chatType int, fromId int, toId int, message string) {
-	ChatLogsCapture = append(ChatLogsCapture, ChatLog{ChatType: chatType, FromId: fromId, ToId: toId, Message: message, ChatTime: time.Now()})
-}
-
-func ClearChatLogs() {
-	ChatLogsCapture = make([]ChatLog, 0)
-}
-
-func StoreItemSale(ItemId int, SellerId int, SellerTier int, SellValue int) {
-	ItemSalesCapture = append(ItemSalesCapture, ItemSales{ItemId: ItemId, TimeSold: time.Now(), SellerId: SellerId, SellerTier: SellerTier, SellValue: SellValue})
-}
-
-func ClearItemSales() {
-	ItemSalesCapture = make([]ItemSales, 0)
-}
-
-func StoreCombatMetric(Action string, ActionType int, Mode int, TotalDamage int, Resisted int, FinalDamage int, AttackerType int, AttackerId int, AttackerTier int, VictimType int, VictimId int) {
-	CombatMetricsCapture = append(CombatMetricsCapture, CombatMetric{Action: Action, ActionType: ActionType, Mode: Mode, TotalDamage: TotalDamage, Resisted: Resisted, FinalDamage: FinalDamage, AttackerType: AttackerType, AttackerId: AttackerId, AttackerTier: AttackerTier, VictimType: VictimType, VictimId: VictimId, CombatTime: time.Now()})
-}
-
-func ClearCombatMetrics() {
-	CombatMetricsCapture = make([]CombatMetric, 0)
 }
 
 // Player, Mob, Object, Room, Quest, ItemInventory
@@ -164,47 +131,4 @@ func execRead(query string, params map[string]interface{}) ([]*neo4j.Record, err
 	} else {
 		return results.([]*neo4j.Record), nil
 	}
-}
-
-//*** POST GRES FUNCTIONS ***//
-
-func pgExecRead(selectStmt string) (*sql.Rows, error) {
-	db, err := sql.Open("postgres", PGCONNSTR)
-	if err != nil {
-		log.Println(err)
-	}
-	defer db.Close()
-	// Select rows from the table
-	rows, err := db.Query(selectStmt)
-	if err != nil {
-		log.Println(err)
-	}
-	defer rows.Close()
-
-	err = rows.Err()
-	if err != nil {
-		log.Println(err)
-	}
-	return rows, err
-}
-
-func pgExec(execStmt string, params ...interface{}) (success bool, err error) {
-	db, err := sql.Open("postgres", PGCONNSTR)
-	success = true
-	if err != nil {
-		success = false
-		log.Println(err)
-	}
-	defer db.Close()
-	/*
-		insertStmt := "INSERT INTO mytable (col1, col2) VALUES ($1, $2)"
-		updateStmt := "UPDATE mytable SET col2 = $1 WHERE col1 = $2"
-		deleteStmt := "DELETE FROM mytable WHERE col1 = $1"
-	*/
-	_, err = db.Exec(execStmt, params)
-	if err != nil {
-		success = false
-		log.Println(err)
-	}
-	return success, err
 }

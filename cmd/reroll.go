@@ -66,6 +66,16 @@ func (reroll) process(s *state) {
 }
 
 func validateStats(s *state, str int, con int, dex int, intel int, pie int) bool {
+	if !validateStatCaps(s, str, con, dex, intel, pie) {
+		return false
+	}
+	return len(config.StatShortfalls(s.actor.Race, str, dex, con, intel, pie)) == 0
+}
+
+// validateStatCaps checks everything validateStats does except the racial
+// minimums. Train uses it on the stats a character already has, where a stat
+// under its minimum has to be trained rather than refused.
+func validateStatCaps(s *state, str int, con int, dex int, intel int, pie int) bool {
 	if status, msg := validateStatLevel(s.actor.Tier, str); !status {
 		s.msg.Actor.SendBad(msg)
 		return false
@@ -89,19 +99,19 @@ func validateStats(s *state, str int, con int, dex int, intel int, pie int) bool
 	if str+con+dex+intel+pie != 50+((s.actor.Tier-1)*2) {
 		return false
 	}
-	if config.RaceDefs[config.AvailableRaces[s.actor.Race]].StrMin > str || str > config.RaceDefs[config.AvailableRaces[s.actor.Race]].StrMax {
+	if str > config.RaceDefs[config.AvailableRaces[s.actor.Race]].StrMax {
 		return false
 	}
-	if config.RaceDefs[config.AvailableRaces[s.actor.Race]].DexMin > dex || dex > config.RaceDefs[config.AvailableRaces[s.actor.Race]].DexMax {
+	if dex > config.RaceDefs[config.AvailableRaces[s.actor.Race]].DexMax {
 		return false
 	}
-	if config.RaceDefs[config.AvailableRaces[s.actor.Race]].ConMin > con || con > config.RaceDefs[config.AvailableRaces[s.actor.Race]].ConMax {
+	if con > config.RaceDefs[config.AvailableRaces[s.actor.Race]].ConMax {
 		return false
 	}
-	if config.RaceDefs[config.AvailableRaces[s.actor.Race]].IntMin > intel || intel > config.RaceDefs[config.AvailableRaces[s.actor.Race]].IntMax {
+	if intel > config.RaceDefs[config.AvailableRaces[s.actor.Race]].IntMax {
 		return false
 	}
-	if config.RaceDefs[config.AvailableRaces[s.actor.Race]].PieMin > pie || pie > config.RaceDefs[config.AvailableRaces[s.actor.Race]].PieMax {
+	if pie > config.RaceDefs[config.AvailableRaces[s.actor.Race]].PieMax {
 		return false
 	}
 	return true

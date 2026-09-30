@@ -274,6 +274,16 @@ func (cast) process(s *state) {
 		return
 	}
 
+	// A named target that matched nothing is an error, never a self cast.
+	if name != "" {
+		if utils.StringIn(spellInstance.Name, objects.RemoteSpells) {
+			s.msg.Actor.SendBad("You cannot sense anyone named '" + name + "'.")
+		} else {
+			s.msg.Actor.SendBad("You don't see '" + name + "' here.")
+		}
+		return
+	}
+
 	if utils.StringIn(spellInstance.Name, objects.OffensiveSpells) {
 		s.msg.Actor.SendBad("Who are you trying to cast on?")
 		return

@@ -176,6 +176,10 @@ func (use) process(s *state) {
 					}
 					return
 				}
+
+				// A named target that matched nothing is an error, never a self cast.
+				s.msg.Actor.SendBad("You don't see '" + strings.ToLower(name) + "' here.")
+				return
 			} else {
 				s.actor.RunHook("use")
 				s.actor.SetTimer("use", 8)

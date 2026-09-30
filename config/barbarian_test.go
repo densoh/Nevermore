@@ -16,10 +16,17 @@ func TestBerserkDamageBonus(t *testing.T) {
 }
 
 func TestRecklessStamCost(t *testing.T) {
-	cases := map[int]int{10: 1, 154: 8, 220: 11, 440: 22}
-	for maxStam, want := range cases {
-		if got := RecklessStamCost(maxStam); got != want {
-			t.Errorf("RecklessStamCost(%d) = %d, want %d", maxStam, got, want)
+	cases := []struct{ maxStam, tier, want int }{
+		{10, 20, 1},   // 5% of a tiny pool, floored at 1
+		{60, 20, 3},   // 5% is below the tier cap
+		{105, 5, 3},   // tier 5: 5% is 6, capped at 5/2+1
+		{345, 15, 8},  // tier 15: 5% is 18, capped at 15/2+1
+		{460, 20, 11}, // tier 20: 5% is 23, capped at 20/2+1
+		{200, 0, 1},   // tier 0 still pays the minimum
+	}
+	for _, c := range cases {
+		if got := RecklessStamCost(c.maxStam, c.tier); got != c.want {
+			t.Errorf("RecklessStamCost(%d, %d) = %d, want %d", c.maxStam, c.tier, got, c.want)
 		}
 	}
 }
@@ -76,9 +83,24 @@ func TestBashDamage(t *testing.T) {
 
 func TestRollBashUnknownSkillIsPlain(t *testing.T) {
 	for _, skill := range []int{-1, 10, 42} {
-		dmg, stun, msg := RollBash(skill)
+		dmg, stun, msg := RollBash(skill, 10)
 		if dmg != 1 || stun != 1 || msg != "" {
 			t.Errorf("RollBash(%d) = %v, %d, %q; want a plain bash", skill, dmg, stun, msg)
+		}
+	}
+}
+
+func TestThunkMultiplier(t *testing.T) {
+	cases := []struct {
+		tier int
+		want float64
+	}{
+		{1, 5}, {5, 5}, // flat through tier 5
+		{6, 5.5}, {15, 10}, {25, 15}, // +0.5 per tier after
+	}
+	for _, c := range cases {
+		if got := ThunkMultiplier(c.tier); got != c.want {
+			t.Errorf("ThunkMultiplier(%d) = %v, want %v", c.tier, got, c.want)
 		}
 	}
 }

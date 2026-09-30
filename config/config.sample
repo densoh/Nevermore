@@ -3,10 +3,7 @@
   "neouname": "nexus",
   "neopword": "neopassword",
   "neoaddress": "127.0.0.1",
-  "pguname": "nexus",
-  "pgpword": "nexuspassword",
-  "pgaddress": "127.0.0.1",
-  "pgport": 5432,
+  "metricsdb": "metrics.db",
   "port": "4001",
   "resttoken": "restpassword"
 }

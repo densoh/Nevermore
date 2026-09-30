@@ -16,6 +16,9 @@
 
 log*.txt
 
+# Metrics SQLite file (plus WAL sidecars)
+metrics.db*
+
 # Editor and OS files
 .DS_Store
 .vscode/
