@@ -43,7 +43,7 @@ func (reckless) process(s *state) {
 		s.msg.Actor.SendBad("You can only swing recklessly with a melee weapon.")
 		return
 	}
-	cost := config.RecklessStamCost(s.actor.Stam.Max)
+	cost := config.RecklessStamCost(s.actor.Stam.Max, s.actor.Tier)
 	if s.actor.Stam.Current < cost {
 		s.msg.Actor.SendBad("You are far too tired to do that.")
 		return
@@ -69,7 +69,7 @@ func recklessAttack(s *state) {
 		s.msg.Actor.SendBad("You can't swing recklessly with a ranged weapon.")
 		return
 	}
-	cost := config.RecklessStamCost(s.actor.Stam.Max)
+	cost := config.RecklessStamCost(s.actor.Stam.Max, s.actor.Tier)
 	if s.actor.Stam.Current < cost {
 		s.actor.RemoveEffect("reckless")
 		s.msg.Actor.SendBad("You are too tired to keep swinging recklessly.")

@@ -634,16 +634,16 @@ func elementalDamage(magnitude int, intel int) (damage int) {
 		damage = 45 + power
 	} else if magnitude == 4 {
 		power = utils.Roll(5, 8, 0)
-		damage = 85 + power
+		damage = 75 + power
 	} else if magnitude == 5 {
 		power = utils.Roll(8, 8, 0)
-		damage = 170 + power
+		damage = 150 + power
 	} else if magnitude == 6 {
 		power = utils.Roll(8, 10, 0)
-		damage = 250 + power
+		damage = 225 + power
 	} else if magnitude == 7 {
 		power = utils.Roll(14, 10, 0)
-		damage = 320 + power
+		damage = 275 + power
 	}
 	return damage
 }
