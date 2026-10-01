@@ -255,8 +255,8 @@ var (
 	RenewalDieBase    = 5
 	RenewalDieTierDiv = 2
 
-	ArmorReduction       = .007
-	ArmorReductionPoints = 10
+	ArmorReduction         = .007
+	ArmorReductionPoints   = 10
 	// Player damage taken = constant / (constant + armor). 1000 matches the
 	// old linear formula through tier 14 at optimized gear.
 	ArmorReductionConstant = 1000
