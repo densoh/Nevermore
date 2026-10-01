@@ -52,7 +52,7 @@ func (m *Mob) RollSpecial(target *Character) (AttackStyle, float64) {
 	case styleRoll <= config.MobVital:
 		return StyleVital, monkIronBody(target, StyleVital, 2-(dex/100))
 	case styleRoll <= config.MobCritical:
-		return StyleCritical, monkIronBody(target, StyleCritical, 4-(dex/50))
+		return StyleCritical, monkIronBody(target, StyleCritical, config.MobCriticalMult-dex*config.MobCriticalPerDex)
 	case styleRoll <= config.MobDouble:
 		return StyleDouble, 2
 	}

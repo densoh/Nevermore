@@ -61,7 +61,7 @@ var Spells = map[string]Spell{
 	"renewal": {
 		Name:        "renewal",
 		Description: "kenlokerai's renewal (herein referred to as renewal), is the most powerful unlimited healing spell that can exist within the magical weave and still be castable by mortals. this spell calls directly upon the caster's deity, and their link to the faith. as such, this spell must be cast by cleric, paladin, or bard. the amount of power of this spell is stronger amongst the devout followers of the gods, and even stronger amongst their chosen. the caster yells their deity's name, and concentrates inwardly upon the power of the their god. as they do, a visible aura surrounds them, as the strong healing energies fill their being. the caster then need only concentrate on bringing the power of the god into their recipient. the target's pain and injury are obliterated as flesh knits, even regrowing lost members if needed, attempting to completely renew the target's body. ",
-		Cost:        20,
+		Cost:        25,
 		Chant:       "Thy wounds wash away as my faith flows.",
 		Magnitude:   2,
 		Effect:      "heal",

@@ -93,11 +93,15 @@ var (
 	MinorAbilityTier   = 5
 	SealJusticeTier    = 10 // Courage and faith open at MinorAbilityTier, justice here
 
-	MobVital       = 3
-	MobCritical    = 4
-	MobDouble      = 10
-	MobFollowVital = 40
-	MobFollMult    = 3
+	MobVital    = 3
+	MobCritical = 4
+	MobDouble   = 10
+	// A mob critical multiplies damage by MobCriticalMult less
+	// MobCriticalPerDex per point of the target's dex: 2.7x at 20 dex.
+	MobCriticalMult   = 3.0
+	MobCriticalPerDex = 0.015
+	MobFollowVital    = 40
+	MobFollMult       = 3
 
 	BindCost   = 75000
 	RenameCost = 150000
@@ -237,11 +241,22 @@ var (
 	SealJusticePieDiv    = 4.0
 	SealJusticeWeaponDiv = 2.0
 	MinorHealTierDiv     = 4 // Vigor/mend gain +1 base per this many tiers
-	MajorHealTierDiv     = 2 // Detraumatize/renewal gain +1 base per this many tiers
-	MajorHealBaseCut     = 5 // Subtracted from detraumatize/renewal base to offset the tier bonus
+	DetraumatizeBase     = 20
+	RenewalBase          = 40
+	MajorHealTierDiv     = 2 // Detraumatize gains +1 base per this many tiers
+	MajorHealBaseCut     = 5 // Subtracted from detraumatize base to offset the tier bonus
+	// Renewal has its own shape: 30 + tier + pie*RenewalPieMod +
+	// 2d(5 + tier/2) before divinity, for 25 mana. It stays 7-20% less
+	// mana-efficient than detraumatize for healers with 13+ pie.
+	RenewalBaseCut    = 10
+	RenewalTierDiv    = 1
+	RenewalPieMod     = .8
+	RenewalDice       = 2
+	RenewalDieBase    = 5
+	RenewalDieTierDiv = 2
 
-	ArmorReduction         = .007
-	ArmorReductionPoints   = 10
+	ArmorReduction       = .007
+	ArmorReductionPoints = 10
 	// Player damage taken = constant / (constant + armor). 1000 matches the
 	// old linear formula through tier 14 at optimized gear.
 	ArmorReductionConstant = 1000

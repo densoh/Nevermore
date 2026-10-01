@@ -244,8 +244,8 @@ func TestMonkIronBody(t *testing.T) {
 		tier            int
 		vital, critical float64
 	}{
-		{15, 0.15, 0.30},
-		{25, 0.25, 0.50},
+		{15, 0.15, 0.225},
+		{25, 0.25, 0.375},
 	}
 	for _, tc := range cases {
 		if got := MonkVitalReduction(tc.tier); math.Abs(got-tc.vital) > 1e-9 {
