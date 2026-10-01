@@ -27,7 +27,7 @@ jobs:
             source ~/.bashrc
             cd /opt/mud/src/github.com/ArcCS/Nevermore
             git pull
-            /usr/local/go/bin/go build -o /opt/game/server ./server/server.go
+            /usr/local/go/bin/go build -ldflags "-X github.com/ArcCS/Nevermore/config.Version=$(git rev-parse --short HEAD)" -o /opt/game/server ./server/server.go
             sudo /usr/bin/systemctl restart supervisord
 
       # - name: Call REST endpoint
