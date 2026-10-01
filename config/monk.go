@@ -133,10 +133,11 @@ const (
 	ConMonkArmor      = 2
 
 	// Iron body: vital and critical multipliers against a monk drop by a
-	// share of the monk's tier. At tier 15 a vital goes 1.8 -> 1.65 and a
-	// critical 3.6 -> 3.3; at tier 25, 1.55 and 3.1. Doubles are untouched.
+	// share of the monk's tier. At 20 dex and tier 15 a vital goes
+	// 1.8 -> 1.65 and a critical 2.7 -> 2.475; at tier 25, 1.55 and 2.325.
+	// Doubles are untouched.
 	MonkVitalReductionPerTier    = 0.01
-	MonkCriticalReductionPerTier = 0.02
+	MonkCriticalReductionPerTier = 0.015
 
 	// Unarmed damage: base + ceil(str/45 * base) + MonkDamageDice d(base/MonkRollDivisor) - MonkDamageFlatCut,
 	// where base is the tier's max weapon damage over MonkDamageDivisor.

@@ -333,18 +333,64 @@ func pray(caller interface{}, target interface{}, magnitude int) string {
 	return ""
 }
 
+// healRoll is one heal spell's amount before divinity, for a caster of the
+// given tier and piety.
+type healRoll func(tier int, pie float64) float64
+
+func minorHealRoll(tier int, pie float64) float64 {
+	return pie*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)) + float64(tier)/float64(config.MinorHealTierDiv)
+}
+
+func detraumatizeRoll(tier int, pie float64) float64 {
+	return float64(config.DetraumatizeBase-config.MajorHealBaseCut) + float64(tier)/float64(config.MajorHealTierDiv) + pie*config.PieHealMod + float64(utils.Roll(10, 1, 0))
+}
+
+func renewalRoll(tier int, pie float64) float64 {
+	dieSides := config.RenewalDieBase + tier/config.RenewalDieTierDiv
+	return float64(config.RenewalBase-config.RenewalBaseCut) + float64(tier)/float64(config.RenewalTierDiv) + pie*config.RenewalPieMod + float64(utils.Roll(dieSides, config.RenewalDice, 0))
+}
+
+// healSpellAmount is what a character's heal spell restores. A cast uses the
+// caster's tier, piety and divinity (minor heals get only
+// MinorHealDivinityMod of it), then the low-piety and singing penalties. A
+// device heals as a caster of the spell's lowest casting tier with
+// BaseDevicePiety and no divinity.
+func healSpellAmount(caller *Character, spell string, roll healRoll) int {
+	if !caller.CheckFlag("casting") {
+		return int(roll(spellMinTier(spell), config.BaseDevicePiety))
+	}
+	divinity := caller.DivinityBonus() * .01
+	if spell == "vigor" || spell == "mend" {
+		divinity *= config.MinorHealDivinityMod
+	}
+	damage := int(roll(caller.Tier, float64(caller.HealPiety())) * (1 + divinity))
+	damage = caller.CalcHealPenalty(damage)
+	return int(float64(damage) * caller.SingCastMod())
+}
+
+// spellMinTier is the lowest tier any class can cast the spell at.
+func spellMinTier(spell string) int {
+	lowest := 0
+	for _, tier := range Spells[spell].Classes {
+		if lowest == 0 || tier < lowest {
+			lowest = tier
+		}
+	}
+	return lowest
+}
+
+// mobHealBase is the flat base of a mob's detraumatize (1) or renewal.
+func mobHealBase(magnitude int) int {
+	if magnitude == 1 {
+		return config.DetraumatizeBase
+	}
+	return config.RenewalBase
+}
+
 func healstam(caller interface{}, target interface{}, magnitude int) string {
 	switch caller := caller.(type) {
 	case *Character:
-		damage := 0
-		if caller.CheckFlag("casting") {
-			divinityLevel := caller.DivinityBonus()
-			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + divinityLevel*.01*config.MinorHealDivinityMod))
-			damage = caller.CalcHealPenalty(damage)
-			damage = int(float64(damage) * caller.SingCastMod())
-		} else {
-			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
-		}
+		damage := healSpellAmount(caller, "vigor", minorHealRoll)
 		switch target := target.(type) {
 		case *Character:
 			healAmount := target.HealStam(damage)
@@ -382,15 +428,7 @@ func healstam(caller interface{}, target interface{}, magnitude int) string {
 func healvit(caller interface{}, target interface{}, magnitude int) string {
 	switch caller := caller.(type) {
 	case *Character:
-		damage := 0
-		if caller.CheckFlag("casting") {
-			divinityLevel := caller.DivinityBonus()
-			damage = int((float64(caller.HealPiety())*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)+caller.Tier/config.MinorHealTierDiv)) * (1 + divinityLevel*.01*config.MinorHealDivinityMod))
-			damage = caller.CalcHealPenalty(damage)
-			damage = int(float64(damage) * caller.SingCastMod())
-		} else {
-			damage = int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
-		}
+		damage := healSpellAmount(caller, "mend", minorHealRoll)
 		switch target := target.(type) {
 		case *Character:
 			healAmount := target.HealVital(damage)
@@ -414,26 +452,15 @@ func healvit(caller interface{}, target interface{}, magnitude int) string {
 }
 
 func heal(caller interface{}, target interface{}, magnitude int) string {
-	damage := 0
-	action := ""
-	if magnitude == 1 {
-		damage = 20
-		action = "detraumatize"
-	} else {
-		damage = 40
+	action := "detraumatize"
+	roll := detraumatizeRoll
+	if magnitude != 1 {
 		action = "renewal"
+		roll = renewalRoll
 	}
 	switch caller := caller.(type) {
 	case *Character:
-		if caller.CheckFlag("casting") {
-
-			divinityLevel := caller.DivinityBonus()
-			damage = int((float64(damage-config.MajorHealBaseCut+caller.Tier/config.MajorHealTierDiv) + (float64(caller.HealPiety()) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))) * (1 + divinityLevel*.01))
-			damage = caller.CalcHealPenalty(damage)
-			damage = int(float64(damage) * caller.SingCastMod())
-		} else {
-			damage += int((config.BaseDevicePiety * config.PieHealMod) + float64(utils.Roll(10, 1, 0)))
-		}
+		damage := healSpellAmount(caller, action, roll)
 		switch target := target.(type) {
 		case *Character:
 			stam, vit := target.Heal(damage)
@@ -456,7 +483,7 @@ func heal(caller interface{}, target interface{}, magnitude int) string {
 		log.Println("Mob casting heal")
 		switch target := target.(type) {
 		case *Mob:
-			damage = int((float64(damage) + (float64(caller.Pie.Current) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))))
+			damage := int((float64(mobHealBase(magnitude)) + (float64(caller.Pie.Current) * config.PieHealMod) + float64(utils.Roll(10, 1, 0))))
 			log.Println(caller.Name + " is healing " + target.Name + " for " + strconv.Itoa(damage))
 			stamDam, vitDam := target.Heal(damage)
 			return "The " + caller.Name + " heals for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality."

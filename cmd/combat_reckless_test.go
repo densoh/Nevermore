@@ -94,6 +94,18 @@ func TestDetermineMissChanceReckless(t *testing.T) {
 	}
 }
 
+// Circle neither pays for the stance nor gets its to-hit bonus.
+func TestCircleMissChanceIgnoresReckless(t *testing.T) {
+	plain := attackerState(config.BARBARIAN, &objects.Item{ItemType: 1})
+	plain.actor.Skills[1].Value = config.SkillExpLevels[2]
+	s := recklessState(&objects.Item{ItemType: 1}, 200)
+	s.actor.Skills[1].Value = config.SkillExpLevels[2]
+
+	if got, want := CircleMissChance(s, 0), DetermineMissChance(plain, 0); got != want {
+		t.Errorf("reckless circle miss chance = %d, want %d", got, want)
+	}
+}
+
 // The toggle ignores every other timer, so the stance drops mid-round or
 // while stunned, and starts the stance cooldown.
 func TestRecklessToggleIgnoresTimers(t *testing.T) {
