@@ -571,7 +571,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 	switch target := target.(type) {
 	case *Character:
 		stamDam, vitDam, resisted := target.ReceiveMagicDamage(damage, magicType)
-		data.StoreCombatMetric(magicType+"spell_"+strconv.Itoa(magnitude), 0, spellType, actualDamage+resisted, resisted, actualDamage, callerType, id, level, 0, target.CharId)
+		data.StoreCombatMetric(magicType+"spell_"+strconv.Itoa(magnitude), 0, spellType, stamDam+vitDam+resisted, resisted, stamDam+vitDam, callerType, id, level, 0, target.CharId)
 		returnString := text.Bad + name + "'s spell struck you for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality. You resisted " + strconv.Itoa(resisted) + "damage." + text.Reset
 		// Reflect
 		switch caller := caller.(type) {
@@ -606,7 +606,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 
 	case *Mob:
 		damage, _, resisted := target.ReceiveMagicDamage(damage, magicType)
-		data.StoreCombatMetric(magicType+"spell_"+strconv.Itoa(magnitude), 0, spellType, actualDamage+resisted, resisted, actualDamage, callerType, id, level, 0, target.MobId)
+		data.StoreCombatMetric(magicType+"spell_"+strconv.Itoa(magnitude), 0, spellType, damage+resisted, resisted, damage, callerType, id, level, 1, target.MobId)
 		switch caller := caller.(type) {
 		case *Character:
 			target.AddThreatDamage(damage, caller)

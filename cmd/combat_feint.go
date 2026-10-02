@@ -101,7 +101,8 @@ func (feint) process(s *state) {
 		gainChiFromHits(s, result.chiHits())
 	}
 
-	whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
+	// A light taunt: the half-damage blow carries little threat of its own.
+	whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.FeintThreatPercent), s.actor)
 	whatMob.CurrentTarget = s.actor.Name
 	s.msg.Actor.SendInfo(whatMob.Name + " turns its attention to you.")
 	s.msg.Observers.SendInfo(s.actor.Name + " feints at " + whatMob.Name + ", drawing its attention.")
