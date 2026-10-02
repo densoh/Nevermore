@@ -29,18 +29,22 @@ func TestTodKillChance(t *testing.T) {
 		c, h, want float64
 	}{
 		{10, 1, 1, 0},
-		{10, 0.5, 0.9, 0},
-		{10, 1, 0.9, 0.015},
-		{10, 1, 0.7, 0.135},
-		{10, 1, 0.5, 0.375},
-		{10, 1, 0.4, 0.54},
-		{10, 1, 0.24, TodMaxChance},
+		{10, 0, 0.5, 0},
+		{10, 1, 0.9, 0.02},
+		{10, 1, 0.7, 0.18},
+		{10, 1, 0.5, 0.5},
+		{10, 1, 0.4, 0.72},
+		{10, 1, 0.35, 0.845},
+		{10, 1, 0.34, TodMaxChance},
 		{10, 1, 0, TodMaxChance},
-		{10, 0.5, 0.2, 0.135},
-		// The coefficient grows with tier: 2.0 at 20, 2.25 at 25.
-		{20, 1, 0.5, 0.5},
-		{25, 1, 0.5, 0.5625},
-		{25, 1, 0.38, TodMaxChance},
+		// Chi is linear: half the commitment, half the chance, and no
+		// threshold where the mob's health outruns the chi.
+		{10, 0.5, 0.5, 0.25},
+		{10, 0.5, 0.9, 0.01},
+		// The coefficient grows with tier: 2.5 at 20, 2.75 at 25.
+		{20, 1, 0.5, 0.625},
+		{25, 1, 0.5, 0.6875},
+		{25, 1, 0.44, TodMaxChance},
 	}
 	for _, tc := range cases {
 		if got := TodKillChance(tc.tier, tc.c, tc.h); math.Abs(got-tc.want) > 1e-9 {
@@ -50,8 +54,8 @@ func TestTodKillChance(t *testing.T) {
 	if TodChanceScaleFor(5) != TodChanceScale || TodChanceScaleFor(10) != TodChanceScale {
 		t.Error("scale grew below the touch tier")
 	}
-	if math.Abs(TodChanceScaleFor(25)-2.25) > 1e-9 {
-		t.Errorf("scale at 25 = %v, want 2.25", TodChanceScaleFor(25))
+	if math.Abs(TodChanceScaleFor(25)-2.75) > 1e-9 {
+		t.Errorf("scale at 25 = %v, want 2.75", TodChanceScaleFor(25))
 	}
 }
 
@@ -81,7 +85,7 @@ func TestTodReferenceGrows(t *testing.T) {
 }
 
 func TestTodCooldown(t *testing.T) {
-	cases := map[int]int{10: 600, 15: 600, 16: 540, 19: 360, 20: 300, 25: 300}
+	cases := map[int]int{10: 300, 15: 300, 16: 276, 19: 204, 20: 180, 25: 180}
 	for tier, want := range cases {
 		if got := TodCooldown(tier); got != want {
 			t.Errorf("TodCooldown(%d) = %d, want %d", tier, got, want)
@@ -196,6 +200,10 @@ func TestMonkReachesGrandmaster(t *testing.T) {
 }
 
 func TestMonkUnarmedRange(t *testing.T) {
+	// Tier 9, str 20: base 27, str share 12, roll 3d9, less the lighter 6 -> 36..60.
+	if lo, hi := MonkUnarmedRange(9, 20); lo != 36 || hi != 60 {
+		t.Errorf("tier 9 str 20 range = %d..%d, want 36..60", lo, hi)
+	}
 	// Tier 10, str 20: base 30, str share 14, roll 3d10, less 8 -> 39..66.
 	if lo, hi := MonkUnarmedRange(10, 20); lo != 39 || hi != 66 {
 		t.Errorf("tier 10 str 20 range = %d..%d, want 39..66", lo, hi)

@@ -35,10 +35,9 @@ var helpText = map[string]helpTextStruct{}
 var oocCommands = []string{"SAY", "QUIT", "HELP", "WHO", "LOOK", "IC", "$POOF", "$DEATH", "AFK", "GO", "ACT"}
 var excludeFromLogs = []string{"SAYTO", "SAY", "TELL", "OSAY", "SEND", "R", "REPLY", "REP", "PARTYTELL", "PTELL", "K", "KILL"}
 var reverseLookup = map[string]string{}
-var emotes = []string{"ACT", "BLINK", "BLUSH", "BOW", "BURP", "CACKLE", "CHEER", "CHUCKLE", "CLAP", "CONFUSED", "COUGH", "CROSSARMS", "CROSSFINGERS", "CRY",
-	"DANCE", "EMOTE", "FLEX", "FLINCH", "FROWN", "GASP", "GIGGLE", "GRIN", "GROAN", "HICCUP", "JUMP", "KNEEL", "LAUGH", "NOD", "PONDER", "SALUTE", "SHAKE", "SHIVER", "SHRUG",
-	"SIGH", "SNEEZE", "SNAP", "SMILE", "SMIRK", "SNICKER", "SPIT", "STARE", "STRETCH", "TAP", "THUMBSDOWN", "THUMBSUP", "WAVE", "WHISTLE", "WINK", "YAWN",
-	"BUG", "BOW", "HUG", "ANGRY", "GLARE", "STARE", "TICKLE", "POKE", "SLAP", "KICK", "WAVE", "WINK"}
+
+// emotes is filled by the act handler from its emote table.
+var emotes []string
 
 // addHandler adds the given commands for the specified handler.
 // It requires the command handler,  a help string to add to the help data, a bitmask permission, and the relative

@@ -114,6 +114,7 @@ func (tod) process(s *state) {
 		}
 		whatMob.AddThreatDamage(1, s.actor)
 		data.StoreCombatMetric("tod-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+		s.actor.SetTimer("combat_tod", config.TodMissTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)
 		// A botched touch hands the mob a free swing at twice its damage,
 		// resolved as a normal-style strike so the player sees the
