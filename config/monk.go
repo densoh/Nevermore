@@ -86,19 +86,23 @@ const (
 
 	// Touch of death. The cooldown starts at TodTimerBase and drops
 	// TodTimerPerTier seconds for every tier past TodTimerScaleTier, never
-	// below TodTimerMin.
-	TodTimerBase      = 600
+	// below TodTimerMin. (2026-10-01: was 600 dropping 60 a tier to 300; in
+	// play a touch is often skipped, e.g. after a crit, and chi gates it anyway.)
+	TodTimerBase      = 300
 	TodTimerScaleTier = 15
-	TodTimerPerTier   = 60
-	TodTimerMin       = 300
+	TodTimerPerTier   = 24
+	TodTimerMin       = 180
+	// A touch that misses entirely goes on this shorter, flat cooldown instead.
+	TodMissTimer = 120
 	// R, the chi commitment the touch is measured against: base + tier*perTier.
 	TodReferenceBase    = 10
 	TodReferencePerTier = 4
-	// Kill chance = scale * (c - h)^2. The scale starts at TodChanceScale and
+	// Kill chance = scale * c * (1 - h)^2: quadratic in the damage already
+	// done, linear in chi committed. The scale starts at TodChanceScale and
 	// grows TodChanceScalePerTier for every tier past MonkTodTier, so the touch
-	// matures with the monk: the cap sits near a quarter health at tier 10 and
-	// near 38% at tier 25.
-	TodChanceScale        = 1.5
+	// matures with the monk: at full chi the cap sits near 35% health at tier
+	// 10 and near 42% at tier 20. (2026-10-01: was 1.5 * (c - h)^2.)
+	TodChanceScale        = 2.0
 	TodChanceScalePerTier = 0.05
 	TodVulnerableChance   = 0.5 // the monk is told a target looks vulnerable once the odds reach this
 	TodMaxChance          = 0.85
@@ -139,19 +143,30 @@ const (
 	MonkVitalReductionPerTier    = 0.01
 	MonkCriticalReductionPerTier = 0.015
 
-	// Unarmed damage: base + ceil(str/45 * base) + MonkDamageDice d(base/MonkRollDivisor) - MonkDamageFlatCut,
+	// Unarmed damage: base + ceil(str/45 * base) + MonkDamageDice d(base/MonkRollDivisor) - MonkDamageCut(tier),
 	// where base is the tier's max weapon damage over MonkDamageDivisor.
 	// Three dice keep the roll bell-shaped, so the spread feels tighter than
 	// its range. The flat cut is a large share of a low-tier hit and a small
 	// share of a high-tier one, so the monk lands near three quarters of a
 	// geared melee hit from tier 5 up instead of drifting down with level
-	// (2026-09-27: was 2 dice with no cut).
-	MonkDamageDivisor = 2
-	MonkRollDivisor   = 3
-	MonkDamageDice    = 3
-	MonkDamageFlatCut = 8
-	MonkDamageFloor   = 1
+	// (2026-09-27: was 2 dice with no cut). Below flurry the cut is lighter
+	// so tiers 6-9 stay playable before the kit is complete (2026-10-01: was
+	// 8 at every tier).
+	MonkDamageDivisor    = 2
+	MonkRollDivisor      = 3
+	MonkDamageDice       = 3
+	MonkDamageFlatCut    = 8
+	MonkDamageFlatCutLow = 6 // below MonkFlurryTier
+	MonkDamageFloor      = 1
 )
+
+// MonkDamageCut is the flat cut taken off a monk's unarmed hit at a tier.
+func MonkDamageCut(tier int) int {
+	if tier < MonkFlurryTier {
+		return MonkDamageFlatCutLow
+	}
+	return MonkDamageFlatCut
+}
 
 // MonkVitalReduction is how much a monk of the given tier shaves off an
 // incoming vital strike multiplier; zero below MonkIronBodyTier.
@@ -193,7 +208,7 @@ func MonkUnarmedRollSides(tier int) int {
 // and strength, before surge or damage modifiers.
 func MonkUnarmedRange(tier int, str int) (int, int) {
 	base := MonkUnarmedBase(tier)
-	fixed := base + int(math.Ceil(float64(str)/45*float64(base))) - MonkDamageFlatCut
+	fixed := base + int(math.Ceil(float64(str)/45*float64(base))) - MonkDamageCut(tier)
 	lo, hi := fixed+MonkDamageDice, fixed+MonkDamageDice*MonkUnarmedRollSides(tier)
 	if lo < MonkDamageFloor {
 		lo = MonkDamageFloor
@@ -358,11 +373,9 @@ func TodFailPercent(c float64) int {
 // TodKillChance is the probability (0..TodMaxChance) that a touch kills,
 // given c = chi spent / R and h = the mob's remaining HP fraction.
 func TodKillChance(tier int, c float64, h float64) float64 {
-	gap := c - h
-	if gap <= 0 {
-		return 0
-	}
-	chance := gap * gap * TodChanceScaleFor(tier)
+	c = math.Min(math.Max(c, 0), 1)
+	done := 1 - math.Min(math.Max(h, 0), 1)
+	chance := TodChanceScaleFor(tier) * c * done * done
 	if chance > TodMaxChance {
 		return TodMaxChance
 	}

@@ -1521,7 +1521,7 @@ func (c *Character) InflictDamage() (damage int) {
 		baseMonkDamage := config.MonkUnarmedBase(c.Tier)
 		strDamage := int(math.Ceil(float64(c.GetStat("str")) / float64(45) * float64(baseMonkDamage)))
 		rngDamage := utils.Roll(config.MonkUnarmedRollSides(c.Tier), config.MonkDamageDice, 0)
-		damage = baseMonkDamage + strDamage + rngDamage - config.MonkDamageFlatCut
+		damage = baseMonkDamage + strDamage + rngDamage - config.MonkDamageCut(c.Tier)
 		if damage < config.MonkDamageFloor {
 			damage = config.MonkDamageFloor
 		}
