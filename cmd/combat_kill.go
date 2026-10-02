@@ -486,11 +486,12 @@ func DetermineMissChance(s *state, lvlDiff int) int {
 	return missChance(s, config.WeaponMissChance(s.actor.Skills[skill].Value), config.MissPerLevel, lvlDiff)
 }
 
-// BackstabMissChance is the miss chance of a backstab: the stealth skill sets
-// the base and the shared modifiers do the rest.
+// BackstabMissChance is the miss chance of a backstab: the regular weapon
+// roll plus a penalty that the stealth skill works off.
 func BackstabMissChance(s *state, lvlDiff int) int {
 	stealth := config.StealthLevel(s.actor.Skills[11].Value)
-	return missChance(s, config.BackstabMissChance(stealth), config.BackstabMissPerLevel, lvlDiff)
+	weapon := config.WeaponMissChance(s.actor.Skills[s.actor.Equipment.Main.ItemType].Value)
+	return missChance(s, weapon+config.BackstabMissPenaltyFor(stealth), config.MissPerLevel, lvlDiff)
 }
 
 // missChance builds a to-hit roll's miss chance from a skill-derived base.

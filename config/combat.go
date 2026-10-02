@@ -14,9 +14,8 @@ var CombatModifiers = map[string]float64{
 	"thwomp": 2,
 	"thump":  1.5,
 
-	// Sneaky Types
-	"backstab": 5,
-	"snipe":    4,
+	// Sneaky Types (backstab scales with stealth, see BackstabMultiplier)
+	"snipe": 4,
 }
 
 // MultiAttackMultipliers is the damage multiplier for each landed hit of a
@@ -126,10 +125,10 @@ var (
 	SneakBonus                  = 10
 	StealChance                 = 20
 	StealChancePerSkillLevel    = 4
-	BackStabChance              = 20 // starting hit chance before stealth, dex and level
-	BackstabDamageSkillModifier = .15
-	BackStabChancePerSkillLevel = 3
-	BackstabMissPerLevel        = 8 // points of miss per level the mob is above the thief, from level 2
+	BackstabMissPenalty         = 30  // points of miss added to the regular weapon roll (before the clamp) at stealth level 0
+	BackstabDamageBase          = 3.0 // backstab damage multiplier at stealth level 0
+	BackstabDamageSkillModifier = .25 // added to the multiplier per stealth level: 4.75x at specialist, 5.5x at grandmaster
+	BackstabPenaltyPerStealth   = 2   // points of that penalty removed per stealth level, 10 left at grandmaster
 	SnipeChance                 = 15
 	HideChancePerPoint          = 3
 	SneakChancePerPoint         = 1
@@ -257,8 +256,8 @@ var (
 	RenewalDieBase    = 5
 	RenewalDieTierDiv = 2
 
-	ArmorReduction         = .007
-	ArmorReductionPoints   = 10
+	ArmorReduction       = .007
+	ArmorReductionPoints = 10
 	// Player damage taken = constant / (constant + armor). 1000 matches the
 	// old linear formula through tier 14 at optimized gear.
 	ArmorReductionConstant = 1000
@@ -507,12 +506,21 @@ func ThreatPercent(maxStam int, percent int) int {
 	return maxStam * percent / 100
 }
 
-// BackstabMissChance is the miss chance a backstab starts from, before dex,
-// level difference and combat flags are applied: the inverse of the base hit
-// chance plus the stealth bonus. Dex and the rest are shared with the
-// weapon miss chance, which is why they are not here.
-func BackstabMissChance(stealthLevel int) int {
-	return 100 - BackStabChance - stealthLevel*BackStabChancePerSkillLevel
+// BackstabMultiplier is the backstab damage multiplier at a stealth level.
+func BackstabMultiplier(stealthLevel int) float64 {
+	return BackstabDamageBase + float64(stealthLevel)*BackstabDamageSkillModifier
+}
+
+// BackstabMissPenaltyFor is the extra miss a backstab carries over a regular
+// swing with the same weapon: BackstabMissPenalty at stealth level 0, falling
+// by BackstabPenaltyPerStealth per level. It is added before the 5-95 clamp,
+// so dex past a swing's cap still offsets it.
+func BackstabMissPenaltyFor(stealthLevel int) int {
+	penalty := BackstabMissPenalty - stealthLevel*BackstabPenaltyPerStealth
+	if penalty < 0 {
+		penalty = 0
+	}
+	return penalty
 }
 
 // FailedTurnThreat is the threat a failed turn hands the caster: the mob's

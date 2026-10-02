@@ -101,8 +101,8 @@ func (backstab) process(s *state) {
 			return
 		}
 
-		// Backstab rolls to hit like any other attack, with stealth standing
-		// in for the weapon skill; see BackstabMissChance.
+		// Backstab rolls to hit like a regular swing, less a penalty the
+		// stealth skill works off; see BackstabMissChance.
 		curChance := 100 - BackstabMissChance(s, whatMob.Level-s.actor.Tier)
 
 		if s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
@@ -113,7 +113,8 @@ func (backstab) process(s *state) {
 		s.actor.RunHook("combat")
 		if curChance >= 100 || utils.Roll(100, 1, 0) <= curChance {
 
-			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * config.CombatModifiers["backstab"])))
+			multiplier := config.BackstabMultiplier(config.StealthLevel(s.actor.Skills[11].Value))
+			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * multiplier)))
 			data.StoreCombatMetric("backstab", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
 			s.actor.AdvanceStealthExp(int(float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
