@@ -4,7 +4,6 @@ import (
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
-	"strconv"
 )
 
 func init() {
@@ -17,16 +16,14 @@ func init() {
 type haste cmd
 
 func (haste) process(s *state) {
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
-	if s.actor.Tier < config.MinorAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MinorAbilityTier) + " to use this skill.")
+	if !s.requireTier(config.MinorAbilityTier) {
 		return
 	}
-	
+
 	haste, ok := s.actor.Flags["haste"]
 	if ok {
 		if haste {

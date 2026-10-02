@@ -20,8 +20,7 @@ func init() {
 type prepare cmd
 
 func (prepare) process(s *state) {
-	if s.actor.Tier < config.SpecialAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.SpecialAbilityTier) + " to use this skill.")
+	if !s.requireTier(config.SpecialAbilityTier) {
 		return
 	}
 

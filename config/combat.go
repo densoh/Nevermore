@@ -126,8 +126,8 @@ var (
 	StealChance                 = 20
 	StealChancePerSkillLevel    = 4
 	BackstabMissPenalty         = 30  // points of miss added to the regular weapon roll (before the clamp) at stealth level 0
-	BackstabDamageBase          = 3.0 // backstab damage multiplier at stealth level 0
-	BackstabDamageSkillModifier = .25 // added to the multiplier per stealth level: 4.75x at specialist, 5.5x at grandmaster
+	BackstabDamageBase          = 2.5 // backstab damage multiplier at stealth level 0
+	BackstabDamageSkillModifier = .25 // added to the multiplier per stealth level: 4.25x at specialist, 5x at grandmaster
 	BackstabPenaltyPerStealth   = 2   // points of that penalty removed per stealth level, 10 left at grandmaster
 	SnipeChance                 = 15
 	HideChancePerPoint          = 3

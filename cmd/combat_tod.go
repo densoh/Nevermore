@@ -22,8 +22,7 @@ func init() {
 type tod cmd
 
 func (tod) process(s *state) {
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
@@ -49,13 +48,11 @@ func (tod) process(s *state) {
 
 	reference := config.TodReference(s.actor.Tier)
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
-	if s.actor.Tier < config.MonkTodTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MonkTodTier) + " to use this skill.")
+	if !s.requireTier(config.MonkTodTier) {
 		return
 	}
 

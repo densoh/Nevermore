@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"strconv"
-
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
@@ -31,8 +29,7 @@ func (reckless) process(s *state) {
 		return
 	}
 
-	if s.actor.Tier < config.RecklessTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.RecklessTier) + " to use this skill.")
+	if !s.requireTier(config.RecklessTier) {
 		return
 	}
 	if s.actor.Equipment.Main == (*objects.Item)(nil) {

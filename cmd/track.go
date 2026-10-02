@@ -5,7 +5,6 @@ import (
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/utils"
-	"strconv"
 )
 
 func init() {
@@ -18,17 +17,13 @@ func init() {
 type track cmd
 
 func (track) process(s *state) {
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
-
+	if !s.requireStamina() {
 		return
 	}
-	if s.actor.Tier < config.MinorAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MinorAbilityTier) + " to use this skill.")
+	if !s.requireTier(config.MinorAbilityTier) {
 		return
 	}
 

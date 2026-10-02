@@ -21,13 +21,11 @@ type berserk cmd
 
 func (berserk) process(s *state) {
 	// Check some timers
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
-	if s.actor.Tier < config.MajorAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MajorAbilityTier) + " to use this skill.")
+	if !s.requireTier(config.MajorAbilityTier) {
 		return
 	}
 

@@ -32,13 +32,11 @@ func (flurry) process(s *state) {
 		return
 	}
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
-	if s.actor.Tier < config.MonkFlurryTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MonkFlurryTier) + " to use this skill.")
+	if !s.requireTier(config.MonkFlurryTier) {
 		return
 	}
 

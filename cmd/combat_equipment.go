@@ -19,8 +19,7 @@ type equipment cmd
 
 func (equipment) process(s *state) {
 
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
