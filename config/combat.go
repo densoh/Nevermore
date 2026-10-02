@@ -176,12 +176,14 @@ var (
 	BashTimer   = 30
 
 	// Threat bumps, as a percent of the mob's max stamina, added on top of any
-	// damage the ability dealt. Taunts (circle, feint, hamstring, shield slam)
-	// use TauntThreatPercent; bash is a lighter taunt. A failed backstab hands
+	// damage the ability dealt. Taunts (circle, hamstring, shield slam)
+	// use TauntThreatPercent; bash and the monk's feint are lighter taunts, so
+	// a monk can peel a mob without out-holding the real tanks. A failed backstab hands
 	// the thief threat; a failed turn hands over the mob's current stamina,
 	// capped at FailedTurnThreatCapPercent.
 	TauntThreatPercent          = 50
 	BashThreatPercent           = 25
+	FeintThreatPercent          = 25
 	FailedBackstabThreatPercent = 25
 	FailedTurnThreatCapPercent  = 50
 	// Heal threat is the amount healed split evenly across the mobs

@@ -62,9 +62,10 @@ const (
 	MeditateSaveCap          = 90
 
 	// Flurry: a stance that spends chi every attack round for extra swings.
-	// A round costs 8 chi below Expert and 10 from Expert up (was 5/7 until 2026-09-26).
-	FlurryChiCostBase   = 8
-	FlurryChiCostExpert = 10
+	// A round costs 6 chi below Expert and 8 from Expert up (was 5/7 until
+	// 2026-09-26, then 8/10 until 2026-10-02).
+	FlurryChiCostBase   = 6
+	FlurryChiCostExpert = 8
 	FlurryExpertSkill   = 7
 	FlurryMaxDuration   = 3600 // safety expiry for the stance, seconds
 	// Flurry swings after the first miss more often, but by less than a

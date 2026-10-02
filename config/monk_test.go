@@ -128,7 +128,7 @@ func TestMonkFlurryFollowsFighterTable(t *testing.T) {
 }
 
 func TestFlurryChiCostScalesWithSkill(t *testing.T) {
-	cases := map[int]int{0: 8, 6: 8, 7: 10, 8: 10, 9: 10, 10: 10}
+	cases := map[int]int{0: 6, 6: 6, 7: 8, 8: 8, 9: 8, 10: 8}
 	for skill, want := range cases {
 		if got := FlurryChiCost(skill); got != want {
 			t.Errorf("FlurryChiCost(%d) = %d, want %d", skill, got, want)

@@ -90,7 +90,6 @@ func (sweep) process(s *state) {
 	data.StoreCombatMetric("sweep-stun", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 	s.msg.Actor.SendGood("You sweep " + whatMob.Name + " off its feet!")
 	s.msg.Observers.SendInfo(s.actor.Name + " sweeps " + whatMob.Name + " off its feet!")
-	whatMob.CurrentTarget = s.actor.Name
 
 	DeathCheck(s, whatMob)
 	s.actor.SetTimer("combat_sweep", config.SweepTimer)
