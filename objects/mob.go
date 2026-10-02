@@ -90,6 +90,11 @@ type Mob struct {
 	// action against this mob, hit or miss. Unlike ThreatTable it ignores
 	// threat from heals, rescues and the mob picking its own target.
 	Attackers map[string]bool
+
+	// SpawnedAt is when the mob started ticking. A mob can't follow anyone
+	// who hasn't attacked it out of the room until
+	// config.MobFollowSpawnLockout has passed.
+	SpawnedAt time.Time
 }
 
 func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
@@ -160,6 +165,7 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		time.Time{},
 		time.Time{},
 		nil,
+		time.Time{},
 	}
 
 	for _, spellN := range strings.Split(mobData["spells"].(string), ",") {
@@ -193,6 +199,7 @@ func (m *Mob) StartTicking() {
 	}
 	log.Println(m.Name + " not active starting ticking")
 	m.IsActive = true
+	m.SpawnedAt = time.Now()
 	m.CalculateInventory()
 	m.ThreatTable = make(map[string]int)
 	m.Attackers = make(map[string]bool)
@@ -809,7 +816,7 @@ func (m *Mob) FollowChar(target *Character, from *Room, to *Room) bool {
 	}
 
 	// Still angry at this one in particular, and in any shape to give chase?
-	if m.CurrentTarget != target.Name || m.Stunned() || m.Stam.Current <= 0 {
+	if m.CurrentTarget != target.Name || m.Stunned() || m.FollowLocked(target.Name) || m.Stam.Current <= 0 {
 		return false
 	}
 
@@ -906,6 +913,13 @@ func (m *Mob) Stun(amt int) {
 // cannot act on its tick, block an exit, or follow a character out of the room.
 func (m *Mob) Stunned() bool {
 	return m.IsStunned && time.Now().Before(m.StunnedUntil)
+}
+
+// FollowLocked reports whether the mob spawned too recently to follow the
+// named character out of the room. A character who has attacked the mob
+// gets no lockout.
+func (m *Mob) FollowLocked(name string) bool {
+	return !m.AttackedBy(name) && time.Since(m.SpawnedAt) < config.MobFollowSpawnLockout
 }
 
 // Teleport Special handler for handling a mobs cast of a teleport spell

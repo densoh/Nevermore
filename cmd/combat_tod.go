@@ -113,10 +113,8 @@ func (tod) process(s *state) {
 		data.StoreCombatMetric("tod-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		s.actor.SetTimer("combat_tod", config.TodMissTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)
-		// A botched touch hands the mob a free swing at twice its damage,
-		// resolved as a normal-style strike so the player sees the
-		// vulnerability text rather than a double banner.
-		whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, config.CombatModifiers["double"], objects.StrikeOpts{
+		// A botched touch may hand the mob a free vital strike.
+		whatMob.RevengeVital(s.actor, config.MobTodRevengeVitalChance, nil, objects.StrikeOpts{
 			Metric:    "tod_fail_retaliate",
 			Mode:      0,
 			HitPrefix: "Exposed!! ",

@@ -1,6 +1,10 @@
 package config
 
-import "github.com/ArcCS/Nevermore/utils"
+import (
+	"time"
+
+	"github.com/ArcCS/Nevermore/utils"
+)
 
 // CombatModifiers are damage multipliers for special attack results.
 var CombatModifiers = map[string]float64{
@@ -100,7 +104,6 @@ var (
 	MobCriticalMult   = 3.0
 	MobCriticalPerDex = 0.015
 	MobFollowVital    = 40
-	MobFollMult       = 3
 
 	BindCost   = 75000
 	RenameCost = 150000
@@ -139,7 +142,9 @@ var (
 	SnipeFumbleChance           = 20
 	MobStealRevengeVitalChance  = 15
 	MobBSRevengeVitalChance     = 25
-	VitalStrikeScale            = 2
+	MobTurnRevengeVitalChance   = 25
+	MobTodRevengeVitalChance    = 25
+	VitalStrikeScale            = 1.5 // every punishment vital: follow, failed backstab/steal/turn/touch
 	BackstabCooldown            = 30
 	QuickdrawCooldown           = 30
 	TrackCooldown               = 16
@@ -199,7 +204,9 @@ var (
 	MobBlockPerLevel  = 15
 	MobFollow         = 40
 	MobFollowPerLevel = 2
-	MobTakeChance     = 20 // Percent
+	// A freshly spawned mob can't follow anyone out of the room for this long.
+	MobFollowSpawnLockout = 4 * time.Second
+	MobTakeChance         = 20 // Percent
 
 	StrCarryMod     = 10 // Per Point
 	BaseCarryWeight = 40

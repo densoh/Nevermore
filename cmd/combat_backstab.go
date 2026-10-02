@@ -138,16 +138,16 @@ func (backstab) process(s *state) {
 			s.msg.Observers.SendBad(s.actor.Name+" failed to backstab ", whatMob.Name, ", and is vulnerable to attack!")
 			whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.FailedBackstabThreatPercent), s.actor)
 			s.actor.SetTimer("combat", config.CombatCooldown)
-			if utils.Roll(100, 1, 0) <= config.MobBSRevengeVitalChance {
+			landed, _ := whatMob.RevengeVital(s.actor, config.MobBSRevengeVitalChance, func() {
 				whatMob.CurrentTarget = s.actor.Name
 				s.msg.Actor.SendInfo(whatMob.Name + " turns it's attention to you.")
 				s.msg.Observers.SendInfo(whatMob.Name + " turns to " + s.actor.Name + ".")
-				whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleVital, float64(config.VitalStrikeScale), objects.StrikeOpts{
-					Metric:   "backstab_mob",
-					Mode:     0,
-					DeathMsg: "was slain while trying to backstab a " + utils.Title(whatMob.Name),
-				})
-			} else {
+			}, objects.StrikeOpts{
+				Metric:   "backstab_mob",
+				Mode:     0,
+				DeathMsg: "was slain while trying to backstab a " + utils.Title(whatMob.Name),
+			})
+			if !landed {
 				data.StoreCombatMetric("backstab-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			}
 			s.ok = true

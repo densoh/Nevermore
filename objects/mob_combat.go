@@ -206,6 +206,22 @@ func (m *Mob) ApplyStrike(target *Character, baseDamage int, style AttackStyle, 
 	return target.DeathCheckBool(opts.DeathMsg)
 }
 
+// RevengeVital rolls the punishment vital a mob earns when a character fails
+// something risky against it - following them out, a failed backstab, steal,
+// turn or touch of death. chance is the percent it lands; it hits for
+// config.VitalStrikeScale times the mob's damage. onLand, if not nil, runs
+// after the roll succeeds and before the strike, for any retargeting or
+// messages that should only happen when the vital lands.
+func (m *Mob) RevengeVital(target *Character, chance int, onLand func(), opts StrikeOpts) (landed bool, died bool) {
+	if utils.Roll(100, 1, 0) > chance {
+		return false, false
+	}
+	if onLand != nil {
+		onLand()
+	}
+	return true, m.ApplyStrike(target, m.InflictDamage(), StyleVital, config.VitalStrikeScale, opts)
+}
+
 // writeCombat writes a combat line to the player, logging any write error.
 func (c *Character) writeCombat(line string) {
 	if _, err := c.Write([]byte(line)); err != nil {

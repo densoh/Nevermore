@@ -146,16 +146,15 @@ func (steal) process(s *state) {
 					s.msg.Observers.SendBad(s.actor.Name + " fails to steal from " + whatMob.Name)
 					s.actor.RemoveHook("combat", "hide")
 					whatMob.AddThreatDamage(whatMob.Stam.Max/4, s.actor)
-					if utils.Roll(100, 1, 0) <= config.MobStealRevengeVitalChance {
+					whatMob.RevengeVital(s.actor, config.MobStealRevengeVitalChance, func() {
 						whatMob.CurrentTarget = s.actor.Name
 						s.msg.Actor.SendInfo(whatMob.Name + " turns to you.")
 						s.msg.Observers.SendInfo(whatMob.Name + " turns to " + s.actor.Name + ".")
-						whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleVital, float64(config.VitalStrikeScale), objects.StrikeOpts{
-							Metric:   "steal_fail",
-							Mode:     0,
-							DeathMsg: "was slain trying to steal from " + whatMob.Name + ".",
-						})
-					}
+					}, objects.StrikeOpts{
+						Metric:   "steal_fail",
+						Mode:     0,
+						DeathMsg: "was slain trying to steal from " + whatMob.Name + ".",
+					})
 					return
 				}
 			} else {

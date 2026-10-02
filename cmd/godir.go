@@ -401,8 +401,8 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 		if !mob.CheckFlag("follows") || mob.CheckFlag("curious_canticle") {
 			continue
 		}
-		// A stunned mob can't give chase, so it earns the character no evade timer either.
-		if mob.Stunned() {
+		// A stunned or freshly spawned mob can't give chase, so it earns the character no evade timer either.
+		if mob.Stunned() || mob.FollowLocked(char.Name) {
 			continue
 		}
 
@@ -423,17 +423,12 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 func followVital(m mover, mob *objects.Mob) (landed bool, died bool) {
 	char := m.char
 
-	if utils.Roll(100, 1, 0) > config.MobFollowVital-(char.GetStat("dex")/2) {
-		return false, false
-	}
-
 	// Whoever took the hit is the one to death check.
-	died = mob.ApplyStrike(char, mob.InflictDamage(), objects.StyleVital, float64(config.MobFollMult), objects.StrikeOpts{
+	return mob.RevengeVital(char, config.MobFollowVital-(char.GetStat("dex")/2), nil, objects.StrikeOpts{
 		Metric:   "follow",
 		Mode:     1,
 		DeathMsg: "was slain by a " + mob.Name + ".",
 	})
-	return true, died
 }
 
 // takeFallDamage applies the damage for a failed levitate roll and returns the
