@@ -295,7 +295,7 @@ func (r hitResult) chiHits() int {
 // double roll rides on it. Damage and reflection are totalled and reported once.
 func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel int, metric string) hitResult {
 	result := hitResult{weaponDamage: 1}
-	baseMiss := DetermineMissChance(s, whatMob.Level-s.actor.Tier)
+	baseMiss := DetermineMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor))
 	followUpMiss := baseMiss + followUpMissPenalty(s, skillLevel)
 	if followUpMiss > 95 {
 		followUpMiss = 95
@@ -412,7 +412,7 @@ func DeathCheck(s *state, m *objects.Mob) {
 		//s.msg.Actor.SendGood("Highest Tier: " + strconv.Itoa(highestTier))
 		//s.msg.Actor.SendGood(strconv.Itoa(tierLimit))
 		experienceAwarded := 0
-		if config.QuestMode {
+		if s.where.InQuestMode() {
 			experienceAwarded = m.Experience
 		} else if m.CheckFlag("hostile") {
 			experienceAwarded = int(float64(m.Experience) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
@@ -436,14 +436,14 @@ func DeathCheck(s *state, m *objects.Mob) {
 			charClean := s.where.Chars.SearchAll(member.Name)
 			if charClean != nil {
 				partyCheck := false
-				if config.QuestMode == false {
+				if !s.where.InQuestMode() {
 					for _, name := range partyMembers {
 						if charClean.Name == name {
 							partyCheck = true
 						}
 					}
 				}
-				if config.QuestMode {
+				if s.where.InQuestMode() {
 					buildActorString += text.Cyan + "You earn " + strconv.Itoa(experienceAwarded) + " experience for the defeat of the " + m.Name + "\n"
 					charClean.GainExperience(experienceAwarded)
 				} else if partyCheck || m.CheckThreatTable(charClean.Name) {
@@ -476,30 +476,30 @@ func DeathCheck(s *state, m *objects.Mob) {
 
 // DetermineMissChance is the miss chance of a weapon attack: the weapon skill
 // sets the base and the shared modifiers do the rest.
-func DetermineMissChance(s *state, lvlDiff int) int {
+func DetermineMissChance(s *state, lvlDiff int, engaged int) int {
 	skill := 5
 	if s.actor.Class != config.MONK {
 		skill = s.actor.Equipment.Main.ItemType
 	}
-	return missChance(s, config.WeaponMissChance(s.actor.Skills[skill].Value), config.MissPerLevel, lvlDiff)
+	return missChance(s, config.WeaponMissChance(s.actor.Skills[skill].Value), lvlDiff, engaged)
 }
 
 // BackstabMissChance is the miss chance of a backstab: the regular weapon
 // roll plus a penalty that the stealth skill works off.
-func BackstabMissChance(s *state, lvlDiff int) int {
+func BackstabMissChance(s *state, lvlDiff int, engaged int) int {
 	stealth := config.StealthLevel(s.actor.Skills[11].Value)
 	weapon := config.WeaponMissChance(s.actor.Skills[s.actor.Equipment.Main.ItemType].Value)
-	return missChance(s, weapon+config.BackstabMissPenaltyFor(stealth), config.MissPerLevel, lvlDiff)
+	return missChance(s, weapon+config.BackstabMissPenaltyFor(stealth), lvlDiff, engaged)
 }
 
 // missChance builds a to-hit roll's miss chance from a skill-derived base.
-// Only the base and the per-level scalar differ between kinds of attack;
-// the level penalty (from two levels up, off in quest mode), dex, combat
-// flags such as bless and reckless, and the 5-95 clamp are shared.
-func missChance(s *state, baseMiss int, missPerLevel int, lvlDiff int) int {
+// Only the base differs between kinds of attack; the level penalty (which
+// loosens with the number of characters engaged, off in quest mode), dex,
+// combat flags such as bless and reckless, and the 5-95 clamp are shared.
+func missChance(s *state, baseMiss int, lvlDiff int, engaged int) int {
 	missChance := baseMiss
-	if !config.QuestMode && lvlDiff >= 2 {
-		missChance += lvlDiff * missPerLevel
+	if !s.where.InQuestMode() {
+		missChance += config.OutlevelMissPenalty(lvlDiff, engaged)
 	}
 	missChance -= s.actor.GetStat("dex") * config.HitPerDex
 	if s.actor.CheckFlag("reckless") {

@@ -100,7 +100,7 @@ func (backstab) process(s *state) {
 
 		// Backstab rolls to hit like a regular swing, less a penalty the
 		// stealth skill works off; see BackstabMissChance.
-		curChance := 100 - BackstabMissChance(s, whatMob.Level-s.actor.Tier)
+		curChance := 100 - BackstabMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor))
 
 		if s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 			curChance = 100

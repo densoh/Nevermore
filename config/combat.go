@@ -591,3 +591,34 @@ func StunSpellDuration(intel int) int {
 func StunSpellSuccessChance(tier int, mobLevel int, intel int, mobInt int) int {
 	return StunSpellChance + (tier-mobLevel)*StunSpellChancePerLevel + (intel-mobInt)/StunSpellIntPerChance
 }
+
+// Fighting a mob above your level gets harder the further up it is, but every
+// character engaged with the mob (the attacker, their party in the room, and
+// anyone else on its threat table) buys a level of headroom. Both penalties
+// ramp one step per level past their threshold so there is no cliff.
+const (
+	// MobOutlevelDamagePerLevel is the extra damage a mob's regular attack
+	// does per level it sits more than engaged+1 levels above its target.
+	MobOutlevelDamagePerLevel = 0.05
+)
+
+// OutlevelDamageMult multiplies a mob's regular attack against a target lvlDiff
+// levels below it: solo it starts at +5% three levels up, a duo at four.
+func OutlevelDamageMult(lvlDiff int, engaged int) float64 {
+	over := lvlDiff - engaged - 1
+	if over <= 0 {
+		return 1
+	}
+	return 1 + float64(over)*MobOutlevelDamagePerLevel
+}
+
+// OutlevelMissPenalty is the miss chance added to a player's attack on a mob
+// lvlDiff levels above them: solo it starts at MissPerLevel two levels up, a
+// duo at three.
+func OutlevelMissPenalty(lvlDiff int, engaged int) int {
+	over := lvlDiff - engaged
+	if over <= 0 {
+		return 0
+	}
+	return over * MissPerLevel
+}

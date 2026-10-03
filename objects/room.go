@@ -259,6 +259,12 @@ func (r *Room) FindExit(exitName string, observer *Character) *Exit {
 	return nil
 }
 
+// InQuestMode reports whether quest mode rules apply here: realm-wide quest
+// mode is on, or this room has the quest_mode flag. Safe on a nil room.
+func (r *Room) InQuestMode() bool {
+	return config.QuestMode || (r != nil && r.Flags["quest_mode"])
+}
+
 func (r *Room) ToggleFlag(flagName string) bool {
 	if val, exists := r.Flags[flagName]; exists {
 		r.Flags[flagName] = !val
@@ -592,6 +598,7 @@ func (r *Room) Save() {
 	roomData["wind"] = utils.Btoi(r.Flags["wind"])
 	roomData["active"] = utils.Btoi(r.Flags["active"])
 	roomData["train"] = utils.Btoi(r.Flags["train"])
+	roomData["quest_mode"] = utils.Btoi(r.Flags["quest_mode"])
 	roomData["mobs"] = r.Mobs.JsonRepr
 	roomData["inventory"] = r.Items.Jsonify()
 	roomData["commands"] = r.SerializeCommands()

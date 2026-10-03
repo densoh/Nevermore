@@ -29,7 +29,7 @@ func TestDetermineMissChanceUnarmedMonk(t *testing.T) {
 	s := attackerState(config.MONK, nil)
 	s.actor.Skills[config.HandSkill].Value = config.SkillExpLevels[3]
 
-	got := DetermineMissChance(s, 0)
+	got := DetermineMissChance(s, 0, 1)
 	want := config.WeaponMissChance(config.SkillExpLevels[3])
 	if got != want {
 		t.Errorf("unarmed monk miss chance = %d, want %d (hand skill)", got, want)
@@ -42,7 +42,7 @@ func TestDetermineMissChanceArmedMonkUsesHandSkill(t *testing.T) {
 	s.actor.Skills[config.HandSkill].Value = config.SkillExpLevels[5]
 	s.actor.Skills[0].Value = 0
 
-	got := DetermineMissChance(s, 0)
+	got := DetermineMissChance(s, 0, 1)
 	want := config.WeaponMissChance(config.SkillExpLevels[5])
 	if got != want {
 		t.Errorf("armed monk miss chance = %d, want %d (hand skill)", got, want)
@@ -55,7 +55,7 @@ func TestDetermineMissChanceWeaponSkill(t *testing.T) {
 	s.actor.Skills[1].Value = config.SkillExpLevels[4]
 	s.actor.Skills[config.HandSkill].Value = config.SkillExpLevels[9]
 
-	got := DetermineMissChance(s, 0)
+	got := DetermineMissChance(s, 0, 1)
 	want := config.WeaponMissChance(config.SkillExpLevels[4])
 	if got != want {
 		t.Errorf("fighter miss chance = %d, want %d (weapon skill)", got, want)
@@ -88,7 +88,7 @@ func TestMissChanceFloor(t *testing.T) {
 		if want < 5 {
 			want = 5
 		}
-		if got := DetermineMissChance(s, 0); got != want {
+		if got := DetermineMissChance(s, 0, 1); got != want {
 			t.Errorf("dex %d miss chance = %d, want %d", dex, got, want)
 		}
 	}
@@ -128,5 +128,21 @@ func TestChiHitsTriplesCritical(t *testing.T) {
 	// Only the first landed hit can crit; the rest count once each.
 	if got := (hitResult{hits: 3, critical: true}).chiHits(); got != 5 {
 		t.Errorf("critical plus two hits: got %d chi hits, want 5", got)
+	}
+}
+
+// The level penalty ramps from one level past the engaged count, so a second
+// character engaged with the mob takes a level off it.
+func TestMissChanceOutlevelGroup(t *testing.T) {
+	s := attackerState(config.FIGHTER, &objects.Item{ItemType: 0})
+	base := DetermineMissChance(s, 0, 1)
+	if got, want := DetermineMissChance(s, 4, 1), base+3*config.MissPerLevel; got != want {
+		t.Errorf("solo 4 levels up = %d, want %d", got, want)
+	}
+	if got, want := DetermineMissChance(s, 4, 2), base+2*config.MissPerLevel; got != want {
+		t.Errorf("duo 4 levels up = %d, want %d", got, want)
+	}
+	if got := DetermineMissChance(s, 1, 1); got != base {
+		t.Errorf("solo 1 level up = %d, want %d", got, base)
 	}
 }

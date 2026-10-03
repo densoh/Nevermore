@@ -78,7 +78,7 @@ func (circle) process(s *state) {
 		}
 
 		// Check for a miss
-		if utils.Roll(100, 1, 0) <= CircleMissChance(s, whatMob.Level-s.actor.Tier) {
+		if utils.Roll(100, 1, 0) <= CircleMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor)) {
 			s.msg.Actor.SendBad("You missed!!")
 			s.actor.SetTimer("combat_circle", config.CircleTimer)
 			s.actor.SetTimer("combat", config.CombatCooldown)
@@ -107,7 +107,7 @@ func (circle) process(s *state) {
 // Circle never pays the reckless stance's stamina cost, so it does not get
 // the stance's to-hit bonus either. The bonus is cancelled in the base so
 // the 5-95 clamp still applies to the final number.
-func CircleMissChance(s *state, lvlDiff int) int {
+func CircleMissChance(s *state, lvlDiff int, engaged int) int {
 	skill := 5
 	if s.actor.Class != config.MONK {
 		skill = s.actor.Equipment.Main.ItemType
@@ -116,5 +116,5 @@ func CircleMissChance(s *state, lvlDiff int) int {
 	if s.actor.CheckFlag("reckless") {
 		base += config.RecklessMissReduction
 	}
-	return missChance(s, base, config.MissPerLevel, lvlDiff)
+	return missChance(s, base, lvlDiff, engaged)
 }

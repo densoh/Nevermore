@@ -29,7 +29,7 @@ func LoadRooms() []interface{} {
 	levitate: e.levitate,
 	day_only: e.day_only,
 	night_only: e.night_only,
-	placement_dependent: e.placement_dependent}}), flags:{train: r.train, active: r.active, repair: r.repair,
+	placement_dependent: e.placement_dependent}}), flags:{train: r.train, quest_mode: r.quest_mode, active: r.active, repair: r.repair,
 	mana_drain: r.mana_drain,
 	no_summon: r.no_summon,
 	heal_fast:  r.heal_fast,
@@ -84,7 +84,7 @@ func LoadRoom(room_id int) map[string]interface{} {
 	levitate: e.levitate,
 	day_only: e.day_only,
 	night_only: e.night_only,
-	placement_dependent: e.placement_dependent}}), flags:{train: r.train, active: r.active, repair: r.repair,
+	placement_dependent: e.placement_dependent}}), flags:{train: r.train, quest_mode: r.quest_mode, active: r.active, repair: r.repair,
 	mana_drain: r.mana_drain,
 	no_summon: r.no_summon,
 	heal_fast:  r.heal_fast,
@@ -183,6 +183,7 @@ func CreateRoom(roomName string, creator string) (int, bool) {
 			"r.earth = 0, "+
 			"r.active = 0, "+
 			"r.train = 0, "+
+			"r.quest_mode = 0, "+
 			"r.mobs = '[]', "+
 			"r.inventory = '[]', "+
 			"r.wind = 0",
@@ -306,6 +307,7 @@ func UpdateRoom(roomData map[string]interface{}) bool {
 			"r.earth = $earth, "+
 			"r.active = $active, "+
 			"r.train = $train,"+
+			"r.quest_mode = $quest_mode, "+
 			"r.mobs = $mobs, "+
 			"r.inventory = $inventory, "+
 			"r.wind = $wind",
@@ -338,6 +340,7 @@ func UpdateRoom(roomData map[string]interface{}) bool {
 			"wind":              roomData["wind"],
 			"active":            roomData["active"],
 			"train":             roomData["train"],
+			"quest_mode":        roomData["quest_mode"],
 			"mobs":              roomData["mobs"],
 			"inventory":         roomData["inventory"],
 			"commands":          roomData["commands"],

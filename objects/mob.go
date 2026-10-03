@@ -564,6 +564,9 @@ func (m *Mob) Tick() {
 			m.CheckForExtraAttack(target)
 		}
 		style, mult := m.RollSpecial(target)
+		if !Rooms[m.ParentId].InQuestMode() {
+			mult *= config.OutlevelDamageMult(m.Level-target.Tier, m.EngagedCount(target))
+		}
 		m.ApplyStrike(target, m.InflictDamage(), style, mult, StrikeOpts{
 			Metric:    metric,
 			Mode:      1,
@@ -633,7 +636,7 @@ func (m *Mob) DeathCheck(target *Character) bool {
 			expReduce = 5
 		}
 		experienceAwarded := 0
-		if config.QuestMode {
+		if Rooms[m.ParentId].InQuestMode() {
 			experienceAwarded = m.Experience
 		} else if m.CheckFlag("hostile") {
 			experienceAwarded = int(float64(m.Experience) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
@@ -650,7 +653,7 @@ func (m *Mob) DeathCheck(target *Character) bool {
 						partyCheck = true
 					}
 				}
-				if config.QuestMode {
+				if Rooms[m.ParentId].InQuestMode() {
 					buildActorString += text.Cyan + "You earn " + strconv.Itoa(experienceAwarded) + " experience for the defeat of the " + m.Name + "\n"
 					charClean.GainExperience(experienceAwarded)
 				} else if partyCheck || m.CheckThreatTable(charClean.Name) {
@@ -1043,6 +1046,41 @@ func (m *Mob) MarkAttackedBy(attacker *Character) {
 // AttackedBy reports whether the named character has attacked this mob.
 func (m *Mob) AttackedBy(name string) bool {
 	return m.Attackers[name]
+}
+
+// EngagedCount is how many characters in the mob's room are fighting it
+// alongside c: c itself, c's party, and anyone on the threat table. Each is
+// counted once and staff are ignored. Threat entries for characters who have
+// left the room do not count. It is never less than 1.
+func (m *Mob) EngagedCount(c *Character) int {
+	names := map[string]bool{c.Name: true}
+	lead := c
+	if c.PartyFollow != "" {
+		if l := ActiveCharacters.Find(c.PartyFollow); l != nil {
+			lead = l
+		}
+	}
+	names[lead.Name] = true
+	for _, name := range lead.PartyFollowers {
+		names[name] = true
+	}
+	for name := range m.ThreatTable {
+		names[name] = true
+	}
+	room, ok := Rooms[m.ParentId]
+	if !ok || room.Chars == nil {
+		return 1
+	}
+	count := 0
+	for _, char := range room.Chars.Contents {
+		if char == c || (names[char.Name] && !char.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster)) {
+			count++
+		}
+	}
+	if count < 1 {
+		return 1
+	}
+	return count
 }
 
 // addThreat adds threat without marking the character as an attacker, for

@@ -38,6 +38,8 @@ func charInRoom(r *objects.Room, c *objects.Character) bool {
 func (scriptDeath) process(s *state) {
 
 	healingHand := objects.Rooms[config.HealingHand]
+	// Quest mode is judged where they died, not at the healing hand.
+	questDeath := s.where.InQuestMode()
 	if !utils.IntIn(healingHand.RoomId, s.rLocks) {
 		s.AddLocks(healingHand.RoomId)
 		s.ok = false
@@ -159,7 +161,7 @@ func (scriptDeath) process(s *state) {
 		totalExpNeeded := config.MaxLoss(s.actor.Tier)
 		finalMin := config.TierExpLevels[s.actor.Tier] - int(float64(totalExpNeeded))
 
-		if config.QuestMode == true {
+		if questDeath {
 			finalMin = config.TierExpLevels[s.actor.Tier]
 		}
 		// Determine the death penalty
