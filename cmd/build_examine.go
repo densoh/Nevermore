@@ -72,6 +72,7 @@ func (examine) process(s *state) {
 			{"T", "wind", strconv.FormatBool(roomRef.Flags["wind"]), "Room causes and amplifies wind."},
 			{"T", "active", strconv.FormatBool(roomRef.Flags["active"]), "The room is activated."},
 			{"T", "train", strconv.FormatBool(roomRef.Flags["train"]), "Characters can train here."},
+			{"T", "quest_mode", strconv.FormatBool(roomRef.Flags["quest_mode"]), "Quest mode rules apply here."},
 		})
 		t.SetCaption("Light is evaluated with dark_always first, then light_always, then natural light.\nX = Cannot Modify,  T=Toggle to Edit, V=Edit by value name\nSee 'help edit' for more.")
 		s.msg.Actor.SendGood(t.Render())

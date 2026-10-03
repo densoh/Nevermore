@@ -6,8 +6,8 @@ import (
 )
 
 func TestBackstabMultiplier(t *testing.T) {
-	// 3x at stealth 0, 0.25 more per level: 5.5x at grandmaster.
-	cases := map[int]float64{0: 3, 7: 4.75, 10: 5.5}
+	// 2.5x at stealth 0, 0.25 more per level: 5x at grandmaster.
+	cases := map[int]float64{0: 2.5, 7: 4.25, 10: 5}
 	for level, want := range cases {
 		if got := BackstabMultiplier(level); math.Abs(got-want) > 1e-9 {
 			t.Errorf("stealth %d multiplier = %v, want %v", level, got, want)

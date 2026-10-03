@@ -87,8 +87,8 @@ func TestDetermineMissChanceReckless(t *testing.T) {
 	s := recklessState(&objects.Item{ItemType: 1}, 200)
 	s.actor.Skills[1].Value = config.SkillExpLevels[2]
 
-	base := DetermineMissChance(plain, 0)
-	got := DetermineMissChance(s, 0)
+	base := DetermineMissChance(plain, 0, 1)
+	got := DetermineMissChance(s, 0, 1)
 	if got != base-config.RecklessMissReduction {
 		t.Errorf("reckless miss chance = %d, want %d (base %d)", got, base-config.RecklessMissReduction, base)
 	}
@@ -101,7 +101,7 @@ func TestCircleMissChanceIgnoresReckless(t *testing.T) {
 	s := recklessState(&objects.Item{ItemType: 1}, 200)
 	s.actor.Skills[1].Value = config.SkillExpLevels[2]
 
-	if got, want := CircleMissChance(s, 0), DetermineMissChance(plain, 0); got != want {
+	if got, want := CircleMissChance(s, 0, 1), DetermineMissChance(plain, 0, 1); got != want {
 		t.Errorf("reckless circle miss chance = %d, want %d", got, want)
 	}
 }

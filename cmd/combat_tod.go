@@ -22,8 +22,7 @@ func init() {
 type tod cmd
 
 func (tod) process(s *state) {
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
@@ -49,13 +48,11 @@ func (tod) process(s *state) {
 
 	reference := config.TodReference(s.actor.Tier)
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
-	if s.actor.Tier < config.MonkTodTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MonkTodTier) + " to use this skill.")
+	if !s.requireTier(config.MonkTodTier) {
 		return
 	}
 
@@ -101,7 +98,7 @@ func (tod) process(s *state) {
 	remaining := hpFraction(whatMob)
 
 	// The touch has to land before it can do anything.
-	missChance := DetermineMissChance(s, whatMob.Level-s.actor.Tier) - s.actor.GetStat("pie")/config.TodHitPieDiv
+	missChance := DetermineMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor)) - s.actor.GetStat("pie")/config.TodHitPieDiv
 	if missChance < 5 {
 		missChance = 5
 	}
@@ -116,10 +113,8 @@ func (tod) process(s *state) {
 		data.StoreCombatMetric("tod-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		s.actor.SetTimer("combat_tod", config.TodMissTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)
-		// A botched touch hands the mob a free swing at twice its damage,
-		// resolved as a normal-style strike so the player sees the
-		// vulnerability text rather than a double banner.
-		whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, config.CombatModifiers["double"], objects.StrikeOpts{
+		// A botched touch may hand the mob a free vital strike.
+		whatMob.RevengeVital(s.actor, config.MobTodRevengeVitalChance, nil, objects.StrikeOpts{
 			Metric:    "tod_fail_retaliate",
 			Mode:      0,
 			HitPrefix: "Exposed!! ",

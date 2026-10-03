@@ -23,18 +23,15 @@ func (sweep) process(s *state) {
 		return
 	}
 
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
-	if s.actor.Tier < config.MonkSweepTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MonkSweepTier) + " to use this skill.")
+	if !s.requireTier(config.MonkSweepTier) {
 		return
 	}
 

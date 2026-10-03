@@ -26,13 +26,11 @@ func (hamstring) process(s *state) {
 		return
 	}
 
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
@@ -85,7 +83,7 @@ func (hamstring) process(s *state) {
 	}
 
 	// Check for a miss. A miss costs the combat round but not the cooldown.
-	if utils.Roll(100, 1, 0) <= DetermineMissChance(s, whatMob.Level-s.actor.Tier) {
+	if utils.Roll(100, 1, 0) <= DetermineMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor)) {
 		s.msg.Actor.SendBad("You missed!!")
 		s.msg.Observers.SendBad(s.actor.Name + " fails to hamstring " + whatMob.Name)
 		data.StoreCombatMetric("hamstring-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)

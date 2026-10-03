@@ -121,6 +121,7 @@ func (use) process(s *state) {
 						whatMob.MarkAttackedBy(s.actor)
 					}
 					msg = objects.Cast(s.actor, whatMob, spellInstance.Effect, spellInstance.Magnitude)
+					objects.SpellHitCallbacks(s.actor, spellInstance, whatMob)
 					s.msg.Actor.SendGood("You use a  " + what.Name + " on " + whatMob.Name)
 					s.msg.Observers.SendGood(s.actor.Name + " used a " + what.Name + " on " + whatMob.Name)
 					if strings.Contains(msg, "$CRIPT") {

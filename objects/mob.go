@@ -90,6 +90,11 @@ type Mob struct {
 	// action against this mob, hit or miss. Unlike ThreatTable it ignores
 	// threat from heals, rescues and the mob picking its own target.
 	Attackers map[string]bool
+
+	// SpawnedAt is when the mob started ticking. A mob can't follow anyone
+	// who hasn't attacked it out of the room until
+	// config.MobFollowSpawnLockout has passed.
+	SpawnedAt time.Time
 }
 
 func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
@@ -160,6 +165,7 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		time.Time{},
 		time.Time{},
 		nil,
+		time.Time{},
 	}
 
 	for _, spellN := range strings.Split(mobData["spells"].(string), ",") {
@@ -193,6 +199,7 @@ func (m *Mob) StartTicking() {
 	}
 	log.Println(m.Name + " not active starting ticking")
 	m.IsActive = true
+	m.SpawnedAt = time.Now()
 	m.CalculateInventory()
 	m.ThreatTable = make(map[string]int)
 	m.Attackers = make(map[string]bool)
@@ -557,6 +564,9 @@ func (m *Mob) Tick() {
 			m.CheckForExtraAttack(target)
 		}
 		style, mult := m.RollSpecial(target)
+		if !Rooms[m.ParentId].InQuestMode() {
+			mult *= config.OutlevelDamageMult(m.Level-target.Tier, m.EngagedCount(target))
+		}
 		m.ApplyStrike(target, m.InflictDamage(), style, mult, StrikeOpts{
 			Metric:    metric,
 			Mode:      1,
@@ -626,7 +636,7 @@ func (m *Mob) DeathCheck(target *Character) bool {
 			expReduce = 5
 		}
 		experienceAwarded := 0
-		if config.QuestMode {
+		if Rooms[m.ParentId].InQuestMode() {
 			experienceAwarded = m.Experience
 		} else if m.CheckFlag("hostile") {
 			experienceAwarded = int(float64(m.Experience) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
@@ -643,7 +653,7 @@ func (m *Mob) DeathCheck(target *Character) bool {
 						partyCheck = true
 					}
 				}
-				if config.QuestMode {
+				if Rooms[m.ParentId].InQuestMode() {
 					buildActorString += text.Cyan + "You earn " + strconv.Itoa(experienceAwarded) + " experience for the defeat of the " + m.Name + "\n"
 					charClean.GainExperience(experienceAwarded)
 				} else if partyCheck || m.CheckThreatTable(charClean.Name) {
@@ -809,7 +819,7 @@ func (m *Mob) FollowChar(target *Character, from *Room, to *Room) bool {
 	}
 
 	// Still angry at this one in particular, and in any shape to give chase?
-	if m.CurrentTarget != target.Name || m.Stunned() || m.Stam.Current <= 0 {
+	if m.CurrentTarget != target.Name || m.Stunned() || m.FollowLocked(target.Name) || m.Stam.Current <= 0 {
 		return false
 	}
 
@@ -906,6 +916,13 @@ func (m *Mob) Stun(amt int) {
 // cannot act on its tick, block an exit, or follow a character out of the room.
 func (m *Mob) Stunned() bool {
 	return m.IsStunned && time.Now().Before(m.StunnedUntil)
+}
+
+// FollowLocked reports whether the mob spawned too recently to follow the
+// named character out of the room. A character who has attacked the mob
+// gets no lockout.
+func (m *Mob) FollowLocked(name string) bool {
+	return !m.AttackedBy(name) && time.Since(m.SpawnedAt) < config.MobFollowSpawnLockout
 }
 
 // Teleport Special handler for handling a mobs cast of a teleport spell
@@ -1031,6 +1048,41 @@ func (m *Mob) AttackedBy(name string) bool {
 	return m.Attackers[name]
 }
 
+// EngagedCount is how many characters in the mob's room are fighting it
+// alongside c: c itself, c's party, and anyone on the threat table. Each is
+// counted once and staff are ignored. Threat entries for characters who have
+// left the room do not count. It is never less than 1.
+func (m *Mob) EngagedCount(c *Character) int {
+	names := map[string]bool{c.Name: true}
+	lead := c
+	if c.PartyFollow != "" {
+		if l := ActiveCharacters.Find(c.PartyFollow); l != nil {
+			lead = l
+		}
+	}
+	names[lead.Name] = true
+	for _, name := range lead.PartyFollowers {
+		names[name] = true
+	}
+	for name := range m.ThreatTable {
+		names[name] = true
+	}
+	room, ok := Rooms[m.ParentId]
+	if !ok || room.Chars == nil {
+		return 1
+	}
+	count := 0
+	for _, char := range room.Chars.Contents {
+		if char == c || (names[char.Name] && !char.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster)) {
+			count++
+		}
+	}
+	if count < 1 {
+		return 1
+	}
+	return count
+}
+
 // addThreat adds threat without marking the character as an attacker, for
 // heals, rescues and the mob choosing its own target.
 func (m *Mob) addThreat(damage int, attacker *Character) {
@@ -1048,8 +1100,76 @@ func (m *Mob) ApplyEffect(effectName string, length string, interval int, magnit
 		effectInstance.Reset(length)
 		return
 	}
-	m.Effects[effectName] = NewEffect(length, interval, magnitude, effect, effectOff)
-	m.Effects[effectName].RunEffect()
+	m.startEffect(effectName, NewEffect(length, interval, magnitude, effect, effectOff))
+}
+
+// ReplaceEffect is ApplyEffect for effects whose callbacks carry state, like a
+// burn that remembers its caster: a running effect of the same name is dropped,
+// without its effectOff, and the new one starts fresh.
+func (m *Mob) ReplaceEffect(effectName string, length string, interval int, magnitude int, effect func(triggers int), effectOff func()) {
+	delete(m.Effects, effectName)
+	m.startEffect(effectName, NewEffect(length, interval, magnitude, effect, effectOff))
+}
+
+func (m *Mob) startEffect(effectName string, e *Effect) {
+	m.Effects[effectName] = e
+	e.RunEffect()
+	if e.interval > 0 {
+		m.scheduleEffectTick(effectName, e)
+	}
+}
+
+// scheduleEffectTick runs a ticking effect every interval seconds until it
+// expires. It keeps its own timer instead of riding the mob's tick, so a stun
+// does not hold it off.
+func (m *Mob) scheduleEffectTick(effectName string, e *Effect) {
+	time.AfterFunc(time.Duration(e.interval)*time.Second, func() {
+		room := m.lockCurrentRoom(effectName + " effect tick")
+		if room == nil {
+			return
+		}
+		defer room.UnlockRoom(m.Name+" "+effectName+" effect tick", false)
+
+		// Stop if the mob died, left the world, or the effect was removed or replaced.
+		if m.Effects[effectName] != e || m.Stam.Current <= 0 || !room.Mobs.Contains(m) {
+			return
+		}
+		e.RunEffect()
+		if m.Effects[effectName] != e || m.Stam.Current <= 0 {
+			return
+		}
+		// Expire unless another full interval fits (half a second of slack for
+		// timer drift), so a duration that isn't a multiple of the interval
+		// ends without a late tick.
+		if e.TimeRemaining() < float64(e.interval)-0.5 {
+			m.expireEffect(effectName, e)
+			return
+		}
+		m.scheduleEffectTick(effectName, e)
+	})
+}
+
+// lockCurrentRoom locks the room the mob is in, re-checking afterwards in case
+// it moved while we waited for the lock.
+func (m *Mob) lockCurrentRoom(requester string) *Room {
+	for {
+		room, ok := Rooms[m.ParentId]
+		if !ok {
+			return nil
+		}
+		room.LockRoom(m.Name+" "+requester, false)
+		if m.ParentId == room.RoomId {
+			return room
+		}
+		room.UnlockRoom(m.Name+" "+requester, false)
+	}
+}
+
+func (m *Mob) expireEffect(effectName string, e *Effect) {
+	if e.effectOff != nil {
+		e.effectOff()
+	}
+	m.RemoveEffect(effectName)
 }
 
 func (m *Mob) RemoveEffect(effectName string) {

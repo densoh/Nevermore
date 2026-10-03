@@ -24,17 +24,14 @@ func (turn) process(s *state) {
 		s.msg.Actor.SendBad("Turn what exactly?")
 		return
 	}
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
-	if s.actor.Tier < config.SpecialAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.SpecialAbilityTier) + " to use this skill.")
+	if !s.requireTier(config.SpecialAbilityTier) {
 		return
 	}
 
@@ -106,10 +103,9 @@ func (turn) process(s *state) {
 			whatMob.Placement = s.actor.Placement
 			whatMob.AddThreatDamage(config.FailedTurnThreat(whatMob.Stam.Current, whatMob.Stam.Max), s.actor)
 			s.msg.Observers.SendInfo(s.actor.Name + " turn attempt fails and enrages " + whatMob.Name)
-			// The enraged mob gets a free swing at twice its damage, scaled to the
-			// mob rather than to the player. Resolved as a normal-style strike so
-			// the player sees the vulnerability text rather than a double banner.
-			whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleNormal, config.CombatModifiers["double"], objects.StrikeOpts{
+			// The enraged mob may get a free vital strike, scaled to the mob
+			// rather than to the player.
+			whatMob.RevengeVital(s.actor, config.MobTurnRevengeVitalChance, nil, objects.StrikeOpts{
 				Metric:    "turn_fail_retaliate",
 				Mode:      0,
 				HitPrefix: "Exposed!! ",

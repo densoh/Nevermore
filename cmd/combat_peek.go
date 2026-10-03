@@ -25,13 +25,11 @@ func (peek) process(s *state) {
 		return
 	}
 
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 

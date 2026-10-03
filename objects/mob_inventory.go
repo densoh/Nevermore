@@ -166,6 +166,19 @@ func (i *MobInventory) GetNumber(o *Mob) int {
 	return pass
 }
 
+// Contains reports whether this exact mob is in the inventory.
+func (i *MobInventory) Contains(o *Mob) bool {
+	if i == nil {
+		return false
+	}
+	for _, c := range i.Contents {
+		if c == o {
+			return true
+		}
+	}
+	return false
+}
+
 // List the items in this MobInventory
 func (i *MobInventory) List(observer *Character) []string {
 	items := make([]string, 0)

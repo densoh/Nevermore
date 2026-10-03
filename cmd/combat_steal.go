@@ -20,8 +20,7 @@ func init() {
 type steal cmd
 
 func (steal) process(s *state) {
-	if s.actor.Tier < config.MinorAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.MinorAbilityTier) + " to use this skill.")
+	if !s.requireTier(config.MinorAbilityTier) {
 		return
 	}
 
@@ -30,13 +29,11 @@ func (steal) process(s *state) {
 		return
 	}
 
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
@@ -149,16 +146,15 @@ func (steal) process(s *state) {
 					s.msg.Observers.SendBad(s.actor.Name + " fails to steal from " + whatMob.Name)
 					s.actor.RemoveHook("combat", "hide")
 					whatMob.AddThreatDamage(whatMob.Stam.Max/4, s.actor)
-					if utils.Roll(100, 1, 0) <= config.MobStealRevengeVitalChance {
+					whatMob.RevengeVital(s.actor, config.MobStealRevengeVitalChance, func() {
 						whatMob.CurrentTarget = s.actor.Name
 						s.msg.Actor.SendInfo(whatMob.Name + " turns to you.")
 						s.msg.Observers.SendInfo(whatMob.Name + " turns to " + s.actor.Name + ".")
-						whatMob.ApplyStrike(s.actor, whatMob.InflictDamage(), objects.StyleVital, float64(config.VitalStrikeScale), objects.StrikeOpts{
-							Metric:   "steal_fail",
-							Mode:     0,
-							DeathMsg: "was slain trying to steal from " + whatMob.Name + ".",
-						})
-					}
+					}, objects.StrikeOpts{
+						Metric:   "steal_fail",
+						Mode:     0,
+						DeathMsg: "was slain trying to steal from " + whatMob.Name + ".",
+					})
 					return
 				}
 			} else {

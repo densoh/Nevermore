@@ -10,6 +10,7 @@ type Spell struct {
 	Magnitude   int
 	Effect      string
 	Classes     map[string]int
+	OnSpellHit  []OnHit // callbacks fired when the spell lands on a mob
 }
 
 var Spells = map[string]Spell{
@@ -74,7 +75,7 @@ var Spells = map[string]Spell{
 		Chant:       "Breeze, be gentle no more.",
 		Magnitude:   1,
 		Effect:      "air-damage",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2, "ranger": 2, "thief": 4, "fighter": 5, "barbarian": 7},
 	},
 	"rumble": {
 		Name:        "rumble",
@@ -83,7 +84,7 @@ var Spells = map[string]Spell{
 		Chant:       "Shaken, not stirred.",
 		Magnitude:   1,
 		Effect:      "earth-damage",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2, "ranger": 2, "thief": 4, "fighter": 5, "barbarian": 7},
 	},
 	"burn": {
 		Name:        "burn",
@@ -92,7 +93,7 @@ var Spells = map[string]Spell{
 		Chant:       "Fire, flicker, ignite!",
 		Magnitude:   1,
 		Effect:      "fire-damage",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2, "ranger": 2, "thief": 4, "fighter": 5, "barbarian": 7},
 	},
 	"blister": {
 		Name:        "blister",
@@ -101,7 +102,7 @@ var Spells = map[string]Spell{
 		Chant:       "Thy water rises and causes thee pain.",
 		Magnitude:   1,
 		Effect:      "water-damage",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2},
+		Classes:     map[string]int{"cleric": 1, "mage": 1, "bard": 2, "ranger": 2, "thief": 4, "fighter": 5, "barbarian": 7},
 	},
 	"dustgust": {
 		Name:        "dustgust",
@@ -110,7 +111,7 @@ var Spells = map[string]Spell{
 		Chant:       "Arise stinging mists, strike my foe.",
 		Magnitude:   2,
 		Effect:      "air-damage",
-		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7},
+		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7, "ranger": 7, "thief": 10},
 	},
 	"stonecrush": {
 		Name:        "stonecrush",
@@ -119,7 +120,7 @@ var Spells = map[string]Spell{
 		Chant:       "The stones of earth, smite thee!",
 		Magnitude:   2,
 		Effect:      "earth-damage",
-		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7},
+		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7, "ranger": 7, "thief": 10},
 	},
 	"fireball": {
 		Name:        "fireball",
@@ -128,7 +129,7 @@ var Spells = map[string]Spell{
 		Chant:       "Fiery missile strike thy target!",
 		Magnitude:   2,
 		Effect:      "fire-damage",
-		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7},
+		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7, "ranger": 7, "thief": 10},
 	},
 	"waterbolt": {
 		Name:        "waterbolt",
@@ -137,7 +138,7 @@ var Spells = map[string]Spell{
 		Chant:       "The force of waves, crash into thee!",
 		Magnitude:   2,
 		Effect:      "water-damage",
-		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7},
+		Classes:     map[string]int{"cleric": 6, "mage": 5, "bard": 7, "ranger": 7, "thief": 10},
 	},
 	"shockbolt": {
 		Name:        "shockbolt",
@@ -146,7 +147,7 @@ var Spells = map[string]Spell{
 		Chant:       "Static bolt, shock my foe!",
 		Magnitude:   3,
 		Effect:      "air-damage",
-		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12},
+		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12, "ranger": 12},
 	},
 	"shatterstone": {
 		Name:        "shatterstone",
@@ -155,7 +156,7 @@ var Spells = map[string]Spell{
 		Chant:       "Stones explode and shrapnel strike!",
 		Magnitude:   3,
 		Effect:      "earth-damage",
-		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12},
+		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12, "ranger": 12},
 	},
 	"burstflame": {
 		Name:        "burstflame",
@@ -164,7 +165,7 @@ var Spells = map[string]Spell{
 		Chant:       "Flameburst, strike, burn!",
 		Magnitude:   3,
 		Effect:      "fire-damage",
-		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12},
+		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12, "ranger": 12},
 	},
 	"steamblast": {
 		Name:        "steamblast",
@@ -173,7 +174,7 @@ var Spells = map[string]Spell{
 		Chant:       "Scalding vapors parbroil thee!",
 		Magnitude:   3,
 		Effect:      "water-damage",
-		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12},
+		Classes:     map[string]int{"cleric": 11, "mage": 9, "bard": 12, "ranger": 12},
 	},
 	"lightning": {
 		Name:        "lightning",
@@ -210,6 +211,16 @@ var Spells = map[string]Spell{
 		Magnitude:   4,
 		Effect:      "water-damage",
 		Classes:     map[string]int{"cleric": 15, "mage": 12, "bard": 16},
+	},
+	"combust": {
+		Name:        "combust",
+		Description: "Combust is a new, hybrid offensive spell in the fire realm, fitting between immolate and flamefill. Rather that surround the target with a flaming aura, as does immolate, the combust spell actually causes the target's flesh to spontaneously ignite and burn, requiring less magic (and obviously being less effective) than flamefill. Mercifully for the target, the magical flames extringuish nearly immediately, however, by that time, the damage is already done, as the target's flesh has been horribly burnt. spell is the fourth tier offensive spell of the fire realm. The caster speaks the spellchant while bringing their hands together, as fists. As the spellchant ends, the caster's hands will begin to glow red, (nearly blinding with heat to those who posessess infravision). The caster then fans out his hands, keeping them touching, and a jet of magical energy fires from each fingertip.... When this energy strikes it's target, the struck points spread heat around, until all of the target's flesh spontaneously bursts into flame, often killing the target.",
+		Cost:        40,
+		Chant:       "Thy flesh ignites with magical flame.",
+		Magnitude:   45,
+		Effect:      "fire-damage",
+		Classes:     map[string]int{"mage": 14, "bard": 21},
+		OnSpellHit:  []OnHit{{Name: "ignite", Chance: 100}},
 	},
 	"thunderbolt": {
 		Name:        "thunderbolt",
@@ -398,7 +409,7 @@ var Spells = map[string]Spell{
 		Chant:       "Go where the winds carry thee.",
 		Magnitude:   1,
 		Effect:      "teleport",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 2, "ranger": 2, "bard": 2, "thief": 4},
+		Classes:     map[string]int{"cleric": 9, "mage": 7, "paladin": 13, "ranger": 13, "bard": 9},
 	},
 	"stun": {
 		Name:        "stun",
@@ -407,7 +418,7 @@ var Spells = map[string]Spell{
 		Chant:       "Confusion of mind, and blast of body.",
 		Magnitude:   1,
 		Effect:      "stun",
-		Classes:     map[string]int{"cleric": 1, "mage": 1, "paladin": 2, "ranger": 2, "bard": 2, "thief": 4},
+		Classes:     map[string]int{"cleric": 5, "mage": 5, "ranger": 9, "bard": 7},
 	},
 	"word-of-recall": {
 		Description: "this spell, strictly in the realm of clerical magic, instantly transports the target to safety. to cast this spell, the cleric grips their holy symbol in one hand, while speaking the spell Chant. the cleric then need only point at the target, and they will be returned to the safest place in the nexus... the chamber of the order of the healing hand. while similar in effet to the spell, teleport, this spell functions entirely differently. when word-of-recall is cast, a manifestation of the cleric's deity (a ray of light for aalynor, an aura of black fire for tilnar, etc.) surrounds the target and safely transport the target, along with all carried equipment to the destination",
@@ -674,6 +685,7 @@ var OffensiveSpells = []string{
 	"frostbite",
 	"putrify",
 	"disrupt-magic",
+	"combust",
 }
 
 var HealingSpells = []string{

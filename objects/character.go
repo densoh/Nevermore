@@ -1503,16 +1503,28 @@ func (c *Character) GetSpellMultiplier() int {
 }
 
 func (c *Character) InflictDamage() (damage int) {
+	return c.inflictDamage(0)
+}
+
+// InflictBackstabDamage is a weapon hit whose dice bonus counts dex on top of
+// the weapon's usual stat, before the backstab multiplier.
+func (c *Character) InflictBackstabDamage() int {
+	return c.inflictDamage(c.GetStat("dex"))
+}
+
+// inflictDamage rolls a hit; extraStat points join the weapon stat in the
+// percentage bonus to the dice roll.
+func (c *Character) inflictDamage(extraStat int) (damage int) {
 	if c.Class != config.MONK {
 		damage = utils.Roll(c.Equipment.Main.SidesDice,
 			c.Equipment.Main.NumDice,
 			c.Equipment.Main.PlusDice)
 
+		stat := c.GetStat("str")
 		if c.Equipment.Main.ItemType == 4 {
-			damage += int(math.Ceil(float64(damage) * (config.StatDamageMod * float64(c.GetStat("dex")))))
-		} else {
-			damage += int(math.Ceil(float64(damage) * (config.StatDamageMod * float64(c.GetStat("str")))))
+			stat = c.GetStat("dex")
 		}
+		damage += int(math.Ceil(float64(damage) * (config.StatDamageMod * float64(stat+extraStat))))
 		damage += c.Equipment.Main.Adjustment
 	} else {
 		// Monks land the base for their tier, plus a strength share of it

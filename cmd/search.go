@@ -17,8 +17,7 @@ func init() {
 type search cmd
 
 func (search) process(s *state) {
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 

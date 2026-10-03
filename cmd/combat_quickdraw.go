@@ -19,18 +19,15 @@ func init() {
 type quickdraw cmd
 
 func (quickdraw) process(s *state) {
-	if s.actor.Tier < config.SpecialAbilityTier {
-		s.msg.Actor.SendBad("You must be at least tier " + strconv.Itoa(config.SpecialAbilityTier) + " to use this skill.")
+	if !s.requireTier(config.SpecialAbilityTier) {
 		return
 	}
 
-	if s.actor.CheckFlag("blind") {
-		s.msg.Actor.SendBad("You can't see anything!")
+	if !s.requireSight() {
 		return
 	}
 
-	if s.actor.Stam.Current <= 0 {
-		s.msg.Actor.SendBad("You are far too tired to do that.")
+	if !s.requireStamina() {
 		return
 	}
 
