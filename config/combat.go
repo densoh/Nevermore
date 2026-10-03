@@ -144,7 +144,7 @@ var (
 	MobBSRevengeVitalChance     = 25
 	MobTurnRevengeVitalChance   = 25
 	MobTodRevengeVitalChance    = 25
-	VitalStrikeScale            = 1.5 // every punishment vital: follow, failed backstab/steal/turn/touch
+	VitalStrikeScale            = 1.75 // every punishment vital: follow, failed backstab/steal/turn/touch
 	BackstabCooldown            = 30
 	QuickdrawCooldown           = 30
 	TrackCooldown               = 16
