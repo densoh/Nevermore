@@ -1062,8 +1062,76 @@ func (m *Mob) ApplyEffect(effectName string, length string, interval int, magnit
 		effectInstance.Reset(length)
 		return
 	}
-	m.Effects[effectName] = NewEffect(length, interval, magnitude, effect, effectOff)
-	m.Effects[effectName].RunEffect()
+	m.startEffect(effectName, NewEffect(length, interval, magnitude, effect, effectOff))
+}
+
+// ReplaceEffect is ApplyEffect for effects whose callbacks carry state, like a
+// burn that remembers its caster: a running effect of the same name is dropped,
+// without its effectOff, and the new one starts fresh.
+func (m *Mob) ReplaceEffect(effectName string, length string, interval int, magnitude int, effect func(triggers int), effectOff func()) {
+	delete(m.Effects, effectName)
+	m.startEffect(effectName, NewEffect(length, interval, magnitude, effect, effectOff))
+}
+
+func (m *Mob) startEffect(effectName string, e *Effect) {
+	m.Effects[effectName] = e
+	e.RunEffect()
+	if e.interval > 0 {
+		m.scheduleEffectTick(effectName, e)
+	}
+}
+
+// scheduleEffectTick runs a ticking effect every interval seconds until it
+// expires. It keeps its own timer instead of riding the mob's tick, so a stun
+// does not hold it off.
+func (m *Mob) scheduleEffectTick(effectName string, e *Effect) {
+	time.AfterFunc(time.Duration(e.interval)*time.Second, func() {
+		room := m.lockCurrentRoom(effectName + " effect tick")
+		if room == nil {
+			return
+		}
+		defer room.UnlockRoom(m.Name+" "+effectName+" effect tick", false)
+
+		// Stop if the mob died, left the world, or the effect was removed or replaced.
+		if m.Effects[effectName] != e || m.Stam.Current <= 0 || !room.Mobs.Contains(m) {
+			return
+		}
+		e.RunEffect()
+		if m.Effects[effectName] != e || m.Stam.Current <= 0 {
+			return
+		}
+		// Expire unless another full interval fits (half a second of slack for
+		// timer drift), so a duration that isn't a multiple of the interval
+		// ends without a late tick.
+		if e.TimeRemaining() < float64(e.interval)-0.5 {
+			m.expireEffect(effectName, e)
+			return
+		}
+		m.scheduleEffectTick(effectName, e)
+	})
+}
+
+// lockCurrentRoom locks the room the mob is in, re-checking afterwards in case
+// it moved while we waited for the lock.
+func (m *Mob) lockCurrentRoom(requester string) *Room {
+	for {
+		room, ok := Rooms[m.ParentId]
+		if !ok {
+			return nil
+		}
+		room.LockRoom(m.Name+" "+requester, false)
+		if m.ParentId == room.RoomId {
+			return room
+		}
+		room.UnlockRoom(m.Name+" "+requester, false)
+	}
+}
+
+func (m *Mob) expireEffect(effectName string, e *Effect) {
+	if e.effectOff != nil {
+		e.effectOff()
+	}
+	m.RemoveEffect(effectName)
 }
 
 func (m *Mob) RemoveEffect(effectName string) {

@@ -318,14 +318,14 @@ func ManaPoolStat(intel int, pie int, class int) int {
 }
 
 func CalcHaste(tier int) int {
-	if tier < 10 {
-		return 2
-	} else if tier >= 10 && tier < 15 {
-		return 3
-	} else if tier > 15 {
+	switch {
+	case tier >= 15:
 		return 4
+	case tier >= 10:
+		return 3
+	default:
+		return 2
 	}
-	return 0
 }
 
 var DoubleDamage = []int{
@@ -572,6 +572,13 @@ const (
 	StunSpellChance         = 70
 	StunSpellChancePerLevel = 10
 	StunSpellIntPerChance   = 2
+)
+
+// Combust's burn ticks BurnTicks times, BurnInterval seconds apart, each tick
+// rolling 1d(caster tier) scaled by the caster's spell damage bonus.
+const (
+	BurnTicks    = 3
+	BurnInterval = 8
 )
 
 // StunSpellDuration is how long a player's stun spell holds a mob.

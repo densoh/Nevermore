@@ -253,6 +253,7 @@ func (cast) process(s *state) {
 		noteSingingCast(s)
 		s.actor.FlagOn("casting", "cast")
 		msg = objects.Cast(s.actor, whatMob, spellInstance.Effect, spellInstance.Magnitude)
+		objects.SpellHitCallbacks(s.actor, spellInstance, whatMob)
 		s.actor.FlagOff("casting", "cast")
 		s.actor.Mana.Subtract(cost)
 		if (s.actor.Class == 5 || s.actor.Class == 4 || s.actor.Class == 7) && utils.StringIn(spellInstance.Name, objects.OffensiveSpells) {

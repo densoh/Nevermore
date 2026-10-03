@@ -534,6 +534,18 @@ var magicSkillMap = map[string]int{
 	"water": 9,
 }
 
+// spellBonusMultiplier is what a character's elemental spell damage is
+// multiplied by: the int/tier/affinity bonus, and the bard singing mod when
+// actively casting.
+func spellBonusMultiplier(caller *Character, magicType string) float64 {
+	bonus := config.SpellDamageBonus(caller.Tier, caller.Int.Current, caller.Class, caller.Skills[magicSkillMap[magicType]].Value, magicSkillMap[magicType])
+	mult := 1 + float64(bonus)*.01
+	if caller.CheckFlag("casting") {
+		mult *= caller.SingCastMod()
+	}
+	return mult
+}
+
 func spellDamage(caller interface{}, target interface{}, magnitude int, magicType string) string {
 	var name string
 	var intel int
@@ -554,11 +566,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 			spellType = 3
 		}
 		actualDamage = elementalDamage(magnitude, intel)
-		bonus := config.SpellDamageBonus(caller.Tier, caller.Int.Current, caller.Class, caller.Skills[magicSkillMap[magicType]].Value, magicSkillMap[magicType])
-		damage = int(float64(actualDamage) * (1 + float64(bonus)*.01))
-		if caller.CheckFlag("casting") {
-			damage = int(float64(damage) * caller.SingCastMod())
-		}
+		damage = int(float64(actualDamage) * spellBonusMultiplier(caller, magicType))
 	case *Mob:
 		name = caller.Name
 		level = caller.Level
@@ -671,6 +679,9 @@ func elementalDamage(magnitude int, intel int) (damage int) {
 	} else if magnitude == 7 {
 		power = utils.Roll(14, 10, 0)
 		damage = 275 + power
+	} else if magnitude == 45 { // combust
+		power = utils.Roll(14, 6, 0)
+		damage = 95 + power
 	}
 	return damage
 }
