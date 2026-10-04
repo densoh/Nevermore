@@ -95,6 +95,22 @@ type Mob struct {
 	// who hasn't attacked it out of the room until
 	// config.MobFollowSpawnLockout has passed.
 	SpawnedAt time.Time
+
+	// WeakenSteps counts the $WEAKEN offerings already baked into this mob's
+	// template stats. It lives on the template so it survives death and
+	// reboots, see Mob.Weaken.
+	WeakenSteps int
+
+	// QuestEvent names the event whose spawn group made this copy, so it can
+	// be removed when the event ends. Empty for ordinary mobs.
+	QuestEvent string
+
+	// DamageBonusPct raises every hit by that percent, e.g. while a script
+	// has the mob enraged.
+	DamageBonusPct int
+
+	// scripts is this copy's mob script bookkeeping; see mob_script.go.
+	scripts *mobScriptState
 }
 
 func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
@@ -103,11 +119,14 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 	if description, ok = mobData["description"].(string); !ok {
 		description = "A mob...  yup"
 	}
+	commands, _ := mobData["commands"].(string)
 	newMob := &Mob{
 		Object{
 			Name:        mobData["name"].(string),
 			Description: description,
 			Placement:   int(mobData["placement"].(int64)),
+			// Mobs saved before Save wrote commands have a null here.
+			Commands: DeserializeCommands(commands),
 		},
 		int(mobData["mob_id"].(int64)),
 		NewItemInventory(),
@@ -166,6 +185,13 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		time.Time{},
 		nil,
 		time.Time{},
+		0,
+		"",
+		0,
+		nil,
+	}
+	if steps, ok := mobData["weaken_steps"].(int64); ok {
+		newMob.WeakenSteps = int(steps)
 	}
 
 	for _, spellN := range strings.Split(mobData["spells"].(string), ",") {
@@ -223,6 +249,7 @@ func (m *Mob) StartTicking() {
 	// Execute Immediately - Do not wrap locks, this is called from an existing lock
 	go func() {
 		Rooms[m.ParentId].LockRoom(m.Name+"MobInitTick", false)
+		m.runSpawnScript()
 		m.PickTarget()
 		Rooms[m.ParentId].UnlockRoom(m.Name+"MobInitTick", false)
 	}()
@@ -281,11 +308,12 @@ func (m *Mob) Tick() {
 		m.MobStunned = 0
 	}
 	m.TicksAlive++
-	if m.TicksAlive >= m.NumWander && m.CurrentTarget == "" {
-		if !m.Flags["permanent"] {
-			go Rooms[m.ParentId].WanderMob(m)
-			return
-		}
+	// Permanent mobs never wander off, and the wander count doesn't apply to
+	// them at all: however long they have stood idle they keep ticking in
+	// full, so a hostile one still picks up whoever walks in.
+	if m.TicksAlive >= m.NumWander && m.CurrentTarget == "" && !m.Flags["permanent"] {
+		go Rooms[m.ParentId].WanderMob(m)
+		return
 	} else {
 		// Picking up treasure
 		if m.Flags["take_treasure"] {
@@ -326,6 +354,12 @@ func (m *Mob) Tick() {
 					}
 				}
 			}
+		}
+
+		// Scripts go before the mob's own moves; one that took an action
+		// was the mob's turn.
+		if m.runTickScripts() {
+			return
 		}
 
 		if m.CurrentTarget == "" && m.Placement != 3 && !m.CheckFlag("immobile") {
@@ -614,6 +648,11 @@ func (m *Mob) Charge(rescuer *Character, rescued *Character) {
 
 func (m *Mob) DeathCheck(target *Character) bool {
 	if m.Stam.Current <= 0 {
+		// The killer runs the mob's @DEATH script. This is called with the
+		// room locked, so it has to wait its turn on a goroutine of its own.
+		if val, ok := m.Commands["@DEATH"]; ok && target != nil && Script != nil {
+			go Script(target, "$RUN "+val.Command)
+		}
 		Rooms[m.ParentId].MessageAll(target.Name + " killed " + m.Name)
 		partyLead := target
 		if target.PartyFollow != "" {
@@ -1033,6 +1072,9 @@ func (m *Mob) DropInventory() string {
 func (m *Mob) AddThreatDamage(damage int, attacker *Character) {
 	m.MarkAttackedBy(attacker)
 	m.addThreat(damage, attacker)
+	if damage > 0 {
+		m.RunScript("HIT", attacker)
+	}
 }
 
 // MarkAttackedBy records that the character has attacked this mob.
@@ -1389,6 +1431,9 @@ func (m *Mob) InflictDamage() int {
 	if m.NumDice > 0 && m.SidesDice > 0 {
 		damage = utils.Roll(m.SidesDice, m.NumDice, m.PlusDice)
 	}
+	if m.DamageBonusPct != 0 {
+		damage += damage * m.DamageBonusPct / 100
+	}
 	return damage
 }
 
@@ -1474,6 +1519,8 @@ func (m *Mob) Save() {
 	mobData["no_touch"] = utils.Btoi(m.Flags["no_touch"])
 	mobData["placement"] = m.Placement
 	mobData["immobile"] = utils.Btoi(m.Flags["immobile"])
+	mobData["commands"] = m.SerializeCommands()
+	mobData["weaken_steps"] = m.WeakenSteps
 	data.UpdateMob(mobData)
 }
 

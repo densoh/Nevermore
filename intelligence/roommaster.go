@@ -62,6 +62,7 @@ func LoopRooms() {
 					}
 				}
 			}
+			objects.Rooms[r].EventEncounter()
 			if (objects.Rooms[r].Flags["fire"] ||
 				objects.Rooms[r].Flags["earth"] ||
 				objects.Rooms[r].Flags["wind"] ||

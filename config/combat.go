@@ -20,6 +20,8 @@ var CombatModifiers = map[string]float64{
 
 	// Sneaky Types (backstab scales with stealth, see BackstabMultiplier)
 	"snipe": 4,
+	// A critical backstab adds this to the backstab multiplier.
+	"backstab_critical": 3,
 }
 
 // MultiAttackMultipliers is the damage multiplier for each landed hit of a
@@ -130,7 +132,8 @@ var (
 	StealChancePerSkillLevel    = 4
 	BackstabMissPenalty         = 30  // points of miss added to the regular weapon roll (before the clamp) at stealth level 0
 	BackstabDamageBase          = 2.5 // backstab damage multiplier at stealth level 0
-	BackstabDamageSkillModifier = .25 // added to the multiplier per stealth level: 4.25x at specialist, 5x at grandmaster
+	BackstabDamageSkillModifier = .2  // added to the multiplier per stealth level: 3.9x at specialist, 4.5x at grandmaster
+	BackstabGrandmasterBonus    = 1.0 // added on top at grandmaster stealth: 5.5x
 	BackstabPenaltyPerStealth   = 2   // points of that penalty removed per stealth level, 10 left at grandmaster
 	SnipeChance                 = 15
 	HideChancePerPoint          = 3
@@ -161,10 +164,12 @@ var (
 
 	// Paladin seals persist until dropped, so the effect gets a duration it
 	// will never reach.
-	SealDuration             = 10 * 365 * 24 * 60 * 60 // Seconds
-	SealTimer                = 10
-	SealCourageArmorBase     = 5
-	SealCourageArmorPerLevel = 1
+	SealDuration = 10 * 365 * 24 * 60 * 60 // Seconds
+	SealTimer    = 10
+	// Seal of courage armor is base + per level, raised by one percent per
+	// point of piety (see SealCourageArmor).
+	SealCourageArmorBase     = 50
+	SealCourageArmorPerLevel = 2
 	// RescueWindow is how long attacks aimed at a rescued ally are drawn onto
 	// the paladin; RescueTimer is the cooldown between rescues.
 	RescueWindow = 8  // Seconds
@@ -367,14 +372,46 @@ var CriticalDamage = []int{
 }
 
 func RollCritical(skill int) bool {
+	return RollCriticalScaled(skill, 1)
+}
+
+// BackstabCriticalChanceMultiplier scales the weapon skill's critical chance
+// for a backstab.
+const BackstabCriticalChanceMultiplier = 2
+
+// RollCriticalScaled rolls a critical with the table chance multiplied by
+// multiplier.
+func RollCriticalScaled(skill int, multiplier int) bool {
 	if skill > 0 {
 		dRoll := utils.Roll(1000, 1, 0)
-		if dRoll <= CriticalDamage[skill] {
+		if dRoll <= CriticalDamage[skill]*multiplier {
 			return true
 		}
 	}
 	return false
 }
+
+// WeaponShatterChance is the percent chance that a critical strike, crushing
+// blow or Thunk shatters the weapon that landed it, destroying it outright.
+const WeaponShatterChance = 5
+
+func RollShatter() bool {
+	return utils.Roll(100, 1, 0) <= WeaponShatterChance
+}
+
+// Repair pricing. A repair costs RepairCostFraction of the item's value scaled
+// by the share of its uses that are gone. Every RepairsBeforeOverhaul
+// repairs a weapon or piece of armor needs an overhaul instead:
+// OverhaulCostMultiplier times the normal price, resetting the count, with an
+// OverhaulFailChance percent chance the item is destroyed (and no gold is taken). quest_loot items never need
+// an overhaul but pay QuestLootRepairMultiplier times the price.
+const (
+	RepairCostFraction        = .3
+	RepairsBeforeOverhaul     = 5
+	OverhaulCostMultiplier    = 15
+	OverhaulFailChance        = 20
+	QuestLootRepairMultiplier = 1.5
+)
 
 // CrushingChance is a barbarian's chance, out of 1000, that the first hit of
 // a regular attack round with a blunt or two-handed weapon is a crushing
@@ -515,7 +552,11 @@ func ThreatPercent(maxStam int, percent int) int {
 
 // BackstabMultiplier is the backstab damage multiplier at a stealth level.
 func BackstabMultiplier(stealthLevel int) float64 {
-	return BackstabDamageBase + float64(stealthLevel)*BackstabDamageSkillModifier
+	mult := BackstabDamageBase + float64(stealthLevel)*BackstabDamageSkillModifier
+	if stealthLevel >= 10 {
+		mult += BackstabGrandmasterBonus
+	}
+	return mult
 }
 
 // BackstabMissPenaltyFor is the extra miss a backstab carries over a regular
@@ -574,8 +615,8 @@ const (
 	StunSpellIntPerChance   = 2
 )
 
-// Combust's burn ticks BurnTicks times, BurnInterval seconds apart, each tick
-// rolling 1d(caster tier) scaled by the caster's spell damage bonus.
+// Combust's burn DoT ticks BurnTicks times, BurnInterval seconds apart, each tick
+// rolling 2d(caster tier/2 + 1)+2 scaled by the caster's spell damage bonus.
 const (
 	BurnTicks    = 3
 	BurnInterval = 8
@@ -621,4 +662,10 @@ func OutlevelMissPenalty(lvlDiff int, engaged int) int {
 		return 0
 	}
 	return over * MissPerLevel
+}
+
+// SealCourageArmor is the armor the seal of courage grants a paladin of the
+// given tier and piety, rounded to the nearest point.
+func SealCourageArmor(tier int, pie int) int {
+	return ((SealCourageArmorBase+SealCourageArmorPerLevel*tier)*(100+pie) + 50) / 100
 }

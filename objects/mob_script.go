@@ -1,0 +1,560 @@
+package objects
+
+import (
+	"math/rand"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ArcCS/Nevermore/text"
+	"github.com/ArcCS/Nevermore/utils"
+	"github.com/jinzhu/copier"
+)
+
+// Mob scripts are the @TRIGGER scripts builders attach to a mob with
+// addCommand. They run as the mob, inside its tick or the hit that fired
+// them, with the mob's room already locked - so unlike player scripts they
+// never go through the command dispatcher, and their verbs live here.
+//
+// Triggers:
+//
+//	@SPAWN   once, when this copy first starts thinking
+//	@AGGRO   when it goes from no target to a target
+//	@COMBAT  every tick it has a target
+//	@IDLE    every tick it has none
+//	@HP75 @HP50 @HP25  once each, the first tick after its stamina drops
+//	         below that percentage - boss phases
+//	@HIT     whenever a player damages it (attacker is the striker)
+//
+// (@DEATH also lives on mobs but runs as the killer, through the player
+// script engine; see Mob.DeathCheck.)
+//
+// Control steps stop the rest of the script when they fail: $CHANCE pct,
+// $COOLDOWN seconds, $ONCE, $IFSTAGE event stage. Put $COOLDOWN after any
+// $CHANCE, or a failed chance roll still starts the cooldown.
+//
+// An action step (cast, damage, stun, summon, heal, enrage, teleport) uses
+// the mob's turn: on a tick, a script that took an action replaces the
+// mob's normal move, breath, spell and attack. Talk, flags and stage steps
+// are free, and so is anything a @HIT script does. $MTELEPORT does nothing
+// from @HIT.
+//
+// Targets: target (current target), attacker (the striker on @HIT, else the
+// target), random, all. Only players the mob can see; staff are never hit.
+//
+// Damage types: physical (armor), fire/air/earth/water (that resistance),
+// true (no mitigation). Amounts are a number or dice: 120, 4d10, 4d10+50.
+
+// mobScriptState is one copy's script bookkeeping. copier leaves unexported
+// fields alone, so every copy of a template starts with its own.
+type mobScriptState struct {
+	running    bool // a script is mid-run; see RunScript
+	cooldowns  map[string]time.Time
+	once       map[string]bool
+	hpFired    map[int]bool
+	lastTarget string
+	spawned    bool
+}
+
+func (m *Mob) scriptState() *mobScriptState {
+	if m.scripts == nil {
+		m.scripts = &mobScriptState{
+			cooldowns: map[string]time.Time{},
+			once:      map[string]bool{},
+			hpFired:   map[int]bool{},
+		}
+	}
+	return m.scripts
+}
+
+// mobRun is one script running.
+type mobRun struct {
+	m        *Mob
+	room     *Room
+	trigger  string
+	step     int
+	attacker *Character
+	usedTurn bool
+	stopped  bool
+}
+
+type mobVerb struct {
+	run      func(r *mobRun, args []string)
+	usesTurn bool
+	Usage    string
+}
+
+// MobVerbs lists every mob script verb; addCommand checks scripts against it.
+var MobVerbs map[string]mobVerb
+
+func init() {
+	MobVerbs = map[string]mobVerb{
+		"$CHANCE":     {mobChance, false, "$CHANCE pct - stop unless a pct% roll succeeds"},
+		"$COOLDOWN":   {mobCooldown, false, "$COOLDOWN seconds - stop if this step ran less than seconds ago"},
+		"$ONCE":       {mobOnce, false, "$ONCE - stop if this script already got past here on this copy"},
+		"$IFSTAGE":    {mobIfStage, false, "$IFSTAGE event stage - stop unless the event is live and at stage"},
+		"$EVENTSTAGE": {mobEventStage, false, "$EVENTSTAGE event stage - advance a live event to stage"},
+		"$MSAY":       {mobSay, false, "$MSAY text - the mob says text"},
+		"$MEMOTE":     {mobEmote, false, "$MEMOTE text - the room sees '<mob> text'"},
+		"$FLAG":       {mobFlag, false, "$FLAG name on|off - set one of the mob's flags"},
+		"$MCAST":      {mobCast, true, "$MCAST spell [target|attacker|random|all] - cast without mana"},
+		"$DAMAGE":     {mobDamage, true, "$DAMAGE target|attacker|random|all amount [type] - hurt players"},
+		"$AOE":        {mobAoe, true, "$AOE amount [type] - hurt everyone the mob can see"},
+		"$STUN":       {mobStun, true, "$STUN target|attacker|random|all seconds - stun players"},
+		"$HEAL":       {mobHeal, true, "$HEAL pct - heal pct% of max stamina"},
+		"$SUMMON":     {mobSummon, true, "$SUMMON mob_id [count] - call up to 5 adds (no loot)"},
+		"$ENRAGE":     {mobEnrage, true, "$ENRAGE seconds pct - deal pct% more damage for seconds"},
+		"$MTELEPORT":  {mobTeleport, true, "$MTELEPORT target|attacker|random|all room_id - send players away"},
+	}
+}
+
+// MobTriggers are the triggers that run as the mob.
+var MobTriggers = []string{"@SPAWN", "@AGGRO", "@COMBAT", "@IDLE", "@HP75", "@HP50", "@HP25", "@HIT"}
+
+// ValidMobScript checks every step of a mob script starts with a mob verb
+// and returns the first one that doesn't.
+func ValidMobScript(script string) (string, bool) {
+	steps := splitSteps(script)
+	if len(steps) == 0 {
+		return script, false
+	}
+	for _, step := range steps {
+		verb := strings.ToUpper(strings.Fields(step)[0])
+		if _, ok := MobVerbs[verb]; !ok {
+			return verb, false
+		}
+	}
+	return "", true
+}
+
+func splitSteps(script string) []string {
+	var steps []string
+	for _, step := range strings.Split(script, ";") {
+		if step = strings.TrimSpace(step); step != "" {
+			steps = append(steps, step)
+		}
+	}
+	return steps
+}
+
+// RunScript runs the mob's @trigger script, if it has one, and reports
+// whether it took an action. Call it with the mob's room locked.
+func (m *Mob) RunScript(trigger string, attacker *Character) bool {
+	val, ok := m.Commands["@"+trigger]
+	if !ok || m.Stam.Current <= 0 {
+		return false
+	}
+	room, ok := Rooms[m.ParentId]
+	if !ok {
+		return false
+	}
+	// One script at a time per mob: an action that ends up damaging the mob
+	// (a reflected spell, say) must not start its @HIT script inside the
+	// script that caused it.
+	st := m.scriptState()
+	if st.running {
+		return false
+	}
+	st.running = true
+	defer func() { st.running = false }()
+
+	r := &mobRun{m: m, room: room, trigger: trigger, attacker: attacker}
+	for i, step := range splitSteps(val.Command) {
+		fields := strings.Fields(step)
+		verb, ok := MobVerbs[strings.ToUpper(fields[0])]
+		if !ok {
+			continue
+		}
+		r.step = i
+		verb.run(r, fields[1:])
+		if r.stopped {
+			break
+		}
+		r.usedTurn = r.usedTurn || verb.usesTurn
+	}
+	return r.usedTurn
+}
+
+// runTickScripts runs the scripts due on this tick: health phases, then
+// aggro, then combat or idle. It reports whether any took the mob's turn.
+func (m *Mob) runTickScripts() bool {
+	st := m.scriptState()
+	used := false
+	if m.Stam.Max > 0 {
+		pct := m.Stam.Current * 100 / m.Stam.Max
+		for _, threshold := range []int{75, 50, 25} {
+			if pct < threshold && !st.hpFired[threshold] {
+				st.hpFired[threshold] = true
+				used = m.RunScript("HP"+strconv.Itoa(threshold), nil) || used
+			}
+		}
+	}
+	if st.lastTarget == "" && m.CurrentTarget != "" && !used {
+		used = m.RunScript("AGGRO", nil)
+	}
+	st.lastTarget = m.CurrentTarget
+	if used {
+		return true
+	}
+	if m.CurrentTarget != "" {
+		return m.RunScript("COMBAT", nil)
+	}
+	return m.RunScript("IDLE", nil)
+}
+
+// runSpawnScript runs @SPAWN the first time this copy starts thinking; a
+// permanent mob restarting when its room wakes up again doesn't re-run it.
+func (m *Mob) runSpawnScript() {
+	st := m.scriptState()
+	if st.spawned {
+		return
+	}
+	st.spawned = true
+	m.RunScript("SPAWN", nil)
+}
+
+// --- control ---
+
+func (r *mobRun) key() string { return r.trigger + "#" + strconv.Itoa(r.step) }
+
+func mobChance(r *mobRun, args []string) {
+	if pct, ok := intArg(args, 0); !ok || utils.Roll(100, 1, 0) > pct {
+		r.stopped = true
+	}
+}
+
+func mobCooldown(r *mobRun, args []string) {
+	secs, ok := intArg(args, 0)
+	st := r.m.scriptState()
+	if !ok || time.Now().Before(st.cooldowns[r.key()]) {
+		r.stopped = true
+		return
+	}
+	st.cooldowns[r.key()] = time.Now().Add(time.Duration(secs) * time.Second)
+}
+
+func mobOnce(r *mobRun, _ []string) {
+	st := r.m.scriptState()
+	if st.once[r.key()] {
+		r.stopped = true
+		return
+	}
+	st.once[r.key()] = true
+}
+
+func mobIfStage(r *mobRun, args []string) {
+	stage, ok := intArg(args, 1)
+	if !ok {
+		r.stopped = true
+		return
+	}
+	if current, live := QuestEventStageIn(args[0], r.room); !live || current < stage {
+		r.stopped = true
+	}
+}
+
+func mobEventStage(r *mobRun, args []string) {
+	stage, ok := intArg(args, 1)
+	if !ok {
+		return
+	}
+	if current, live := QuestEventStageIn(args[0], r.room); live && stage > current {
+		_, _ = AdvanceQuestEvent(args[0], stage, nil, true)
+	}
+}
+
+// --- free actions ---
+
+func mobSay(r *mobRun, args []string) {
+	r.room.MessageAll(text.Yellow + r.m.Name + " says, \"" + strings.Join(args, " ") + "\"" + text.Reset + "\n")
+}
+
+func mobEmote(r *mobRun, args []string) {
+	r.room.MessageAll(text.Yellow + r.m.Name + " " + strings.Join(args, " ") + text.Reset + "\n")
+}
+
+func mobFlag(r *mobRun, args []string) {
+	if len(args) < 2 {
+		return
+	}
+	name := strings.ToLower(args[0])
+	switch strings.ToUpper(args[1]) {
+	case "ON":
+		r.m.Flags[name] = true
+	case "OFF":
+		r.m.Flags[name] = false
+	}
+}
+
+// --- actions ---
+
+// targets resolves a target word to the players it means.
+func (r *mobRun) targets(word string) []*Character {
+	var visible []*Character
+	for _, c := range r.room.Chars.Contents {
+		if isStaff(c) || c.Flags["hidden"] || (c.Flags["invisible"] && !r.m.Flags["detect-invisible"]) {
+			continue
+		}
+		visible = append(visible, c)
+	}
+	pick := func(name string) []*Character {
+		for _, c := range visible {
+			if c.Name == name {
+				return []*Character{c}
+			}
+		}
+		return nil
+	}
+	switch strings.ToUpper(word) {
+	case "ALL":
+		return visible
+	case "RANDOM":
+		if len(visible) == 0 {
+			return nil
+		}
+		return []*Character{visible[rand.Intn(len(visible))]}
+	case "ATTACKER":
+		if r.attacker != nil {
+			if c := pick(r.attacker.Name); c != nil {
+				return c
+			}
+		}
+		return pick(r.m.CurrentTarget)
+	default: // TARGET
+		return pick(r.m.CurrentTarget)
+	}
+}
+
+func mobCast(r *mobRun, args []string) {
+	if len(args) == 0 {
+		r.stopped = true
+		return
+	}
+	spell, ok := Spells[strings.ToLower(args[0])]
+	if !ok {
+		r.stopped = true
+		return
+	}
+	if utils.StringIn(strings.ToLower(args[0]), MobSupportSpells) {
+		r.room.MessageAll(r.m.Name + " casts a " + spell.Name + " spell on itself.\n")
+		Cast(r.m, r.m, spell.Effect, spell.Magnitude)
+		return
+	}
+	who := "target"
+	if len(args) > 1 {
+		who = args[1]
+	}
+	targets := r.targets(who)
+	if len(targets) == 0 {
+		r.stopped = true
+		return
+	}
+	for _, t := range targets {
+		r.room.MessageAll(r.m.Name + " casts a " + spell.Name + " spell on " + t.Name + ".\n")
+		t.RunHook("attacked")
+		Cast(r.m, t, spell.Effect, spell.Magnitude)
+		t.DeathCheck("was slain by a " + r.m.Name + ".")
+	}
+}
+
+func mobDamage(r *mobRun, args []string) {
+	if len(args) < 2 {
+		r.stopped = true
+		return
+	}
+	r.hurt(r.targets(args[0]), args[1:])
+}
+
+func mobAoe(r *mobRun, args []string) {
+	if len(args) < 1 {
+		r.stopped = true
+		return
+	}
+	r.hurt(r.targets("all"), args)
+}
+
+// hurt deals amount [type] to each target through the normal damage paths.
+func (r *mobRun) hurt(targets []*Character, args []string) {
+	if len(targets) == 0 {
+		r.stopped = true
+		return
+	}
+	kind := "physical"
+	if len(args) > 1 {
+		kind = strings.ToLower(args[1])
+	}
+	for _, t := range targets {
+		amount, ok := rollAmount(args[0])
+		if !ok {
+			r.stopped = true
+			return
+		}
+		t.RunHook("attacked")
+		var stam, vit int
+		switch kind {
+		case "true":
+			stam, vit = t.ReceiveDamageNoArmor(amount)
+		case "fire", "air", "earth", "water":
+			stam, vit, _ = t.ReceiveMagicDamage(amount, kind)
+		default:
+			stam, vit, _ = t.ReceiveDamage(amount)
+		}
+		writeChar(t, text.Bad+r.m.Name+" hits you for "+strconv.Itoa(stam)+" stamina and "+strconv.Itoa(vit)+" vitality damage."+text.Reset)
+		t.DeathCheck("was slain by a " + r.m.Name + ".")
+	}
+}
+
+func mobStun(r *mobRun, args []string) {
+	if len(args) < 2 {
+		r.stopped = true
+		return
+	}
+	secs, ok := intArg(args, 1)
+	targets := r.targets(args[0])
+	if !ok || len(targets) == 0 {
+		r.stopped = true
+		return
+	}
+	for _, t := range targets {
+		t.RunHook("attacked")
+		t.SetTimer("global", secs)
+		t.SetTimer("stun", secs)
+		writeChar(t, text.Bad+r.m.Name+" stuns you!"+text.Reset)
+	}
+}
+
+func mobHeal(r *mobRun, args []string) {
+	pct, ok := intArg(args, 0)
+	if !ok || r.m.Stam.Current >= r.m.Stam.Max {
+		r.stopped = true
+		return
+	}
+	r.m.Stam.Current = min(r.m.Stam.Max, r.m.Stam.Current+r.m.Stam.Max*pct/100)
+	r.room.MessageAll(text.Green + r.m.Name + " looks revitalized." + text.Reset + "\n")
+}
+
+// maxSummon caps one $SUMMON, under the room's own cap of 10 mobs.
+const maxSummon = 5
+
+func mobSummon(r *mobRun, args []string) {
+	mobId, ok := intArg(args, 0)
+	template, exists := Mobs[mobId]
+	if !ok || !exists {
+		r.stopped = true
+		return
+	}
+	count := 1
+	if n, ok := intArg(args, 1); ok {
+		count = max(1, min(n, maxSummon))
+	}
+	summoned := 0
+	for i := 0; i < count && len(r.room.Mobs.Contents) < 10; i++ {
+		add := Mob{}
+		if err := copier.CopyWithOption(&add, template, copier.Option{DeepCopy: true}); err != nil {
+			continue
+		}
+		// Summoned adds carry no loot or gold, so a boss can't be farmed
+		// for them, and leave with the summoner's event.
+		add.ItemList = map[int]int{}
+		add.Gold = 0
+		add.QuestEvent = r.m.QuestEvent
+		add.Placement = r.m.Placement
+		r.room.Mobs.Add(&add, true)
+		add.StartTicking()
+		summoned++
+	}
+	if summoned == 0 {
+		r.stopped = true
+		return
+	}
+	r.room.MessageAll(text.Magenta + r.m.Name + " summons " + template.Name + "!" + text.Reset + "\n")
+}
+
+func mobEnrage(r *mobRun, args []string) {
+	secs, ok1 := intArg(args, 0)
+	pct, ok2 := intArg(args, 1)
+	if !ok1 || !ok2 || secs <= 0 {
+		r.stopped = true
+		return
+	}
+	m := r.m
+	if _, raging := m.Effects["enrage"]; !raging {
+		m.DamageBonusPct += pct
+		r.room.MessageAll(text.Red + m.Name + " flies into a rage!" + text.Reset + "\n")
+	}
+	m.ApplyEffect("enrage", strconv.Itoa(secs), secs, 0, func(int) {}, func() {
+		m.DamageBonusPct -= pct
+		if room, ok := Rooms[m.ParentId]; ok {
+			room.MessageAll(m.Name + " calms down.\n")
+		}
+	})
+}
+
+func mobTeleport(r *mobRun, args []string) {
+	if len(args) < 2 {
+		r.stopped = true
+		return
+	}
+	roomId, ok := intArg(args, 1)
+	dest, exists := Rooms[roomId]
+	targets := r.targets(args[0])
+	// A @HIT script runs inside the attacker's own command, which would carry
+	// on in the room they had just been taken out of.
+	if r.trigger == "HIT" || !ok || !exists || dest == r.room || len(targets) == 0 {
+		r.stopped = true
+		return
+	}
+	// The mob's room is already locked. Waiting for a second room here could
+	// deadlock against a command holding it and wanting this one, so if it is
+	// busy the teleport just doesn't happen this time.
+	if !dest.TryLock() {
+		r.stopped = true
+		return
+	}
+	defer dest.Unlock()
+	for _, t := range targets {
+		r.room.Chars.Remove(t)
+		dest.Chars.Add(t)
+		t.ParentId = dest.RoomId
+		writeChar(t, text.Magenta+r.m.Name+" sends you elsewhere!"+text.Reset)
+		writeChar(t, dest.Look(t))
+		r.room.MessageAll(t.Name + " vanishes!\n")
+	}
+}
+
+// --- helpers ---
+
+func intArg(args []string, i int) (int, bool) {
+	if i >= len(args) {
+		return 0, false
+	}
+	v, err := strconv.Atoi(args[i])
+	return v, err == nil
+}
+
+// rollAmount reads 120, 4d10 or 4d10+50.
+func rollAmount(s string) (int, bool) {
+	s = strings.ToLower(s)
+	if v, err := strconv.Atoi(s); err == nil {
+		return max(v, 0), true
+	}
+	num, rest, found := strings.Cut(s, "d")
+	if !found {
+		return 0, false
+	}
+	sides, plus := rest, "0"
+	if a, b, ok := strings.Cut(rest, "+"); ok {
+		sides, plus = a, b
+	}
+	n, err1 := strconv.Atoi(num)
+	sd, err2 := strconv.Atoi(sides)
+	p, err3 := strconv.Atoi(plus)
+	if err1 != nil || err2 != nil || err3 != nil || n <= 0 || sd <= 0 {
+		return 0, false
+	}
+	return utils.Roll(sd, n, p), true
+}
+
+func writeChar(c *Character, msg string) {
+	_, _ = c.Write([]byte(msg + "\n"))
+}

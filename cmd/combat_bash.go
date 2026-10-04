@@ -122,6 +122,9 @@ func (bash) process(s *state) {
 			s.msg.Actor.Send("The " + whatMob.Name + " reflects " + strconv.Itoa(reflectDamage) + " damage back at you!")
 			s.actor.DeathCheck(" was killed by reflection!")
 		}
+		if bashMsg == "Thunk!!" {
+			shatterWeapon(s)
+		}
 		DeathCheck(s, whatMob)
 		s.actor.SetTimer("combat_bash", config.BashTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)

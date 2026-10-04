@@ -1,12 +1,18 @@
 package cmd
 
 import (
+	"sort"
+	"strings"
+
+	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 )
 
 func init() {
 	addHandler(scripts{},
-		"Usage:  types  \n Print all of the command scripts that can be attached to things. ",
+		"Usage:  scripts  \n Print all of the command scripts that can be attached to things. \n"+
+			"Chain steps with ;  Attach under @PUT to run when an item is put into a container, \n"+
+			"or under @DEATH on a mob to run as its killer when it dies.",
 		permissions.Builder,
 		"scripts")
 }
@@ -36,12 +42,29 @@ var ScriptList = map[string]string{
 	"$BUYBAG":     "Usage: $BUYBAG, buys a bag",
 	"$MODBAG":     "Usage: $MODBAG, modifies a bag",
 	"$SPLIT":      "Usage: $SPLIT, generates a split order for items",
+	"$REQUIRE":    "Usage: $REQUIRE ITEM item_id [item_id...], event scripts: refuse unless the item is one of these",
+	"$CONSUME":    "Usage: $CONSUME, event scripts: destroy the item; put it after any step that can refuse",
+	"$IFSTAGE":    "Usage: $IFSTAGE event stage, stops the script unless the event is running and has reached stage",
+	"$EVENTSTAGE": "Usage: $EVENTSTAGE event stage, advances a running event to stage (never back)",
+	"$GIVEGOLD":   "Usage: $GIVEGOLD amount, gives the actor gold",
+	"$GIVEITEM":   "Usage: $GIVEITEM item_id, gives the actor a copy of an item (dropped at their feet if too heavy)",
+	"$WEAKEN":     "Usage: $WEAKEN room_id mob_id percent max_steps, permanently take percent% of a mob's armor/resists/hp/damage, up to max_steps times",
 }
 
 func (scripts) process(s *state) {
 	for key, value := range ScriptList {
 		s.msg.Actor.SendInfo(key + "| " + value + "\n")
 	}
+	s.msg.Actor.SendInfo("\nMob scripts, under " + strings.Join(objects.MobTriggers, " ") + " on a mob:")
+	verbs := make([]string, 0, len(objects.MobVerbs))
+	for verb := range objects.MobVerbs {
+		verbs = append(verbs, verb)
+	}
+	sort.Strings(verbs)
+	for _, verb := range verbs {
+		s.msg.Actor.SendInfo(verb + "| " + objects.MobVerbs[verb].Usage + "\n")
+	}
+	s.msg.Actor.SendInfo("Targets: target attacker random all. Damage types: physical fire air earth water true.")
 
 	s.ok = true
 	return

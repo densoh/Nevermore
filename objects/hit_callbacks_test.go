@@ -27,34 +27,34 @@ func TestTriggerOnHitChance(t *testing.T) {
 	}
 }
 
-func TestBurnDamageScalesWithBonus(t *testing.T) {
-	// 1d1 always rolls 1.
-	if got := burnDamage(&HitContext{Tier: 1, Bonus: 2.5}); got != 2 {
-		t.Fatalf("burn damage %d, want 2", got)
+func TestTierRollDamageScalesWithBonus(t *testing.T) {
+	// Tier 1 rolls 2d1+2, always 4.
+	if got := tierRollDamage(&HitContext{Tier: 1, Bonus: 2.5}); got != 10 {
+		t.Fatalf("damage %d, want 10", got)
 	}
 	for i := 0; i < 200; i++ {
-		if got := burnDamage(&HitContext{Tier: 14, Bonus: 1}); got < 1 || got > 14 {
-			t.Fatalf("1d14 burn rolled %d", got)
+		if got := tierRollDamage(&HitContext{Tier: 14, Bonus: 1}); got < 4 || got > 18 {
+			t.Fatalf("2d8+2 rolled %d", got)
 		}
 	}
 }
 
-func TestBurnCredit(t *testing.T) {
+func TestDoTCredit(t *testing.T) {
 	caster := &Character{Object: Object{Name: "Mage"}}
 	tank := &Character{Object: Object{Name: "Tank"}}
 	thief := &Character{Object: Object{Name: "Thief"}}
 	mob := &Mob{ThreatTable: map[string]int{"Mage": 50, "Tank": 30, "Thief": 10}}
 
 	room := &Room{Chars: &CharInventory{Contents: []*Character{thief, caster, tank}}}
-	if got := burnCredit("Mage", mob, room); got != caster {
+	if got := dotCredit("Mage", mob, room); got != caster {
 		t.Errorf("caster in room: credited %v", got)
 	}
 	room.Chars.Contents = []*Character{thief, tank}
-	if got := burnCredit("Mage", mob, room); got != tank {
+	if got := dotCredit("Mage", mob, room); got != tank {
 		t.Errorf("caster gone: credited %v, want top threat Tank", got)
 	}
 	room.Chars.Contents = nil
-	if got := burnCredit("Mage", mob, room); got != nil {
+	if got := dotCredit("Mage", mob, room); got != nil {
 		t.Errorf("empty room: credited %v, want nobody", got)
 	}
 }

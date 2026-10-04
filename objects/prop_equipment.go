@@ -319,6 +319,17 @@ func (e *Equipment) DamageWeapon(whichHand string, damage int) string {
 	return ""
 }
 
+// ShatterWeapon destroys the main hand weapon outright; unlike a break, nothing
+// goes back to the inventory to be repaired.
+func (e *Equipment) ShatterWeapon() string {
+	if e.Main == (*Item)(nil) {
+		return ""
+	}
+	shattered := e.Main
+	e.UnequipSpecific("main")
+	return "Your " + shattered.DisplayName() + " shatters!" + e.ReleaseOnBreak(shattered)
+}
+
 // Prepare sets a weapon aside for a quickdraw.  Any existing pairing is replaced,
 // and the weapon it displaces, if any, is handed back for the inventory.
 func (e *Equipment) Prepare(item *Item) (released *Item) {
@@ -972,6 +983,9 @@ func RestoreEquipment(jsonString string, charClass int) (*Equipment, []Item) {
 		}
 		if _, ok := item["adjustment"]; ok {
 			newItem.Adjustment = int(item["adjustment"].(float64))
+		}
+		if _, ok := item["repairs"]; ok {
+			newItem.Repairs = int(item["repairs"].(float64))
 		}
 		ok := NewEquipment.Equip(&newItem, charClass)
 		if !ok {

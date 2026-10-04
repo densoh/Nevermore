@@ -187,6 +187,8 @@ func (examine) process(s *state) {
 				{"V", "adjustment", strconv.Itoa(objRef.Adjustment), "Adjustment to final roll damage"},
 				{"V", "spell", objRef.Spell, "Spell/Song learned/cast when used."},
 				{"T", "always_crit", strconv.FormatBool(objRef.Flags["always_crit"]), "Always criticals when used"},
+				{"T", "quest_loot", strconv.FormatBool(objRef.Flags["quest_loot"]), "Reward from a quest"},
+				{"T", "no_shatter", strconv.FormatBool(objRef.Flags["no_shatter"]), "Cannot shatter on a critical, crushing blow or Thunk"},
 				{"T", "permanent", strconv.FormatBool(objRef.Flags["permanent"]), "Does not despawn"},
 				{"T", "magic", strconv.FormatBool(objRef.Flags["magic"]), "Magical item"},
 				{"T", "no_take", strconv.FormatBool(objRef.Flags["no_take"]), "Cannot be picked up."},

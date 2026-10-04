@@ -303,6 +303,9 @@ func RestoreInventory(jsonString string) *ItemInventory {
 			if _, ok := item["store_price"]; ok {
 				newItem.StorePrice = int(item["store_price"].(float64))
 			}
+			if _, ok := item["repairs"]; ok {
+				newItem.Repairs = int(item["repairs"].(float64))
+			}
 			newItem.Spell = item["spell"].(string)
 			newItem.Armor = int(item["armor"].(float64))
 			if newItem.ItemType == 9 {

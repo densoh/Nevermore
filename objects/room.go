@@ -262,7 +262,7 @@ func (r *Room) FindExit(exitName string, observer *Character) *Exit {
 // InQuestMode reports whether quest mode rules apply here: realm-wide quest
 // mode is on, or this room has the quest_mode flag. Safe on a nil room.
 func (r *Room) InQuestMode() bool {
-	return config.QuestMode || (r != nil && r.Flags["quest_mode"])
+	return config.QuestMode || (r != nil && (r.Flags["quest_mode"] || QuestEventRoom(r.RoomId)))
 }
 
 func (r *Room) ToggleFlag(flagName string) bool {

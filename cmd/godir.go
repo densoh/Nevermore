@@ -327,6 +327,11 @@ func canMove(m mover, from *objects.Room, to *objects.Room, toE *objects.Exit) (
 		return false, 0, nil
 	}
 
+	if objects.QuestExitSealed(from.RoomId, toE.Name) {
+		m.bad("The way is sealed.")
+		return false, 0, nil
+	}
+
 	if toE.Flags["day_only"] && !objects.DayTime {
 		m.bad("You can only go there at night.")
 		return false, 0, nil

@@ -13,6 +13,7 @@ import (
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
+	menu "github.com/ArcCS/Nevermore/prompt"
 	"github.com/ArcCS/Nevermore/utils"
 )
 
@@ -59,6 +60,21 @@ func addHandler(h handler, helpString string, permission permissions.Permissions
 	}
 }
 
+// runTyped runs the script in cmds that matches what the player typed and
+// reports whether there was one. A trigger for the whole line wins over one
+// for just the command word, which gets the rest of the line as arguments.
+func (s *state) runTyped(cmds map[string]menu.MenuItem, completeCommand string, actorOnly bool) bool {
+	if val, ok := cmds[completeCommand]; ok {
+		s.runTrigger(actorOnly, val.Command)
+		return true
+	}
+	if val, ok := cmds[s.cmd]; ok {
+		s.runTrigger(actorOnly, val.Command, s.original)
+		return true
+	}
+	return false
+}
+
 // dispatch handler takes the command sent and attempts to find it in a stack of command locations for execution
 func dispatchHandler(s *state) {
 
@@ -96,176 +112,48 @@ func dispatchHandler(s *state) {
 			return
 		}
 
-		// Check the player stack for the command first
+		// Scripts attached to things go before the built in commands, most
+		// personal first: the player's own temporary commands (confirm
+		// prompts, paging), what they carry, what they wear, the room, then
+		// permanent items and mobs at their placement.
 		completeCommand := s.cmd + " " + strings.Join(s.input, " ")
-		if val, ok := s.actor.Commands[completeCommand]; ok {
-			s.scriptActor(val.Command)
-			return
-		} else if val, ok := s.actor.Commands[s.cmd]; ok {
-			s.scriptActor(val.Command, s.original)
+		if s.runTyped(s.actor.Commands, completeCommand, true) {
 			return
 		}
 		s.actor.EmptyCommands()
 
 		for _, i := range s.actor.Inventory.Contents {
-			// Check the room stack for a command second:
-			if val, ok := i.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := i.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
+			if s.runTyped(i.Commands, completeCommand, false) {
 				return
 			}
 		}
 
-		if s.actor.Equipment.Head != nil {
-			if val, ok := s.actor.Equipment.Head.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Head.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
+		for _, i := range s.actor.Equipment.List() {
+			if s.runTyped(i.Commands, completeCommand, false) {
 				return
 			}
 		}
 
-		if s.actor.Equipment.Chest != nil {
-			if val, ok := s.actor.Equipment.Chest.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Chest.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Neck != nil {
-			if val, ok := s.actor.Equipment.Neck.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Neck.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Legs != nil {
-			if val, ok := s.actor.Equipment.Legs.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Legs.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Feet != nil {
-			if val, ok := s.actor.Equipment.Feet.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Feet.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Arms != nil {
-			if val, ok := s.actor.Equipment.Arms.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Arms.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Hands != nil {
-			if val, ok := s.actor.Equipment.Hands.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Hands.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Ring1 != nil {
-			if val, ok := s.actor.Equipment.Ring1.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Ring1.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Ring2 != nil {
-			if val, ok := s.actor.Equipment.Ring2.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Ring2.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Main != nil {
-			if val, ok := s.actor.Equipment.Main.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Main.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		if s.actor.Equipment.Off != nil {
-			if val, ok := s.actor.Equipment.Off.Commands[completeCommand]; ok {
-				s.scriptAll(val.Command)
-				return
-			} else if val, ok := s.actor.Equipment.Off.Commands[s.cmd]; ok {
-				s.scriptAll(val.Command, s.original)
-				return
-			}
-		}
-
-		// Check the room stack for a command second:
-		if val, ok := s.where.Commands[completeCommand]; ok {
-			s.scriptAll(val.Command)
-			return
-		} else if val, ok := s.where.Commands[s.cmd]; ok {
-			s.scriptAll(val.Command, s.original)
+		if s.runTyped(s.where.Commands, completeCommand, false) {
 			return
 		}
 
 		for _, i := range s.where.Items.Contents {
-			// Check the room stack for a command second:
-			if i.Flags["permanent"] {
-				if i.Placement == s.actor.Placement {
-					if val, ok := i.Commands[completeCommand]; ok {
-						s.scriptAll(val.Command)
-						return
-					} else if val, ok := i.Commands[s.cmd]; ok {
-						s.scriptAll(val.Command, s.original)
-						return
-					}
+			if i.Flags["permanent"] && i.Placement == s.actor.Placement {
+				if s.runTyped(i.Commands, completeCommand, false) {
+					return
 				}
 			}
 		}
 
 		for _, i := range s.where.Mobs.Contents {
-			// Check the room stack for a command second:
-			if i.Flags["permanent"] {
-				if i.Placement == s.actor.Placement {
-					if val, ok := i.Commands[completeCommand]; ok {
-						s.scriptAll(val.Command)
-						return
-					} else if val, ok := i.Commands[s.cmd]; ok {
-						s.scriptAll(val.Command, s.original)
-						return
-					}
+			if i.Flags["permanent"] && i.Placement == s.actor.Placement {
+				if s.runTyped(i.Commands, completeCommand, false) {
+					return
 				}
 			}
 		}
+
 		if len(s.cmd) > 1 {
 			filtered_values := []string{}
 			h_keys := []string{}
