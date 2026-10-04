@@ -32,6 +32,11 @@ import (
 // reached at its At time, by a DM, or by a script ($EVENTSTAGE, including a
 // mob's @DEATH script) - whichever comes first.
 //
+// A stage can also redirect exits: while the event is at that stage or later
+// the exit leads somewhere else, and it leads back where it always did the
+// moment the event ends. Nothing about the exit itself is changed or saved,
+// so there is nothing to put back. A later stage can re-point the same exit.
+//
 // In preview the event runs for staff only: spawns roll only where staff
 // stand, only staff see its messages, quest mode is off and its exits stay
 // sealed to players. It lets a DM walk the event before players can.
@@ -61,6 +66,15 @@ type Stage struct {
 	Message string     // broadcast when reached; the login message from then on
 	Rooms   []int      // rooms that join quest mode from this stage
 	Exits   []ExitGate // exits sealed to players until this stage
+
+	Redirects []ExitRedirect // exits that lead elsewhere from this stage
+}
+
+// An ExitRedirect sends one exit to a different room while it applies.
+type ExitRedirect struct {
+	Room int
+	Exit string
+	To   int
 }
 
 // An ExitGate names one exit, by its room and lowercased exit name.
@@ -146,9 +160,26 @@ var (
 	questRooms = map[int]time.Time{}
 	// exitGates maps "room/exit" to the events and stages sealing it.
 	exitGates = map[string][]exitGateRef{}
+	// exitRedirects maps "room/exit" to the events and stages redirecting
+	// it, in event name order.
+	exitRedirects = map[string][]exitRedirectRef{}
+	// timedExits maps "room/exit" to a destination a script gave it for a
+	// while. They live in memory only, so a reboot puts every exit back.
+	timedExits = map[string]timedExit{}
 	// eventSpawnRolls is when each event/group/room last rolled to spawn.
 	eventSpawnRolls = map[string]time.Time{}
 )
+
+type exitRedirectRef struct {
+	event string
+	stage int
+	to    int
+}
+
+type timedExit struct {
+	to    int
+	until time.Time
+}
 
 type exitGateRef struct {
 	event string
@@ -164,6 +195,15 @@ func gateKey(room int, exit string) string {
 func reindexQuestEvents() {
 	questRooms = map[int]time.Time{}
 	exitGates = map[string][]exitGateRef{}
+	exitRedirects = map[string][]exitRedirectRef{}
+	for _, name := range sortedEventNames() {
+		for n, stage := range questEvents[name].Stages {
+			for _, rd := range stage.Redirects {
+				key := gateKey(rd.Room, rd.Exit)
+				exitRedirects[key] = append(exitRedirects[key], exitRedirectRef{name, n, rd.To})
+			}
+		}
+	}
 	for name, e := range questEvents {
 		for n, stage := range e.Stages {
 			for _, gate := range stage.Exits {
@@ -525,6 +565,92 @@ func QuestExitSealed(roomId int, exit string) bool {
 	}
 	return false
 }
+
+// QuestExitTo returns where this exit temporarily leads for c, if anywhere
+// but its own destination. A timed redirect from a script wins; otherwise
+// it is the latest stage reached of the first live event, by name, that
+// redirects it. A nil c sees what players see.
+func QuestExitTo(roomId int, exit string, c *Character) (int, bool) {
+	key := gateKey(roomId, exit)
+	now := time.Now()
+	questEventsMu.RLock()
+	defer questEventsMu.RUnlock()
+
+	to, found := 0, false
+	if timed, ok := timedExits[key]; ok && now.Before(timed.until) {
+		to, found = timed.to, true
+	} else {
+		event, stage := "", 0
+		for _, ref := range exitRedirects[key] {
+			e := questEvents[ref.event]
+			if e == nil || !e.liveFor(c, now) || ref.stage > e.Stage {
+				continue
+			}
+			if event != "" && ref.event != event {
+				break
+			}
+			if ref.stage > stage {
+				event, stage, to, found = ref.event, ref.stage, ref.to, true
+			}
+		}
+	}
+	if !found {
+		return 0, false
+	}
+	// A destination deleted since falls back to the exit's own.
+	if _, ok := Rooms[to]; !ok {
+		return 0, false
+	}
+	return to, true
+}
+
+// RedirectExitFor makes an exit lead to another room for d, after which it
+// leads where it always did. A d of zero or less puts it back now.
+func RedirectExitFor(roomId int, exit string, to int, d time.Duration) {
+	questEventsMu.Lock()
+	defer questEventsMu.Unlock()
+	now := time.Now()
+	for key, timed := range timedExits {
+		if !now.Before(timed.until) {
+			delete(timedExits, key)
+		}
+	}
+	if d <= 0 {
+		delete(timedExits, gateKey(roomId, exit))
+		return
+	}
+	timedExits[gateKey(roomId, exit)] = timedExit{to, now.Add(d)}
+}
+
+// ParseExitTo reads the arguments of $EXITTO: room_id exit to_room_id
+// seconds, where the exit name may be several words. Seconds of 0 puts the
+// exit back.
+func ParseExitTo(args []string) (roomId int, exit string, to int, d time.Duration, ok bool) {
+	if len(args) < 4 {
+		return
+	}
+	roomId, err1 := strconv.Atoi(args[0])
+	to, err2 := strconv.Atoi(args[len(args)-2])
+	secs, err3 := strconv.Atoi(args[len(args)-1])
+	exit = strings.ToLower(strings.Join(args[1:len(args)-2], " "))
+	if err1 != nil || err2 != nil || err3 != nil || secs < 0 || secs > MaxExitToSeconds {
+		return 0, "", 0, 0, false
+	}
+	room, exists := Rooms[roomId]
+	if !exists {
+		return 0, "", 0, 0, false
+	}
+	if _, exists = room.Exits[exit]; !exists {
+		return 0, "", 0, 0, false
+	}
+	if _, exists = Rooms[to]; !exists {
+		return 0, "", 0, 0, false
+	}
+	return roomId, exit, to, time.Duration(secs) * time.Second, true
+}
+
+// MaxExitToSeconds is the longest a script may redirect an exit: a day.
+const MaxExitToSeconds = 86400
 
 // QuestEventStage returns an event's stage and whether it is live for c.
 func QuestEventStage(name string, c *Character) (int, bool) {

@@ -97,10 +97,11 @@ func (godir) process(s *state) {
 	if toE, ok := from.Exits[exitTxt]; ok {
 		s.actor.RunHook("move")
 		// Check that the room ID exists
-		if to, ok := objects.Rooms[toE.ToId]; ok {
+		toId := toE.ToFor(s.actor)
+		if to, ok := objects.Rooms[toId]; ok {
 			// Apply a lock
-			if !utils.IntIn(toE.ToId, s.rLocks) {
-				s.AddLocks(toE.ToId)
+			if !utils.IntIn(toId, s.rLocks) {
+				s.AddLocks(toId)
 				s.ok = false
 				return
 			} else {

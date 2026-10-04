@@ -24,7 +24,7 @@ func (sayto) process(s *state) {
 	}
 
 	for _, loc := range s.where.Exits {
-		room := objects.Rooms[loc.ToId]
+		room := objects.Rooms[loc.To()]
 		room.MessageAll("You hear someone speaking nearby.")
 	}
 

@@ -142,6 +142,20 @@ func CheckQuestEvent(name string) (QuestEventReport, error) {
 			}
 		}
 	}
+	for _, n := range e.stageNumbers() {
+		for _, rd := range e.Stages[n].Redirects {
+			label := "stage " + strconv.Itoa(n) + " redirects exit " + rd.Exit + " in room " + strconv.Itoa(rd.Room)
+			if room, ok := Rooms[rd.Room]; !ok {
+				problem(label + ", but that room no longer exists")
+			} else if exit, ok := room.Exits[rd.Exit]; !ok {
+				problem(label + ", which has no such exit")
+			} else if _, ok := Rooms[rd.To]; !ok {
+				problem(label + " to room " + strconv.Itoa(rd.To) + ", which no longer exists")
+			} else {
+				note(label + " from room " + strconv.Itoa(exit.ToId) + " to room " + strconv.Itoa(rd.To) + " until the event ends")
+			}
+		}
+	}
 	for _, sc := range scripts {
 		if sc.verb == "$IFSTAGE" && sc.stage > 1 && !reachable[sc.stage] {
 			note(sc.where + " waits for stage " + strconv.Itoa(sc.stage) + ", which only a DM can reach")

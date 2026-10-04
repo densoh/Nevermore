@@ -34,6 +34,8 @@ func init() {
 			"  event stage <name> <n> message <text>                 broadcast on reaching it; becomes the login message\n"+
 			"  event stage <name> <n> room add|remove <ids>          rooms join quest mode from stage n\n"+
 			"  event stage <name> <n> exit add|remove <room_id> <exit>   sealed to players until stage n\n"+
+			"  event stage <name> <n> redirect add <room_id> <exit> <to_room_id>   exit leads elsewhere from stage n\n"+
+			"  event stage <name> <n> redirect remove <room_id> <exit>             (stage 1 = the whole event; back to normal when it ends)\n"+
 			"  event stage <name> <n> delete\n"+
 			"  Scripts: $IFSTAGE <name> <n> stops a script below stage n; $EVENTSTAGE <name> <n> advances it.\n"+
 			"  ids: 100 101 or 100-120 or 100,105-110",
@@ -218,6 +220,9 @@ func eventShow(s *state, name string) {
 		for _, gate := range stage.Exits {
 			line += " unseals " + gate.Exit + " in room " + strconv.Itoa(gate.Room) + ";"
 		}
+		for _, rd := range stage.Redirects {
+			line += " sends " + rd.Exit + " in room " + strconv.Itoa(rd.Room) + " to room " + strconv.Itoa(rd.To) + ";"
+		}
 		s.msg.Actor.SendInfo(line)
 		if stage.Message != "" {
 			s.msg.Actor.SendInfo("  Message: " + stage.Message)
@@ -375,8 +380,47 @@ func eventStage(name string, args, input []string) error {
 			stage.Exits = kept
 			return nil
 		})
+	case "REDIRECT":
+		// add <room_id> <exit...> <to_room_id> | remove <room_id> <exit...>
+		adding := len(rest) > 0 && rest[0] == "ADD"
+		if (!adding && (len(rest) < 3 || rest[0] != "REMOVE")) || (adding && len(rest) < 4) {
+			return errors.New("redirect add <room_id> <exit> <to_room_id>, or redirect remove <room_id> <exit>")
+		}
+		roomId, err := strconv.Atoi(rest[1])
+		if err != nil {
+			return errors.New("the room must be a number")
+		}
+		exitWords, to := rest[2:], 0
+		if adding {
+			exitWords = rest[2 : len(rest)-1]
+			if to, err = strconv.Atoi(rest[len(rest)-1]); err != nil {
+				return errors.New("the destination room must be a number")
+			}
+			if _, ok := objects.Rooms[to]; !ok {
+				return errors.New("room " + rest[len(rest)-1] + " doesn't exist")
+			}
+		}
+		exit := strings.ToLower(strings.Join(exitWords, " "))
+		if room, ok := objects.Rooms[roomId]; !ok {
+			return errors.New("room " + rest[1] + " doesn't exist")
+		} else if _, ok := room.Exits[exit]; !ok && adding {
+			return errors.New("room " + rest[1] + " has no exit " + exit)
+		}
+		return edit(func(stage *objects.Stage) error {
+			kept := stage.Redirects[:0:0]
+			for _, rd := range stage.Redirects {
+				if rd.Room != roomId || rd.Exit != exit {
+					kept = append(kept, rd)
+				}
+			}
+			if adding {
+				kept = append(kept, objects.ExitRedirect{Room: roomId, Exit: exit, To: to})
+			}
+			stage.Redirects = kept
+			return nil
+		})
 	}
-	return errors.New("stages take at, message, room, exit or delete")
+	return errors.New("stages take at, message, room, exit, redirect or delete")
 }
 
 // eventMembers handles "event room|mob|item <name> add|remove <ids>".

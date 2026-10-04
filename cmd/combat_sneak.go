@@ -70,10 +70,11 @@ func (sneak) process(s *state) {
 
 	if toE, ok := from.Exits[exitTxt]; ok {
 		// Check that the room ID exists
-		if to, ok := objects.Rooms[toE.ToId]; ok {
+		toId := toE.ToFor(s.actor)
+		if to, ok := objects.Rooms[toId]; ok {
 			// Apply a lock
-			if !utils.IntIn(toE.ToId, s.rLocks) {
-				s.AddLocks(toE.ToId)
+			if !utils.IntIn(toId, s.rLocks) {
+				s.AddLocks(toId)
 				s.ok = false
 				return
 			} else {
@@ -103,7 +104,7 @@ func (sneak) process(s *state) {
 					return
 				}
 
-				if !objects.Rooms[toE.ToId].Flags["active"] {
+				if !objects.Rooms[toId].Flags["active"] {
 					s.msg.Actor.SendBad("Go where?")
 					return
 				}
@@ -144,7 +145,7 @@ func (sneak) process(s *state) {
 					return
 				}
 
-				if objects.Rooms[toE.ToId].Crowded() {
+				if objects.Rooms[toId].Crowded() {
 					s.msg.Actor.SendInfo("That area is crowded.")
 					s.ok = true
 					return
@@ -153,7 +154,7 @@ func (sneak) process(s *state) {
 				from.Chars.Remove(s.actor)
 				to.Chars.Add(s.actor)
 				s.actor.Placement = 3
-				s.actor.ParentId = toE.ToId
+				s.actor.ParentId = toId
 				s.actor.SetTimer("combat", config.CombatCooldown)
 				s.scriptActor("LOOK")
 				s.ok = true
