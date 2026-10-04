@@ -96,6 +96,7 @@ func init() {
 		"$EVENTSTAGE": {mobEventStage, false, "$EVENTSTAGE event stage - advance a live event to stage"},
 		"$MSAY":       {mobSay, false, "$MSAY text - the mob says text"},
 		"$MEMOTE":     {mobEmote, false, "$MEMOTE text - the room sees '<mob> text'"},
+		"$EXITTO":     {mobExitTo, false, "$EXITTO room_id exit to_room_id seconds - the exit leads elsewhere for a while (0 = put it back)"},
 		"$FLAG":       {mobFlag, false, "$FLAG name on|off - set one of the mob's flags"},
 		"$MCAST":      {mobCast, true, "$MCAST spell [target|attacker|random|all] - cast without mana"},
 		"$DAMAGE":     {mobDamage, true, "$DAMAGE target|attacker|random|all amount [type] - hurt players"},
@@ -284,6 +285,15 @@ func mobFlag(r *mobRun, args []string) {
 	case "OFF":
 		r.m.Flags[name] = false
 	}
+}
+
+func mobExitTo(r *mobRun, args []string) {
+	roomId, exit, to, d, ok := ParseExitTo(args)
+	if !ok {
+		r.stopped = true
+		return
+	}
+	RedirectExitFor(roomId, exit, to, d)
 }
 
 // --- actions ---

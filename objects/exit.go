@@ -51,6 +51,23 @@ func NewExit(roomId int, exitData map[string]interface{}) *Exit {
 	return newExt
 }
 
+// To is where the exit leads players right now: ToId, unless a running
+// quest event or a script has temporarily redirected it. Use it, or ToFor,
+// for anything a player experiences; ToId is the exit's own, saved
+// destination and is never changed by a redirect.
+func (e *Exit) To() int {
+	return e.ToFor(nil)
+}
+
+// ToFor is To as c experiences it, which differs for staff while an event
+// is only in preview.
+func (e *Exit) ToFor(c *Character) int {
+	if to, ok := QuestExitTo(e.ParentId, e.Name, c); ok {
+		return to
+	}
+	return e.ToId
+}
+
 func (e *Exit) Look() string {
 	if e.Description == "" {
 		return "A standard run of the mill exit"

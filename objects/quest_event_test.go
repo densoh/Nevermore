@@ -312,3 +312,88 @@ func containsAny(lines []string, sub string) bool {
 	}
 	return false
 }
+
+// An exit leads to its redirect only while the event is live at that stage,
+// and back to its own destination the moment it isn't.
+func TestQuestExitRedirect(t *testing.T) {
+	for _, id := range []int{-110, -111, -112, -113} {
+		Rooms[id] = &Room{RoomId: id, Flags: map[string]bool{}}
+		defer delete(Rooms, id)
+	}
+	exit := &Exit{Object: Object{Name: "Old Gate"}, ParentId: -110, ToId: -111}
+	e := &QuestEvent{Name: "harvest", Expires: hour(1), Stages: map[int]*Stage{
+		1: {Redirects: []ExitRedirect{{Room: -110, Exit: "old gate", To: -112}}},
+		3: {Redirects: []ExitRedirect{{Room: -110, Exit: "old gate", To: -113}}},
+	}}
+	withQuestEvents(t, e)
+
+	steps := []struct {
+		label         string
+		set           func()
+		player, staff int
+	}{
+		{"before start", func() {}, -111, -111},
+		{"in preview", func() { e.Active, e.Preview, e.Stage = true, true, 1 }, -111, -112},
+		{"running, stage 1", func() { e.Preview = false }, -112, -112},
+		{"running, stage 2", func() { e.Stage = 2 }, -112, -112},
+		{"running, stage 3 re-points it", func() { e.Stage = 3 }, -113, -113},
+		{"destination deleted", func() { delete(Rooms, -113) }, -111, -111},
+		{"ended", func() { e.Active, e.Stage = false, 0 }, -111, -111},
+	}
+	for _, step := range steps {
+		step.set()
+		if got := exit.ToFor(player); got != step.player {
+			t.Errorf("%s: players go to %d, want %d", step.label, got, step.player)
+		}
+		if got := exit.ToFor(staff); got != step.staff {
+			t.Errorf("%s: staff go to %d, want %d", step.label, got, step.staff)
+		}
+	}
+	if exit.ToId != -111 {
+		t.Error("a redirect changed the exit's own destination")
+	}
+}
+
+// A script's timed redirect wins over an event's, and lapses on its own.
+func TestRedirectExitFor(t *testing.T) {
+	for _, id := range []int{-120, -121, -122, -123} {
+		Rooms[id] = &Room{RoomId: id, Flags: map[string]bool{}, Exits: map[string]*Exit{}}
+		defer delete(Rooms, id)
+	}
+	exit := &Exit{Object: Object{Name: "rope bridge"}, ParentId: -120, ToId: -121}
+	Rooms[-120].Exits["rope bridge"] = exit
+	withQuestEvents(t, &QuestEvent{Name: "harvest", Active: true, Stage: 1, Expires: hour(1), Stages: map[int]*Stage{
+		1: {Redirects: []ExitRedirect{{Room: -120, Exit: "rope bridge", To: -122}}},
+	}})
+	defer RedirectExitFor(-120, "rope bridge", 0, 0)
+
+	roomId, name, to, d, ok := ParseExitTo([]string{"-120", "ROPE", "BRIDGE", "-123", "60"})
+	if !ok || roomId != -120 || name != "rope bridge" || to != -123 || d != time.Minute {
+		t.Fatalf("ParseExitTo = %d %q %d %v %v", roomId, name, to, d, ok)
+	}
+	for _, bad := range [][]string{
+		{"-120", "rope", "bridge", "-123"},           // no seconds
+		{"-120", "trapdoor", "-123", "60"},           // no such exit
+		{"-120", "rope", "bridge", "-999", "60"},     // no such destination
+		{"-120", "rope", "bridge", "-123", "999999"}, // too long
+	} {
+		if _, _, _, _, ok := ParseExitTo(bad); ok {
+			t.Errorf("ParseExitTo(%v) accepted", bad)
+		}
+	}
+
+	RedirectExitFor(roomId, name, to, d)
+	if got := exit.To(); got != -123 {
+		t.Errorf("timed redirect: leads to %d, want -123", got)
+	}
+	RedirectExitFor(roomId, name, to, time.Nanosecond)
+	time.Sleep(time.Millisecond)
+	if got := exit.To(); got != -122 {
+		t.Errorf("after the timed redirect lapsed: leads to %d, want the event's -122", got)
+	}
+	RedirectExitFor(roomId, name, to, time.Hour)
+	RedirectExitFor(roomId, name, 0, 0)
+	if got := exit.To(); got != -122 {
+		t.Errorf("after clearing: leads to %d, want the event's -122", got)
+	}
+}

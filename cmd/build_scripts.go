@@ -44,6 +44,7 @@ var ScriptList = map[string]string{
 	"$SPLIT":      "Usage: $SPLIT, generates a split order for items",
 	"$REQUIRE":    "Usage: $REQUIRE ITEM item_id [item_id...], event scripts: refuse unless the item is one of these",
 	"$CONSUME":    "Usage: $CONSUME, event scripts: destroy the item; put it after any step that can refuse",
+	"$EXITTO":     "Usage: $EXITTO room_id exit to_room_id seconds, the exit leads to another room for that long, then back (0 = put it back now)",
 	"$IFSTAGE":    "Usage: $IFSTAGE event stage, stops the script unless the event is running and has reached stage",
 	"$EVENTSTAGE": "Usage: $EVENTSTAGE event stage, advances a running event to stage (never back)",
 	"$GIVEGOLD":   "Usage: $GIVEGOLD amount, gives the actor gold",

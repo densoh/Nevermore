@@ -147,7 +147,7 @@ func (r *Room) Look(looker *Character) (buildText string) {
 			longExit := make([]string, 0)
 			for _, exiti := range r.Exits {
 				// Clean up just in case delete didn't get cleaned up...
-				if nextRoom, ok := Rooms[exiti.ToId]; !ok {
+				if nextRoom, ok := Rooms[exiti.ToFor(looker)]; !ok {
 					delete(r.Exits, exiti.Name)
 				} else {
 					if exiti.Flags["invisible"] != true &&
@@ -189,7 +189,7 @@ func (r *Room) Look(looker *Character) (buildText string) {
 				invis = ""
 				hidden = ""
 				inactive = ""
-				if nextRoom, ok := Rooms[exiti.ToId]; !ok {
+				if nextRoom, ok := Rooms[exiti.ToFor(looker)]; !ok {
 					delete(r.Exits, exiti.Name)
 				} else {
 					if exiti.Flags["invisible"] {
@@ -202,9 +202,9 @@ func (r *Room) Look(looker *Character) (buildText string) {
 						inactive = "[i]"
 					}
 					if len(strings.Split(exiti.Name, " ")) >= 3 {
-						longExit = append(longExit, "You see "+exiti.Name+" "+hidden+invis+inactive+"("+strconv.Itoa(exiti.Placement)+")[ID:"+strconv.Itoa(exiti.ToId)+"]")
+						longExit = append(longExit, "You see "+exiti.Name+" "+hidden+invis+inactive+"("+strconv.Itoa(exiti.Placement)+")[ID:"+strconv.Itoa(exiti.ToFor(looker))+"]")
 					} else {
-						exitText = append(exitText, exiti.Name+" "+hidden+invis+inactive+"("+strconv.Itoa(exiti.Placement)+")[ID:"+strconv.Itoa(exiti.ToId)+"]")
+						exitText = append(exitText, exiti.Name+" "+hidden+invis+inactive+"("+strconv.Itoa(exiti.Placement)+")[ID:"+strconv.Itoa(exiti.ToFor(looker))+"]")
 					}
 				}
 			}
@@ -249,8 +249,8 @@ func (r *Room) CleanExits() {
 func (r *Room) FindExit(exitName string, observer *Character) *Exit {
 	for k, v := range r.Exits {
 		if strings.Contains(strings.ToLower(k), strings.ToLower(exitName)) {
-			if _, ok := Rooms[v.ToId]; ok {
-				if Rooms[v.ToId].Flags["active"] || observer.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+			if to, ok := Rooms[v.ToFor(observer)]; ok {
+				if to.Flags["active"] || observer.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 					return v
 				}
 			}
