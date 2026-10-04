@@ -11,6 +11,7 @@ import (
 	"github.com/ArcCS/Nevermore/message"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
+	"github.com/ArcCS/Nevermore/text"
 	"github.com/jinzhu/copier"
 	"log"
 	"time"
@@ -68,6 +69,9 @@ func (g *game) gameInit() {
 	objects.Rooms[g.character.ParentId].UnlockRoom("GameInit", false)
 
 	cmd.Script(g.character, "$POOF")
+	for _, msg := range objects.QuestEventMessages(g.character) {
+		_, _ = g.character.Write([]byte(text.Yellow + msg + text.Reset + "\n"))
+	}
 	objects.LastActivity[g.character.Name] = time.Now()
 	// Initialize this characters ticker
 	g.nextFunc = g.gameProcess

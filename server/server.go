@@ -71,6 +71,7 @@ func StartTime() {
 				return
 			case <-objects.WorldTicker.C:
 				SyncTime()
+				objects.CheckQuestEvents()
 			}
 		}
 	}()

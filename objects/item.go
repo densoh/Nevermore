@@ -27,6 +27,7 @@ type Item struct {
 	Spell        string
 	StorePrice   int
 	Adjustment   int
+	Repairs      int // repairs since the last overhaul, see config.RepairsBeforeOverhaul
 
 	Storage *ItemInventory
 	Weight  int
@@ -60,6 +61,7 @@ func LoadItem(itemData map[string]interface{}) (*Item, bool) {
 		itemData["spell"].(string),
 		0,
 		int(itemData["adjustment"].(int64)),
+		0,
 		&ItemInventory{},
 		int(itemData["weight"].(int64)),
 	}
@@ -178,6 +180,8 @@ func (i *Item) Save() {
 	itemData["value"] = i.Value
 	itemData["spell"] = i.Spell
 	itemData["always_crit"] = utils.Btoi(i.Flags["always_crit"])
+	itemData["quest_loot"] = utils.Btoi(i.Flags["quest_loot"])
+	itemData["no_shatter"] = utils.Btoi(i.Flags["no_shatter"])
 	itemData["permanent"] = utils.Btoi(i.Flags["permanent"])
 	itemData["magic"] = utils.Btoi(i.Flags["magic"])
 	itemData["light"] = utils.Btoi(i.Flags["light"])
@@ -223,6 +227,9 @@ func ReturnItemInstanceProps(item *Item) map[string]interface{} {
 	}
 	if item.StorePrice != 0 {
 		serialList["store_price"] = item.StorePrice
+	}
+	if item.Repairs != 0 {
+		serialList["repairs"] = item.Repairs
 	}
 	if item.ItemType == 9 {
 		serialList["contents"] = item.Storage.Jsonify()

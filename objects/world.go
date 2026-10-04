@@ -39,13 +39,18 @@ func AddRoomUpdate(roomId int) {
 	}
 }
 
+// FlushRoomUpdates saves the pending rooms nobody is standing in. Occupied
+// ones stay pending until they empty, rather than being dropped unsaved.
 func FlushRoomUpdates() {
+	var occupied []int
 	for _, roomId := range RoomsPendingUpdate {
 		if len(Rooms[roomId].Chars.Contents) <= 0 {
 			Rooms[roomId].Save()
+		} else {
+			occupied = append(occupied, roomId)
 		}
 	}
-	RoomsPendingUpdate = nil
+	RoomsPendingUpdate = occupied
 }
 
 // Load fills the world with love.
@@ -85,6 +90,8 @@ func Load() {
 	}
 
 	log.Printf("Finished loading %d rooms.", len(Rooms))
+
+	LoadQuestEvents()
 
 	preparse = nil
 

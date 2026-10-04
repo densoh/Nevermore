@@ -64,10 +64,15 @@ func (i *MobInventory) Release(o *Mob) {
 
 // Remove Pass mob as a pointer, compare and remove
 func (i *MobInventory) Remove(o *Mob) {
-	go func() {
-		o.MobTickerUnload <- true
-		close(o.MobCommands)
-	}()
+	// A mob that isn't ticking - a permanent one in an empty room - has no
+	// goroutine to receive the unload, and RemoveNonPerms already closed its
+	// MobCommands; signalling it again would block forever and then panic.
+	if o.IsActive {
+		go func() {
+			o.MobTickerUnload <- true
+			close(o.MobCommands)
+		}()
+	}
 	for c, p := range i.Contents {
 		if p == o {
 			copy(i.Contents[c:], i.Contents[c+1:])

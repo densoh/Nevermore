@@ -210,7 +210,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 		gainChiFromHits(s, result.chiHits())
 	}
 	DeathCheck(s, whatMob)
-	if s.actor.Class != config.MONK {
+	if s.actor.Class != config.MONK && s.actor.Equipment.Main != nil {
 		weapMsg := s.actor.Equipment.DamageWeapon("main", result.weaponDamage)
 		if weapMsg != "" {
 			s.msg.Actor.SendInfo(weapMsg)
@@ -322,6 +322,7 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 		alwaysCrit = s.actor.Equipment.Main.Flags["always_crit"]
 	}
 	crushing := false
+	shatterRisk := false
 	totalReflect := 0
 	for hit := 0; hit < result.hits; hit++ {
 		mult := attacks[hit]
@@ -329,6 +330,7 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 		if hit == 0 {
 			if canCrush(s) && config.RollCrushing(skillLevel) {
 				crushing = true
+				shatterRisk = true
 				mult *= config.CombatModifiers["crushing"]
 				s.msg.Actor.SendGood("Craaackk!! A crushing blow!")
 				action = metric + "-crushing"
@@ -337,6 +339,7 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 				s.msg.Actor.SendGood("Critical Strike!")
 				result.weaponDamage = 10
 				result.critical = true
+				shatterRisk = !alwaysCrit
 				action = metric + "-critical"
 			} else if config.RollDouble(skillLevel) {
 				mult *= config.CombatModifiers["double"]
@@ -370,8 +373,23 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 		s.msg.Actor.Send("The " + whatMob.Name + " reflects " + strconv.Itoa(totalReflect) + " damage back at you!")
 		s.actor.DeathCheck(" was killed by reflection!")
 	}
+	if shatterRisk {
+		shatterWeapon(s)
+	}
 	warnTouchVulnerable(s, whatMob)
 	return result
+}
+
+// shatterWeapon rolls the chance that a critical strike, crushing blow or
+// Thunk destroyed the weapon that landed it. A no_shatter weapon never rolls,
+// nor does an always_crit one, or its own crits would grind it away.
+func shatterWeapon(s *state) {
+	main := s.actor.Equipment.Main
+	if s.actor.Class == config.MONK || main == nil || main.Flags["no_shatter"] || main.Flags["always_crit"] || !config.RollShatter() {
+		return
+	}
+	s.msg.Actor.SendBad(s.actor.Equipment.ShatterWeapon())
+	s.msg.Observers.SendInfo(s.actor.Name + "'s weapon shatters!")
 }
 
 // followUpMissPenalty is the extra miss chance on every swing after the first.

@@ -21,6 +21,6 @@ func init() {
 type echoall cmd
 
 func (echoall) process(s *state) {
-		s.msg.Actor.SendInfo(strings.Join(s.words, " "))
-		s.msg.Observers.SendInfo(strings.Join(s.words, " "))
+		s.msg.Actor.SendInfo(strings.Join(s.input, " "))
+		s.msg.Observers.SendInfo(strings.Join(s.input, " "))
 }

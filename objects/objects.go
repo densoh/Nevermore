@@ -25,9 +25,14 @@ func (o *Object) EmptyCommands() {
 	}
 }
 
+// AddCommands attaches the script cmdCmd under the trigger cmdItem. The
+// trigger is uppercased to match typed input; the script keeps its case.
 func (o *Object) AddCommands(cmdItem string, cmdCmd string) {
+	if o.Commands == nil {
+		o.Commands = make(map[string]prompt.MenuItem)
+	}
 	o.Commands[strings.ToUpper(cmdItem)] = prompt.MenuItem{
-		Command: strings.ToUpper(cmdCmd),
+		Command: cmdCmd,
 	}
 }
 

@@ -37,6 +37,7 @@ type state struct {
 	words       []string           // Input as uppercased words, less stopwords
 	ok          bool               // Flag to indicate if command was successful
 	scripting   bool               // Is state in scripting mode?
+	event       *scriptEvent       // The @EVENT script being run, if any
 
 	// DO NOT MANIPULATE LOCKS DIRECTLY - use AddLock and see it's comments
 	rLocks []int

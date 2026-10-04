@@ -45,7 +45,7 @@ func (removeCommand) process(s *state) {
 			if _, ok := item.Commands[s.words[2]]; ok {
 				item.RemoveCommand(s.words[2])
 				s.msg.Actor.SendGood("Script removed from item")
-				item.Save()
+				saveScriptedItem(item)
 				return
 			} else {
 				s.msg.Actor.SendBad("The command wasn't found in the items command list.")
@@ -69,7 +69,7 @@ func (removeCommand) process(s *state) {
 			if _, ok := mob.Commands[s.words[2]]; ok {
 				mob.RemoveCommand(s.words[2])
 				s.msg.Actor.SendGood("Script removed from mob")
-				mob.Save()
+				saveScriptedMob(mob)
 				return
 			} else {
 				s.msg.Actor.SendBad("The command wasn't found on this mob.")

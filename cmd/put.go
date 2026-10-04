@@ -96,6 +96,18 @@ func (put) process(s *state) {
 		return
 	}
 
+	// The container's @PUT script goes before the capacity check: one that
+	// consumes what it's given never fills up.
+	ev := &scriptEvent{item: target, owner: where.Name}
+	if !s.runEvent(where.Commands, "PUT", ev) || ev.refused {
+		return
+	}
+	if ev.consumed {
+		s.actor.RunHook("act")
+		s.ok = true
+		return
+	}
+
 	if len(where.Storage.Contents) >= where.MaxUses {
 		s.msg.Actor.SendBad("That container is full.")
 		return

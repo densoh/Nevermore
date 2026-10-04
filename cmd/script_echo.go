@@ -16,5 +16,5 @@ func init() {
 type echo cmd
 
 func (echo) process(s *state) {
-	s.msg.Actor.SendInfo(strings.Join(s.words, " "))
+	s.msg.Actor.SendInfo(strings.Join(s.input, " "))
 }

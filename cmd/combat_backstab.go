@@ -111,8 +111,18 @@ func (backstab) process(s *state) {
 		if curChance >= 100 || utils.Roll(100, 1, 0) <= curChance {
 
 			multiplier := config.BackstabMultiplier(config.StealthLevel(s.actor.Skills[11].Value))
+			// A backstab can critical at twice the weapon skill's rate (never
+			// double), adding to the backstab multiplier rather than multiplying
+			// it. A critical backstab never shatters the weapon.
+			metric := "backstab"
+			critical := config.RollCriticalScaled(config.WeaponLevel(s.actor.Skills[s.actor.Equipment.Main.ItemType].Value, s.actor.Class, s.actor.Equipment.Main.ItemType), config.BackstabCriticalChanceMultiplier)
+			if critical {
+				multiplier += config.CombatModifiers["backstab_critical"]
+				s.msg.Actor.SendGood("Critical Strike!")
+				metric = "backstab-critical"
+			}
 			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictBackstabDamage()) * multiplier)))
-			data.StoreCombatMetric("backstab", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+			data.StoreCombatMetric(metric, 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
 			s.actor.AdvanceStealthExp(int(float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
 			whatMob.AddThreatDamage(actualDamage, s.actor)

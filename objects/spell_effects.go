@@ -680,7 +680,7 @@ func elementalDamage(magnitude int, intel int) (damage int) {
 		power = utils.Roll(14, 10, 0)
 		damage = 275 + power
 	} else if magnitude == 45 { // combust
-		power = utils.Roll(14, 6, 0)
+		power = utils.Roll(12, 6, 0)
 		damage = 95 + power
 	}
 	return damage
@@ -1256,7 +1256,7 @@ func sealcourage(caller interface{}, target interface{}, magnitude int) string {
 		target.ApplyEffect("seal-courage", strconv.Itoa(config.SealDuration), 1, 0,
 			func(triggers int) {
 				if triggers == 0 {
-					armor = config.SealCourageArmorBase + config.SealCourageArmorPerLevel*target.Tier
+					armor = config.SealCourageArmor(target.Tier, target.GetStat("pie"))
 					target.FlagOnAndMsg("seal-courage", "seal", text.Info+"You invoke the seal of courage and steady yourself behind your shield.\n")
 					target.SetModifier("armor", armor)
 					return

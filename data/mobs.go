@@ -38,6 +38,7 @@ func LoadMobs() []interface{} {
 	breathes: m.breathes,
 	placement:m.placement,
 	commands: m.commands,
+	weaken_steps: coalesce(m.weaken_steps, 0),
 	drops: collect({chance: d.chance, item_id: i.item_id}),
 	flags:{
 	no_specials: m.no_specials,
@@ -109,6 +110,7 @@ func LoadMob(mobId int) map[string]interface{} {
 	breathes: m.breathes,
 	commands: m.commands,
 	placement:m.placement,
+	weaken_steps: coalesce(m.weaken_steps, 0),
 	drops: collect({chance: d.chance, item_id: i.item_id}),
 	flags:{
 	no_specials: m.no_specials,
@@ -279,6 +281,7 @@ func UpdateMob(mobData map[string]interface{}) bool {
 		m.immobile=$immobile,
 		m.no_specials=$no_specials,
 		m.no_touch=$no_touch,
+		m.weaken_steps=$weaken_steps,
 		m.hostile=$hostile`,
 		map[string]interface{}{
 			"mob_id":              mobData["mob_id"],
@@ -336,6 +339,7 @@ func UpdateMob(mobData map[string]interface{}) bool {
 			"commands":            mobData["commands"],
 			"no_specials":         mobData["no_specials"],
 			"no_touch":            mobData["no_touch"],
+			"weaken_steps":        mobData["weaken_steps"],
 		},
 	)
 	if err != nil {
