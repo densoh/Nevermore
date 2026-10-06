@@ -134,9 +134,17 @@ func (i *MobInventory) Search(alias string, num int, observer *Character) *Mob {
 		return nil
 	}
 
+	best := 0
+	for _, c := range i.Contents {
+		best = max(best, nameMatchQuality(c.Name, alias))
+	}
+	if best == 0 {
+		return nil
+	}
+
 	pass := 1
 	for _, c := range i.Contents {
-		if strings.Contains(strings.ToLower(c.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(c.Name, alias) == best {
 			if pass == num {
 				if c.Flags["hidden"] == false ||
 					(c.Flags["hidden"] == true &&

@@ -247,16 +247,23 @@ func (r *Room) CleanExits() {
 }
 
 func (r *Room) FindExit(exitName string, observer *Character) *Exit {
+	// Exits is a map, so rank every usable match rather than taking whichever
+	// comes up first; ties go to the shorter name, so "west" beats "northwest"
+	var found *Exit
+	foundName := ""
+	best := 0
 	for k, v := range r.Exits {
-		if strings.Contains(strings.ToLower(k), strings.ToLower(exitName)) {
-			if to, ok := Rooms[v.ToFor(observer)]; ok {
-				if to.Flags["active"] || observer.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
-					return v
-				}
+		q := nameMatchQuality(k, exitName)
+		if q == 0 || q < best || (q == best && (len(k) > len(foundName) || (len(k) == len(foundName) && k > foundName))) {
+			continue
+		}
+		if to, ok := Rooms[v.ToFor(observer)]; ok {
+			if to.Flags["active"] || observer.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+				found, foundName, best = v, k, q
 			}
 		}
 	}
-	return nil
+	return found
 }
 
 // InQuestMode reports whether quest mode rules apply here: realm-wide quest

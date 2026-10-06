@@ -407,9 +407,9 @@ func RollShatter() bool {
 // an overhaul but pay QuestLootRepairMultiplier times the price.
 const (
 	RepairCostFraction        = .3
-	RepairsBeforeOverhaul     = 5
+	RepairsBeforeOverhaul     = 10
 	OverhaulCostMultiplier    = 15
-	OverhaulFailChance        = 20
+	OverhaulFailChance        = 25
 	QuestLootRepairMultiplier = 1.5
 )
 

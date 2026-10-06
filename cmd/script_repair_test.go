@@ -3,6 +3,7 @@ package cmd
 import (
 	"testing"
 
+	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 )
 
@@ -26,12 +27,12 @@ func TestRepairQuote(t *testing.T) {
 		problem  bool
 	}{
 		{"half worn", weapon(50, 0, nil), 150, false, false},
-		{"fourth repair", weapon(50, 4, nil), 150, false, false},
-		{"overhaul due", weapon(50, 5, nil), 2250, true, false},
-		{"quest loot never overhauls", weapon(50, 9, map[string]bool{"quest_loot": true}), 225, false, false},
+		{"last repair before overhaul", weapon(50, config.RepairsBeforeOverhaul-1, nil), 150, false, false},
+		{"overhaul due", weapon(50, config.RepairsBeforeOverhaul, nil), 2250, true, false},
+		{"quest loot never overhauls", weapon(50, config.RepairsBeforeOverhaul+4, map[string]bool{"quest_loot": true}), 225, false, false},
 		{"pristine", weapon(100, 0, nil), 0, false, true},
 		{"always crit", weapon(50, 0, map[string]bool{"always_crit": true}), 0, false, true},
-		{"armor overhaul due", &objects.Item{ItemId: id, ItemType: 5, MaxUses: 50, Value: 1000, Repairs: 5, Flags: map[string]bool{}}, 2250, true, false},
+		{"armor overhaul due", &objects.Item{ItemId: id, ItemType: 5, MaxUses: 50, Value: 1000, Repairs: config.RepairsBeforeOverhaul, Flags: map[string]bool{}}, 2250, true, false},
 	}
 	for _, c := range cases {
 		cost, overhaul, problem := repairQuote(c.item)

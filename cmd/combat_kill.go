@@ -429,25 +429,7 @@ func DeathCheck(s *state, m *objects.Mob) {
 		//debuging stuff
 		//s.msg.Actor.SendGood("Highest Tier: " + strconv.Itoa(highestTier))
 		//s.msg.Actor.SendGood(strconv.Itoa(tierLimit))
-		experienceAwarded := 0
-		if s.where.InQuestMode() {
-			experienceAwarded = m.Experience
-		} else if m.CheckFlag("hostile") {
-			experienceAwarded = int(float64(m.Experience) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
-		} else {
-			experienceAwarded = m.Experience / 10
-		}
-
-		for flag, modifier := range config.XP_Modifiers {
-			if m.CheckFlag(flag) {
-				experienceAwarded += int(float64(m.Experience) * modifier)
-			}
-		}
-
-		// Check for elemental damage in the room and add bonus experience
-		if s.where.Flags["earth"] || s.where.Flags["fire"] || s.where.Flags["water"] || s.where.Flags["air"] {
-			experienceAwarded = int(float64(experienceAwarded) * 1.06) // 6% bonus for elemental rooms
-		}
+		experienceAwarded := m.KillExperience(s.where, expReduce)
 
 		for _, member := range s.where.Chars.Contents {
 			buildActorString := ""

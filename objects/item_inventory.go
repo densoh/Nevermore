@@ -90,9 +90,17 @@ func (i *ItemInventory) Search(alias string, num int) *Item {
 		return nil
 	}
 
+	best := 0
+	for _, c := range i.Contents {
+		best = max(best, nameMatchQuality(c.DisplayName(), alias))
+	}
+	if best == 0 {
+		return nil
+	}
+
 	pass := 1
 	for _, c := range i.Contents {
-		if strings.Contains(strings.ToLower(c.DisplayName()), strings.ToLower(alias)) {
+		if nameMatchQuality(c.DisplayName(), alias) == best {
 			if pass == num {
 				return c
 			} else {

@@ -6,7 +6,6 @@ import (
 	"github.com/jinzhu/copier"
 	"log"
 	"math/rand"
-	"strings"
 )
 
 type Equipment struct {
@@ -397,8 +396,15 @@ func (e *Equipment) Search(alias string, nameNum int) *Item {
 	if e.Prepared != (*Item)(nil) {
 		searchList = append(searchList, e.Prepared)
 	}
+	best := 0
 	for _, c := range searchList {
-		if strings.Contains(strings.ToLower(c.Name), strings.ToLower(alias)) {
+		best = max(best, nameMatchQuality(c.Name, alias))
+	}
+	if best == 0 {
+		return nil
+	}
+	for _, c := range searchList {
+		if nameMatchQuality(c.Name, alias) == best {
 			if passes == nameNum {
 				return c
 			} else {
@@ -663,9 +669,13 @@ func (e *Equipment) UnequipSpecific(alias string) (ok bool) {
 // Unequip Attempt to unequip by name, or type
 func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 	ok = false
+	best := e.bestMatchQuality(alias)
+	if best == 0 {
+		return false, nil
+	}
 	itemSlot := ""
 	if e.Head != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Head.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Head.Name, alias) == best {
 			item = e.Head
 			e.Head = (*Item)(nil)
 			itemSlot = "head"
@@ -673,7 +683,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Chest != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Chest.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Chest.Name, alias) == best {
 			item = e.Chest
 			e.Chest = (*Item)(nil)
 			itemSlot = "chest"
@@ -681,7 +691,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Neck != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Neck.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Neck.Name, alias) == best {
 			item = e.Neck
 			e.Neck = (*Item)(nil)
 			itemSlot = "neck"
@@ -689,7 +699,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Legs != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Legs.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Legs.Name, alias) == best {
 			item = e.Legs
 			e.Legs = (*Item)(nil)
 			itemSlot = "legs"
@@ -697,7 +707,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Feet != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Feet.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Feet.Name, alias) == best {
 			item = e.Feet
 			e.Feet = (*Item)(nil)
 			itemSlot = "feet"
@@ -705,7 +715,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Arms != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Arms.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Arms.Name, alias) == best {
 			item = e.Arms
 			e.Arms = (*Item)(nil)
 			itemSlot = "arms"
@@ -713,7 +723,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Hands != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Hands.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Hands.Name, alias) == best {
 			item = e.Hands
 			e.Hands = (*Item)(nil)
 			itemSlot = "hands"
@@ -721,7 +731,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Ring1 != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Ring1.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Ring1.Name, alias) == best {
 			item = e.Ring1
 			e.Ring1 = (*Item)(nil)
 			itemSlot = "ring1"
@@ -729,7 +739,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Ring2 != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Ring2.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Ring2.Name, alias) == best {
 			item = e.Ring2
 			e.Ring2 = (*Item)(nil)
 			itemSlot = "ring2"
@@ -737,7 +747,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Main != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Main.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Main.Name, alias) == best {
 			item = e.Main
 			e.Main = (*Item)(nil)
 			itemSlot = "main"
@@ -745,7 +755,7 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 		}
 	}
 	if e.Off != (*Item)(nil) && ok == false {
-		if strings.Contains(strings.ToLower(e.Off.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Off.Name, alias) == best {
 			item = e.Off
 			e.Off = (*Item)(nil)
 			itemSlot = "off"
@@ -766,63 +776,76 @@ func (e *Equipment) Unequip(alias string) (ok bool, item *Item) {
 // FindLocation Attempt to find an item by name, return location
 func (e *Equipment) FindLocation(alias string) (slot string) {
 	itemSlot := ""
+	best := e.bestMatchQuality(alias)
+	if best == 0 {
+		return ""
+	}
 	if e.Head != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Head.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Head.Name, alias) == best {
 			itemSlot = "head"
 		}
 	}
 	if e.Chest != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Chest.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Chest.Name, alias) == best {
 			itemSlot = "chest"
 		}
 	}
 	if e.Neck != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Neck.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Neck.Name, alias) == best {
 			itemSlot = "neck"
 		}
 	}
 	if e.Legs != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Legs.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Legs.Name, alias) == best {
 			itemSlot = "legs"
 		}
 	}
 	if e.Feet != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Feet.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Feet.Name, alias) == best {
 			itemSlot = "feet"
 		}
 	}
 	if e.Arms != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Arms.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Arms.Name, alias) == best {
 			itemSlot = "arms"
 		}
 	}
 	if e.Hands != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Hands.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Hands.Name, alias) == best {
 			itemSlot = "hands"
 		}
 	}
 	if e.Ring1 != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Ring1.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Ring1.Name, alias) == best {
 			itemSlot = "ring1"
 		}
 	}
 	if e.Ring2 != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Ring2.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Ring2.Name, alias) == best {
 			itemSlot = "ring2"
 		}
 	}
 	if e.Main != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Main.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Main.Name, alias) == best {
 			itemSlot = "main"
 		}
 	}
 	if e.Off != (*Item)(nil) {
-		if strings.Contains(strings.ToLower(e.Off.Name), strings.ToLower(alias)) {
+		if nameMatchQuality(e.Off.Name, alias) == best {
 			itemSlot = "off"
 		}
 	}
 
 	return itemSlot
+}
+
+// bestMatchQuality is the best nameMatchQuality among the worn items
+func (e *Equipment) bestMatchQuality(alias string) int {
+	best := 0
+	for _, c := range e.List() {
+		best = max(best, nameMatchQuality(c.Name, alias))
+	}
+	return best
 }
 
 // UnequipAll Remove all equipment
