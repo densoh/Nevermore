@@ -5,6 +5,7 @@ import (
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -30,6 +31,9 @@ You sense the following enchantments bound to your lifeforce:
 {{.SpellEffects}}
 `
 
+	knownSpells := append([]string(nil), s.actor.Spells...)
+	sort.Strings(knownSpells)
+
 	var spellEffects []string
 	for k := range s.actor.Effects {
 		if _, ok := objects.Spells[k]; ok {
@@ -41,7 +45,7 @@ You sense the following enchantments bound to your lifeforce:
 		Spells       string
 		SpellEffects string
 	}{
-		strings.Join(s.actor.Spells, ", "),
+		strings.Join(knownSpells, ", "),
 		strings.Join(spellEffects, ", "),
 	}
 	tmpl, _ := template.New("stat_info").Parse(spellTemplate)
