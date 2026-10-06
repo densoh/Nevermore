@@ -674,14 +674,7 @@ func (m *Mob) DeathCheck(target *Character) bool {
 		if expReduce > 5 {
 			expReduce = 5
 		}
-		experienceAwarded := 0
-		if Rooms[m.ParentId].InQuestMode() {
-			experienceAwarded = m.Experience
-		} else if m.CheckFlag("hostile") {
-			experienceAwarded = int(float64(m.Experience) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
-		} else {
-			experienceAwarded = m.Experience / 10
-		}
+		experienceAwarded := m.KillExperience(Rooms[m.ParentId], expReduce)
 		for _, member := range Rooms[m.ParentId].Chars.Contents {
 			buildActorString := ""
 			charClean := Rooms[m.ParentId].Chars.SearchAll(member.Name)
@@ -725,6 +718,32 @@ func (m *Mob) DeathCheck(target *Character) bool {
 		return true
 	}
 	return false
+}
+
+// KillExperience is the experience each member earns for killing the mob in
+// room, shared by melee kills and spell/callback kills. expReduce is the
+// number of players in the room, capped at 5.
+func (m *Mob) KillExperience(room *Room, expReduce int) int {
+	experienceAwarded := 0
+	if room.InQuestMode() {
+		experienceAwarded = m.Experience
+	} else if m.CheckFlag("hostile") {
+		experienceAwarded = int(float64(m.Experience) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
+	} else {
+		experienceAwarded = m.Experience / 10
+	}
+
+	for flag, modifier := range config.XP_Modifiers {
+		if m.CheckFlag(flag) {
+			experienceAwarded += int(float64(m.Experience) * modifier)
+		}
+	}
+
+	// Check for elemental damage in the room and add bonus experience
+	if room.Flags["earth"] || room.Flags["fire"] || room.Flags["water"] || room.Flags["air"] {
+		experienceAwarded = int(float64(experienceAwarded) * 1.06) // 6% bonus for elemental rooms
+	}
+	return experienceAwarded
 }
 
 func (m *Mob) CheckForExtraAttack(target *Character) {
@@ -941,6 +960,9 @@ func (m *Mob) Stun(amt int) {
 	if m.Flags["no_stun"] || amt <= 0 {
 		return
 	}
+	// Any stun that lands breaks a scripted wind-up that stuns cancel, even
+	// one too short to move the mob's next tick.
+	m.windupStunned()
 	until := time.Now().Add(time.Duration(amt) * time.Second)
 	if !until.After(m.NextTick) {
 		return
@@ -1348,6 +1370,7 @@ func (m *Mob) ReceiveDamage(damage int) (int, int, int) {
 		finalDamage = m.Stam.Current
 	}
 	m.Stam.Subtract(finalDamage)
+	m.windupDamaged(finalDamage)
 	if finalDamage > m.WimpyValue && m.CheckFlag("flees") {
 		m.MobCommands <- "flee"
 	}
@@ -1360,6 +1383,7 @@ func (m *Mob) ReceiveDamageNoArmor(damage int) (int, int) {
 		finalDamage = m.Stam.Current
 	}
 	m.Stam.Subtract(finalDamage)
+	m.windupDamaged(finalDamage)
 	if finalDamage > m.WimpyValue && m.CheckFlag("flees") {
 		m.MobCommands <- "flee"
 	}

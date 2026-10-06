@@ -1,6 +1,7 @@
 package objects
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -316,5 +317,162 @@ func TestPermanentHostileMobAggrosPastWanderCount(t *testing.T) {
 	}
 	if tank.Stam.Current != 95 {
 		t.Errorf("@AGGRO didn't fire on the pickup: stamina %d", tank.Stam.Current)
+	}
+}
+
+// The overboard throw: a warning tick, then on the next tick the victim is
+// stunned and sent away - unless the mob was stunned in between.
+func TestMobScriptWindup(t *testing.T) {
+	const deck, sea = -140, -141
+	script := map[string]string{
+		"@COMBAT": "$MEMOTE grapples %target%! ; $WINDUP loses its grip on %target%! ; $STUN target 8 ; $MTELEPORT target -141",
+	}
+	setup := func() (*Mob, *Room, *Character, *Character) {
+		tank, rogue := scriptFighter("Tank"), scriptFighter("Rogue")
+		m, r := scriptBoss(t, deck, script, tank, rogue)
+		Rooms[sea] = &Room{RoomId: sea, Flags: map[string]bool{}, Mobs: &MobInventory{},
+			Chars: &CharInventory{ParentId: sea, Contents: []*Character{scriptFighter("Swimmer")}}}
+		t.Cleanup(func() { delete(Rooms, sea) })
+		m.MobTicker = time.NewTicker(time.Hour)
+		m.NextTick = time.Now().Add(8 * time.Second)
+		return m, r, tank, rogue
+	}
+	thrown := func(c *Character) bool {
+		ready, _ := c.TimerReady("stun")
+		return c.ParentId == sea && !ready
+	}
+
+	// Nobody stops it: the tank goes over, even though the mob has since
+	// turned to the rogue.
+	m, r, tank, rogue := setup()
+	if !m.runTickScripts() || m.scriptState().windup == nil {
+		t.Fatal("the warning tick didn't wind up, or didn't use the turn")
+	}
+	if tank.ParentId != deck {
+		t.Fatal("the tank was thrown on the warning tick")
+	}
+	m.CurrentTarget = rogue.Name
+	if !m.runTickScripts() {
+		t.Error("the follow-up tick didn't count as the mob's turn")
+	}
+	if !thrown(tank) || rogue.ParentId != deck {
+		t.Errorf("after the follow-up: tank in %d, rogue in %d; want the tank thrown and stunned", tank.ParentId, rogue.ParentId)
+	}
+
+	// A stun in the window - even one too short to delay the tick - breaks it.
+	m, _, tank, _ = setup()
+	m.runTickScripts()
+	m.Stun(1)
+	if m.scriptState().windup != nil {
+		t.Fatal("a landed stun didn't cancel the wind-up")
+	}
+	m.runTickScripts()
+	if tank.ParentId != deck {
+		t.Error("the tank was thrown after the mob had been stunned")
+	}
+
+	// A no_stun mob can't be interrupted.
+	m, _, tank, _ = setup()
+	m.Flags["no_stun"] = true
+	m.runTickScripts()
+	m.Stun(10)
+	if m.scriptState().windup == nil {
+		t.Error("a stun that can't land cancelled the wind-up")
+	}
+
+	// The victim got away first: nothing happens and the mob acts normally.
+	m, r, tank, _ = setup()
+	_ = r
+	m.runTickScripts()
+	r.Chars.Remove(tank)
+	if m.runTickScripts() {
+		t.Error("a wind-up with no victim still took the turn")
+	}
+	if ready, _ := tank.TimerReady("stun"); !ready {
+		t.Error("a victim who had left was still stunned")
+	}
+}
+
+func TestMobScriptFillNames(t *testing.T) {
+	m := &Mob{Object: Object{Name: "kraken"}, CurrentTarget: "Tank"}
+	r := &mobRun{m: m, attacker: scriptFighter("Rogue")}
+	got := r.fillNames("$MEMOTE %self% grapples %target% while %ATTACKER% watches")
+	if got != "$MEMOTE kraken grapples Tank while Rogue watches" {
+		t.Errorf("fillNames = %q", got)
+	}
+	r.victim = "Mage"
+	if got := r.fillNames("%target%"); got != "Mage" {
+		t.Errorf("a wind-up's victim wasn't used: %q", got)
+	}
+}
+
+func TestParseWindup(t *testing.T) {
+	w := parseWindup(strings.Fields("stun damage 400 hits 3 rescue escape loses its grip on %target%!"))
+	if !w.stun || w.damage != 400 || w.hits != 3 || !w.rescue || !w.escape || w.breakMsg != "loses its grip on %target%!" {
+		t.Errorf("parsed %+v", w)
+	}
+	w = parseWindup(strings.Fields("is interrupted by nothing"))
+	if !w.stun || w.damage != 0 || w.breakMsg != "is interrupted by nothing" {
+		t.Errorf("default should be stun only: %+v", w)
+	}
+	w = parseWindup(strings.Fields("none shrugs it off"))
+	if w.stun || w.damage != 0 || w.hits != 0 || w.rescue || w.escape || w.breakMsg != "shrugs it off" {
+		t.Errorf("none: %+v", w)
+	}
+	if w = parseWindup(nil); !w.stun || w.breakMsg != "" {
+		t.Errorf("no args: %+v", w)
+	}
+}
+
+// Each cancel condition stops the throw on its own, and none disables them.
+func TestMobScriptWindupConditions(t *testing.T) {
+	const deck, sea = -150, -151
+	run := func(conds string, between func(m *Mob, tank *Character)) (thrown, pending bool) {
+		tank := scriptFighter("Tank")
+		m, _ := scriptBoss(t, deck, map[string]string{
+			"@COMBAT": "$WINDUP " + conds + " ; $STUN target 8 ; $MTELEPORT target -151",
+		}, tank)
+		Rooms[sea] = &Room{RoomId: sea, Flags: map[string]bool{}, Mobs: &MobInventory{},
+			Chars: &CharInventory{ParentId: sea, Contents: []*Character{scriptFighter("Swimmer")}}}
+		t.Cleanup(func() { delete(Rooms, sea) })
+		m.MobTicker = time.NewTicker(time.Hour)
+		m.NextTick = time.Now().Add(8 * time.Second)
+		m.runTickScripts()
+		between(m, tank)
+		pending = m.scriptState().windup != nil
+		m.runTickScripts()
+		return tank.ParentId == sea, pending
+	}
+	nothing := func(*Mob, *Character) {}
+
+	if thrown, _ := run("stun", nothing); !thrown {
+		t.Error("uncontested wind-up didn't land")
+	}
+	if thrown, _ := run("damage 300", func(m *Mob, _ *Character) { m.ReceiveDamageNoArmor(150); m.ReceiveDamageNoArmor(150) }); thrown {
+		t.Error("300 damage in the window didn't cancel a 'damage 300' wind-up")
+	}
+	if thrown, _ := run("damage 300", func(m *Mob, _ *Character) { m.ReceiveDamageNoArmor(299) }); !thrown {
+		t.Error("299 damage cancelled a 'damage 300' wind-up")
+	}
+	if thrown, _ := run("hits 2", func(m *Mob, _ *Character) { m.ReceiveDamage(1); m.ReceiveDamage(1) }); thrown {
+		t.Error("two hits didn't cancel a 'hits 2' wind-up")
+	}
+	if thrown, _ := run("damage 300", func(m *Mob, _ *Character) { m.Stun(10) }); !thrown {
+		t.Error("a stun cancelled a wind-up that only damage should")
+	}
+	if thrown, pending := run("none", func(m *Mob, _ *Character) { m.Stun(10); m.ReceiveDamageNoArmor(900) }); !thrown || !pending {
+		t.Error("'none' was cancelled")
+	}
+	if thrown, _ := run("escape", func(m *Mob, tank *Character) { tank.Placement = m.Placement + 2 }); thrown {
+		t.Error("the victim moving away didn't cancel an 'escape' wind-up")
+	}
+	if thrown, _ := run("rescue", func(_ *Mob, tank *Character) {
+		Rooms[deck].Chars.Contents = append(Rooms[deck].Chars.Contents, scriptFighter("Paladin"))
+		tank.RescuedBy, tank.RescueUntil = "Paladin", time.Now().Add(time.Minute)
+	}); thrown {
+		t.Error("a rescue didn't cancel a 'rescue' wind-up")
+	}
+	if thrown, _ := run("stun rescue", func(m *Mob, _ *Character) { m.Stun(10) }); thrown {
+		t.Error("with two conditions, the first didn't cancel")
 	}
 }

@@ -57,13 +57,7 @@ func (i *CharInventory) SearchAll(alias string) *Character {
 		return nil
 	}
 
-	for _, c := range i.Contents {
-		if strings.Contains(strings.ToLower(c.Name), strings.ToLower(alias)) {
-			return c
-		}
-	}
-
-	return nil
+	return bestNamedCharacter(i.Contents, alias)
 }
 
 // Search the CharInventory to return a specific instance of something
@@ -75,19 +69,18 @@ func (i *CharInventory) Search(alias string, observer *Character) *Character {
 		return nil
 	}
 
+	visible := make([]*Character, 0, len(i.Contents))
 	for _, c := range i.Contents {
 		if c.Flags["invisible"] == false ||
 			(c.Flags["invisible"] == true &&
 				observer.Flags["detect-invisible"] &&
 				!c.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster)) ||
 			observer.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
-			if strings.Contains(strings.ToLower(c.Name), strings.ToLower(alias)) {
-				return c
-			}
+			visible = append(visible, c)
 		}
 	}
 
-	return nil
+	return bestNamedCharacter(visible, alias)
 }
 
 // ListAttackers List Chars attacking in the room
@@ -124,18 +117,30 @@ func (i *CharInventory) MobSearch(alias string, observer *Mob) *Character {
 		return nil
 	}
 
+	visible := make([]*Character, 0, len(i.Contents))
 	for _, c := range i.Contents {
 		if c.Flags["invisible"] == false ||
 			(c.Flags["invisible"] == true &&
 				observer.Flags["detect-invisible"] &&
 				!c.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster)) {
-			if strings.Contains(strings.ToLower(c.Name), strings.ToLower(alias)) {
-				return c
-			}
+			visible = append(visible, c)
 		}
 	}
 
-	return nil
+	return bestNamedCharacter(visible, alias)
+}
+
+// bestNamedCharacter returns the first character with the best nameMatchQuality,
+// or nil when nobody matches
+func bestNamedCharacter(chars []*Character, alias string) *Character {
+	var found *Character
+	best := 0
+	for _, c := range chars {
+		if q := nameMatchQuality(c.Name, alias); q > best {
+			best, found = q, c
+		}
+	}
+	return found
 }
 
 // List the items in this CharInventory

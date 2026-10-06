@@ -33,6 +33,29 @@ import (
 // $COOLDOWN seconds, $ONCE, $IFSTAGE event stage. Put $COOLDOWN after any
 // $CHANCE, or a failed chance roll still starts the cooldown.
 //
+// $WINDUP [conditions] [text] splits a script over two ticks, for a move
+// players can see coming and stop. The steps before it run now (the warning)
+// and the mob spends its turn winding up; the steps after it run on the
+// mob's next tick, against whoever was its target when it wound up, even if
+// it has turned to someone else since. If the victim has left the room by
+// then, nothing happens. A mob winds up one thing at a time.
+//
+// The conditions say what cancels it; any one of them does. With none
+// given, a stun does:
+//
+//	stun       any stun that lands on the mob
+//	damage N   the mob takes N or more damage in the window
+//	hits N     the mob is hit N or more times in the window
+//	rescue     the victim is under a rescue when it comes due
+//	escape     the victim is no longer at the mob's position when it comes due
+//	none       nothing cancels it
+//
+// Whatever follows the conditions is shown after the mob's name when it is
+// cancelled, in place of a stock line - so the text can't begin with one of
+// those words.
+//
+// %target%, %attacker% and %self% in a step are replaced with those names.
+//
 // An action step (cast, damage, stun, summon, heal, enrage, teleport) uses
 // the mob's turn: on a tick, a script that took an action replaces the
 // mob's normal move, breath, spell and attack. Talk, flags and stage steps
@@ -54,6 +77,67 @@ type mobScriptState struct {
 	hpFired    map[int]bool
 	lastTarget string
 	spawned    bool
+	windup     *mobWindup
+}
+
+// mobWindup is the rest of a script waiting for the mob's next tick.
+type mobWindup struct {
+	trigger  string
+	step     int    // the step to resume at
+	victim   string // the mob's target when it wound up
+	breakMsg string // shown, after the mob's name, if it is cancelled
+
+	// What cancels it, and how far along the cancelling is.
+	stun, rescue, escape   bool
+	damage, hits           int
+	damageTaken, hitsTaken int
+}
+
+// windupConditions are the words $WINDUP recognises before its text; the
+// value says whether the word takes a number.
+var windupConditions = map[string]bool{"stun": false, "damage": true, "hits": true, "rescue": false, "escape": false, "none": false}
+
+// parseWindup reads $WINDUP's arguments into a wind-up.
+func parseWindup(args []string) *mobWindup {
+	w := &mobWindup{}
+	given := false
+	i := 0
+	for i < len(args) {
+		word := strings.ToLower(args[i])
+		takesNumber, ok := windupConditions[word]
+		if !ok {
+			break
+		}
+		n := 0
+		if takesNumber {
+			if i+1 >= len(args) {
+				break
+			}
+			if v, err := strconv.Atoi(args[i+1]); err == nil && v > 0 {
+				n = v
+			}
+			i++
+		}
+		switch word {
+		case "stun":
+			w.stun = true
+		case "damage":
+			w.damage = n
+		case "hits":
+			w.hits = n
+		case "rescue":
+			w.rescue = true
+		case "escape":
+			w.escape = true
+		}
+		given = true
+		i++
+	}
+	if !given {
+		w.stun = true
+	}
+	w.breakMsg = strings.Join(args[i:], " ")
+	return w
 }
 
 func (m *Mob) scriptState() *mobScriptState {
@@ -74,6 +158,7 @@ type mobRun struct {
 	trigger  string
 	step     int
 	attacker *Character
+	victim   string // a resumed wind-up's target; overrides the current one
 	usedTurn bool
 	stopped  bool
 }
@@ -89,6 +174,7 @@ var MobVerbs map[string]mobVerb
 
 func init() {
 	MobVerbs = map[string]mobVerb{
+		"$WINDUP":     {mobWindUp, false, "$WINDUP [stun|damage N|hits N|rescue|escape|none ...] [text] - finish the script next tick unless cancelled; text shows if it is"},
 		"$CHANCE":     {mobChance, false, "$CHANCE pct - stop unless a pct% roll succeeds"},
 		"$COOLDOWN":   {mobCooldown, false, "$COOLDOWN seconds - stop if this step ran less than seconds ago"},
 		"$ONCE":       {mobOnce, false, "$ONCE - stop if this script already got past here on this copy"},
@@ -141,6 +227,12 @@ func splitSteps(script string) []string {
 // RunScript runs the mob's @trigger script, if it has one, and reports
 // whether it took an action. Call it with the mob's room locked.
 func (m *Mob) RunScript(trigger string, attacker *Character) bool {
+	return m.runScriptFrom(trigger, attacker, 0, "")
+}
+
+// runScriptFrom runs a script from the given step. A victim names the
+// target a resumed wind-up is aimed at.
+func (m *Mob) runScriptFrom(trigger string, attacker *Character, start int, victim string) bool {
 	val, ok := m.Commands["@"+trigger]
 	if !ok || m.Stam.Current <= 0 {
 		return false
@@ -159,9 +251,12 @@ func (m *Mob) RunScript(trigger string, attacker *Character) bool {
 	st.running = true
 	defer func() { st.running = false }()
 
-	r := &mobRun{m: m, room: room, trigger: trigger, attacker: attacker}
+	r := &mobRun{m: m, room: room, trigger: trigger, attacker: attacker, victim: victim}
 	for i, step := range splitSteps(val.Command) {
-		fields := strings.Fields(step)
+		if i < start {
+			continue
+		}
+		fields := strings.Fields(r.fillNames(step))
 		verb, ok := MobVerbs[strings.ToUpper(fields[0])]
 		if !ok {
 			continue
@@ -180,6 +275,21 @@ func (m *Mob) RunScript(trigger string, attacker *Character) bool {
 // aggro, then combat or idle. It reports whether any took the mob's turn.
 func (m *Mob) runTickScripts() bool {
 	st := m.scriptState()
+	// A wind-up that nobody interrupted comes due before anything else.
+	if w := st.windup; w != nil {
+		victim := m.windupVictim(w)
+		switch {
+		case victim == nil:
+			st.windup = nil
+		case w.rescue && victim.Rescuer() != nil, w.escape && victim.Placement != m.Placement:
+			m.cancelWindup(w)
+		default:
+			st.windup = nil
+			m.runScriptFrom(w.trigger, nil, w.step, w.victim)
+			st.lastTarget = m.CurrentTarget
+			return true
+		}
+	}
 	used := false
 	if m.Stam.Max > 0 {
 		pct := m.Stam.Current * 100 / m.Stam.Max
@@ -214,7 +324,96 @@ func (m *Mob) runSpawnScript() {
 	m.RunScript("SPAWN", nil)
 }
 
+// windupVictim is the wound-up move's target, if still in the room.
+func (m *Mob) windupVictim(w *mobWindup) *Character {
+	room, ok := Rooms[m.ParentId]
+	if !ok {
+		return nil
+	}
+	for _, c := range room.Chars.Contents {
+		if c.Name == w.victim {
+			return c
+		}
+	}
+	return nil
+}
+
+// windupStunned is told when a stun lands on the mob.
+func (m *Mob) windupStunned() {
+	if w := m.pendingWindup(); w != nil && w.stun {
+		m.cancelWindup(w)
+	}
+}
+
+// windupDamaged is told how much every hit took off the mob.
+func (m *Mob) windupDamaged(amount int) {
+	w := m.pendingWindup()
+	if w == nil || amount <= 0 {
+		return
+	}
+	w.damageTaken += amount
+	w.hitsTaken++
+	if (w.damage > 0 && w.damageTaken >= w.damage) || (w.hits > 0 && w.hitsTaken >= w.hits) {
+		m.cancelWindup(w)
+	}
+}
+
+func (m *Mob) pendingWindup() *mobWindup {
+	if m.scripts == nil {
+		return nil
+	}
+	return m.scripts.windup
+}
+
+// cancelWindup drops a pending wind-up and tells the room.
+func (m *Mob) cancelWindup(w *mobWindup) {
+	if m.scripts == nil || m.scripts.windup != w {
+		return
+	}
+	m.scripts.windup = nil
+	msg := "is interrupted!"
+	if w.breakMsg != "" {
+		msg = w.breakMsg
+	}
+	if room, ok := Rooms[m.ParentId]; ok {
+		room.MessageAll(text.Green + m.Name + " " + msg + text.Reset + "\n")
+	}
+}
+
+// fillNames replaces %target%, %attacker% and %self% in a step.
+func (r *mobRun) fillNames(step string) string {
+	if !strings.Contains(step, "%") {
+		return step
+	}
+	target := r.m.CurrentTarget
+	if r.victim != "" {
+		target = r.victim
+	}
+	attacker := target
+	if r.attacker != nil {
+		attacker = r.attacker.Name
+	}
+	return strings.NewReplacer(
+		"%target%", target, "%TARGET%", target,
+		"%attacker%", attacker, "%ATTACKER%", attacker,
+		"%self%", r.m.Name, "%SELF%", r.m.Name,
+	).Replace(step)
+}
+
 // --- control ---
+
+func mobWindUp(r *mobRun, args []string) {
+	st := r.m.scriptState()
+	targets := r.targets("target")
+	r.stopped = true
+	if st.windup != nil || len(targets) == 0 {
+		return
+	}
+	w := parseWindup(args)
+	w.trigger, w.step, w.victim = r.trigger, r.step+1, targets[0].Name
+	st.windup = w
+	r.usedTurn = true
+}
 
 func (r *mobRun) key() string { return r.trigger + "#" + strconv.Itoa(r.step) }
 
@@ -331,6 +530,9 @@ func (r *mobRun) targets(word string) []*Character {
 		}
 		return pick(r.m.CurrentTarget)
 	default: // TARGET
+		if r.victim != "" {
+			return pick(r.victim)
+		}
 		return pick(r.m.CurrentTarget)
 	}
 }
