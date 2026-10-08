@@ -242,31 +242,37 @@ var (
 	FizzleSave             = 25 // chance to fizzle per int below 9
 
 	PieHealMod           = .7 // Per point
-	MinorPieHealMod      = .6 // Per point, vigor/mend only
+	MinorPieHealMod      = .9 // Per point above MinorHealPieFloor, vigor/mend only
+	MinorHealPieFloor    = 10 // Piety up to this adds nothing to vigor/mend
 	MinorHealDivinityMod = .3 // Vigor/mend get 30% of the divinity bonus of detraumatize/renewal
 	PaladinDivinityMod   = .5 // Paladins get this share of their divinity bonus without the seal of faith
 
 	// Seal of justice adds (base + pie/pieDiv + weaponLevel/weaponDiv) percent damage.
 	// Seal of justice damage bonus, in percent: base + tier/TierDiv +
 	// pie/PieDiv + weaponLevel/WeaponDiv. About 15% at tier 10 and 27% at 20.
-	SealJusticeBase      = 5.0
-	SealJusticeTierDiv   = 2.0
-	SealJusticePieDiv    = 4.0
-	SealJusticeWeaponDiv = 2.0
-	MinorHealTierDiv     = 4 // Vigor/mend gain +1 base per this many tiers
-	DetraumatizeBase     = 20
-	RenewalBase          = 40
-	MajorHealTierDiv     = 2 // Detraumatize gains +1 base per this many tiers
-	MajorHealBaseCut     = 5 // Subtracted from detraumatize base to offset the tier bonus
-	// Renewal has its own shape: 30 + tier + pie*RenewalPieMod +
-	// 2d(5 + tier/2) before divinity, for 25 mana. It stays 7-20% less
-	// mana-efficient than detraumatize for healers with 13+ pie.
-	RenewalBaseCut    = 10
-	RenewalTierDiv    = 1
+	SealJusticeBase        = 5.0
+	SealJusticeTierDiv     = 2.0
+	SealJusticePieDiv      = 4.0
+	SealJusticeWeaponDiv   = 2.0
+	MinorHealTierDiv       = 4 // Vigor/mend gain +1 base per this many tiers
+	CasterMinorHealTierDiv = 3 // MinorHealTierDiv for classes in MinorHealCasterClasses
+	// Spellcasting classes; monks, fighters, barbarians and thieves keep MinorHealTierDiv.
+	MinorHealCasterClasses = []int{MAGE, CLERIC, PALADIN, BARD, RANGER}
+	MinorHealDieSides      = 6 // Vigor/mend roll 1d(sides) + MinorHealDieBonus
+	MinorHealDieBonus      = 7
+	DetraumatizeBase       = 20
+	RenewalBase            = 40
+	MajorHealTierDiv       = 3 // Detraumatize gains +1 base per this many tiers
+	MajorHealBaseCut       = 2 // Subtracted from detraumatize base to offset the tier bonus
+	// Renewal has its own shape: 35 + tier/2 + pie*RenewalPieMod +
+	// 2d(5 + tier/3) before divinity, for 25 mana. It stays about 22-24%
+	// less mana-efficient than detraumatize for healers with 16+ pie.
+	RenewalBaseCut    = 5
+	RenewalTierDiv    = 2
 	RenewalPieMod     = .8
 	RenewalDice       = 2
 	RenewalDieBase    = 5
-	RenewalDieTierDiv = 2
+	RenewalDieTierDiv = 3
 
 	ArmorReduction       = .007
 	ArmorReductionPoints = 10
@@ -569,6 +575,14 @@ func BackstabMissPenaltyFor(stealthLevel int) int {
 		penalty = 0
 	}
 	return penalty
+}
+
+// TodMissPenaltyFor is the extra miss a touch of death carries over a regular
+// swing: TodMissPenalty less tier/TodMissTierDiv, less pie/TodHitPieDiv. Like the
+// backstab penalty it is added before the 5-95 clamp, so dex and piety past a
+// swing's cap still offset it. It can go negative to soak other penalties.
+func TodMissPenaltyFor(tier int, pie int) int {
+	return TodMissPenalty - tier/TodMissTierDiv - pie/TodHitPieDiv
 }
 
 // FailedTurnThreat is the threat a failed turn hands the caster: the mob's

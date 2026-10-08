@@ -98,10 +98,7 @@ func (tod) process(s *state) {
 	remaining := hpFraction(whatMob)
 
 	// The touch has to land before it can do anything.
-	missChance := DetermineMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor)) - s.actor.GetStat("pie")/config.TodHitPieDiv
-	if missChance < 5 {
-		missChance = 5
-	}
+	missChance := TodMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor))
 	if utils.Roll(100, 1, 0) <= missChance {
 		s.msg.Actor.SendBad("Your touch finds nothing vital, leaving you open to a savage blow from " + whatMob.Name + "!")
 		s.msg.Observers.SendInfo(s.actor.Name + " reaches for " + whatMob.Name + " and misses, leaving an opening.")

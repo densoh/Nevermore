@@ -109,7 +109,7 @@ type Character struct {
 	// moment the player fights or moves - see SetTimer and the GO handler.
 	ResumeGraceUntil time.Time
 	// LastCombat is the last moment the character landed a hit, cast an
-	// offensive spell, or was attacked. Regen is halved while it is within
+	// offensive spell, or was attacked. Regen is cut while it is within
 	// CombatRegenWindowSeconds, and monk chi only bleeds away once it is
 	// ChiDecayGraceSeconds in the past.
 	LastCombat time.Time
@@ -268,8 +268,13 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 		if FilledCharacter.Class == 5 || FilledCharacter.Class == 6 {
 			FilledCharacter.ClassProps["heals"] = int(charData["heals"].(int64))
 		}
-		if FilledCharacter.Class == 7 || FilledCharacter.Class == 6 {
-			FilledCharacter.ClassProps["restores"] = int(charData["restores"].(int64))
+		if FilledCharacter.Class == 7 || FilledCharacter.Class == 5 {
+			// Clerics only gained restores on 2026-10-07; one with none stored starts with a full day's worth.
+			if restores, ok := charData["restores"].(int64); ok {
+				FilledCharacter.ClassProps["restores"] = int(restores)
+			} else {
+				FilledCharacter.ClassProps["restores"] = 5
+			}
 		}
 
 		// GM Specifics:
@@ -279,7 +284,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 		}
 
 		// Refresh or not to refresh on load?
-		if time.Since(lastRefresh) > 24*time.Hour {
+		if RefreshDue(lastRefresh, time.Now()) {
 			FilledCharacter.Refresh()
 			FilledCharacter.LastRefresh = time.Now()
 		}
@@ -341,7 +346,7 @@ func (c *Character) ClearResumeGrace() {
 	c.ResumeGraceUntil = time.Time{}
 }
 
-// MarkCombat notes that the character is fighting, which halves regen and
+// MarkCombat notes that the character is fighting, which cuts regen and
 // holds off chi decay.
 func (c *Character) MarkCombat() {
 	c.LastCombat = time.Now()
@@ -832,10 +837,10 @@ func (c *Character) Save() {
 		charData["enchants"] = c.ClassProps["enchants"]
 	}
 	if c.Class == 5 || c.Class == 6 {
-		c.ClassProps["heals"] = c.ClassProps["heals"]
+		charData["heals"] = c.ClassProps["heals"]
 	}
-	if c.Class == 7 || c.Class == 6 {
-		c.ClassProps["restores"] = c.ClassProps["restores"]
+	if c.Class == 7 || c.Class == 5 {
+		charData["restores"] = c.ClassProps["restores"]
 	}
 	data.SaveChar(charData)
 }
@@ -1577,6 +1582,12 @@ func (c *Character) MaxWeight() int {
 	return config.MaxWeight(c.Str.Current)
 }
 
+// RefreshDue reports whether the last daily refresh happened before 0:00 UTC today.
+func RefreshDue(last, now time.Time) bool {
+	y, m, d := now.UTC().Date()
+	return last.Before(time.Date(y, m, d, 0, 0, 0, 0, time.UTC))
+}
+
 func (c *Character) Refresh() {
 	c.Broadcasts = config.BaseBroads + (c.GetStat("int") * config.IntBroad)
 	c.Evals = config.BaseEvals + (int(math.Ceil(float64(c.GetStat("int")) / float64(config.IntEvalDivInt))))
@@ -1586,7 +1597,7 @@ func (c *Character) Refresh() {
 	if c.Class == 5 || c.Class == 6 {
 		c.ClassProps["heals"] = 5
 	}
-	if c.Class == 7 || c.Class == 6 {
+	if c.Class == 7 || c.Class == 5 {
 		c.ClassProps["restores"] = 5
 	}
 }
