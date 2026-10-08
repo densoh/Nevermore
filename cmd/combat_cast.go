@@ -20,6 +20,27 @@ func init() {
 
 type cast cmd
 
+// dailyCharges maps spells limited per day to the ClassProps counter that gates them.
+var dailyCharges = map[string]string{
+	"heal":    "heals",
+	"restore": "restores",
+}
+
+// spendDailyCharge uses one daily charge if the spell is limited, telling the
+// caster and returning false when none are left. Staff are never limited.
+func spendDailyCharge(s *state, spell string) bool {
+	prop, limited := dailyCharges[spell]
+	if !limited || s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+		return true
+	}
+	if s.actor.ClassProps[prop] <= 0 {
+		s.msg.Actor.SendBad("You cannot cast " + spell + " anymore today.")
+		return false
+	}
+	s.actor.ClassProps[prop]--
+	return true
+}
+
 func (cast) process(s *state) {
 	/* Allowing blind casting
 	if s.actor.CheckFlag("blind") {
@@ -149,23 +170,9 @@ func (cast) process(s *state) {
 				s.ok = true
 				return
 			}
-			if spellInstance.Name == "heal" {
-				if s.actor.ClassProps["heals"] <= 0 {
-					s.msg.Actor.SendBad("You cannot cast heal anymore today.")
-					s.ok = true
-					return
-				} else {
-					s.actor.ClassProps["heals"]--
-				}
-			}
-			if spellInstance.Name == "restore" {
-				if s.actor.ClassProps["restores"] <= 0 {
-					s.msg.Actor.SendBad("You cannot cast restore anymore today.")
-					s.ok = true
-					return
-				} else {
-					s.actor.ClassProps["restore"]--
-				}
+			if !spendDailyCharge(s, spellInstance.Name) {
+				s.ok = true
+				return
 			}
 			noteSingingCast(s)
 			s.actor.FlagOn("casting", "cast")
@@ -202,6 +209,10 @@ func (cast) process(s *state) {
 		if strings.Contains(spellInstance.Effect, "damage") {
 			//TODO PVP flags etc.
 			s.msg.Actor.SendBad("Who are you trying to cast on?")
+			s.ok = true
+			return
+		}
+		if !spendDailyCharge(s, spellInstance.Name) {
 			s.ok = true
 			return
 		}
@@ -250,6 +261,10 @@ func (cast) process(s *state) {
 			s.actor.Victim = whatMob
 			whatMob.MarkAttackedBy(s.actor)
 		}
+		if !spendDailyCharge(s, spellInstance.Name) {
+			s.ok = true
+			return
+		}
 		noteSingingCast(s)
 		s.actor.FlagOn("casting", "cast")
 		msg = objects.Cast(s.actor, whatMob, spellInstance.Effect, spellInstance.Magnitude)
@@ -289,8 +304,17 @@ func (cast) process(s *state) {
 		return
 	}
 
+	if spellInstance.Name == "restore" {
+		s.msg.Actor.SendBad("You can only cast this spell on others.")
+		return
+	}
+
 	log.Println("Casting on self")
 	s.actor.RunHook("combat")
+	if !spendDailyCharge(s, spellInstance.Name) {
+		s.ok = true
+		return
+	}
 	noteSingingCast(s)
 	s.actor.FlagOn("casting", "cast")
 	msg = objects.Cast(s.actor, s.actor, spellInstance.Effect, spellInstance.Magnitude)

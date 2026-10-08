@@ -2,6 +2,7 @@ package objects
 
 import (
 	"log"
+	"math"
 	"math/rand"
 	"strconv"
 
@@ -338,7 +339,19 @@ func pray(caller interface{}, target interface{}, magnitude int) string {
 type healRoll func(tier int, pie float64) float64
 
 func minorHealRoll(tier int, pie float64) float64 {
-	return pie*config.MinorPieHealMod + float64(utils.Roll(5, 1, 3)) + float64(tier)/float64(config.MinorHealTierDiv)
+	return minorHeal(tier, pie, config.MinorHealTierDiv)
+}
+
+// casterMinorHealRoll is minorHealRoll for MinorHealCasterClasses, which gain
+// the tier bonus faster.
+func casterMinorHealRoll(tier int, pie float64) float64 {
+	return minorHeal(tier, pie, config.CasterMinorHealTierDiv)
+}
+
+// minorHeal is vigor/mend's roll: only piety above MinorHealPieFloor counts.
+func minorHeal(tier int, pie float64, tierDiv int) float64 {
+	pieBonus := math.Max(0, pie-float64(config.MinorHealPieFloor)) * config.MinorPieHealMod
+	return pieBonus + float64(utils.Roll(config.MinorHealDieSides, 1, config.MinorHealDieBonus)) + float64(tier)/float64(tierDiv)
 }
 
 func detraumatizeRoll(tier int, pie float64) float64 {
@@ -362,6 +375,9 @@ func healSpellAmount(caller *Character, spell string, roll healRoll) int {
 	divinity := caller.DivinityBonus() * .01
 	if spell == "vigor" || spell == "mend" {
 		divinity *= config.MinorHealDivinityMod
+		if utils.IntIn(caller.Class, config.MinorHealCasterClasses) {
+			roll = casterMinorHealRoll
+		}
 	}
 	damage := int(roll(caller.Tier, float64(caller.HealPiety())) * (1 + divinity))
 	damage = caller.CalcHealPenalty(damage)

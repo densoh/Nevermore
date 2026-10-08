@@ -7,7 +7,7 @@ import "math"
 // Mana regenerates from ManaRegenMod * (RegenStat + tier), where RegenStat is
 // the larger of piety and the average of piety and intelligence, so an
 // int-heavy caster is not punished for skipping piety. Health regenerates
-// from ConHealRegenMod * con. Both are halved (RegenCombatMod) while the
+// from ConHealRegenMod * con. Both are cut to RegenCombatMod while the
 // character has attacked or been attacked within CombatRegenWindowSeconds.
 // Rooms flagged heal_fast double both. Bless (or, for paladins, the seal of
 // faith) adds a fifth to both and softens the combat cut to
@@ -15,8 +15,8 @@ import "math"
 // combat cut.
 var (
 	ManaRegenMod             = .3
-	RegenCombatMod           = .5  // share of regen kept while in combat
-	BlessRegenCombatMod      = .75 // share kept while in combat and blessed
+	RegenCombatMod           = .35 // share of regen kept while in combat
+	BlessRegenCombatMod      = .65 // share kept while in combat and blessed
 	CombatRegenWindowSeconds = 8
 	HealFastRoomRegenMod     = 2.0
 	BlessRegenMod            = 1.2

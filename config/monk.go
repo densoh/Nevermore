@@ -115,7 +115,9 @@ const (
 	TodFailMinPercent = 5
 	TodFailMaxPercent = 25
 	TodFailHits       = 1
-	TodHitPieDiv      = 4   // miss chance -= pie/4
+	TodHitPieDiv      = 4  // miss chance -= pie/4
+	TodMissPenalty    = 30 // extra miss over a regular swing, less tier/TodMissTierDiv
+	TodMissTierDiv    = 2
 	TodMissRefund     = 0.5 // share of the committed chi returned when the touch whiffs
 
 	// Passive dodge and feint. Feint is a full attack round (flurried if the

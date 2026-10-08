@@ -176,11 +176,11 @@ var HealingSkill = map[int]int{
 	3:  60,
 	4:  80,
 	5:  100,
-	6:  120,
-	7:  140,
-	8:  160,
-	9:  180,
-	10: 200,
+	6:  115, // tapers from rank 6 so top healers don't run away
+	7:  130,
+	8:  140,
+	9:  150,
+	10: 160,
 }
 
 // SpellTierDamagePercent is the damage bonus, in percent per caster tier,

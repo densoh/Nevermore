@@ -91,3 +91,70 @@ func TestUseRefusesUnknownTarget(t *testing.T) {
 		t.Errorf("message %q does not name the missing target", got)
 	}
 }
+
+// Heal and restore each spend their own daily counter and stop at zero.
+func TestSpendDailyChargeCountsDown(t *testing.T) {
+	s := casterState()
+	s.actor.ClassProps = map[string]int{"heals": 2, "restores": 1}
+
+	if !spendDailyCharge(s, "heal") || !spendDailyCharge(s, "heal") {
+		t.Fatal("caster with 2 heals should cast twice")
+	}
+	if spendDailyCharge(s, "heal") {
+		t.Fatal("caster with no heals left should be refused")
+	}
+	if got := actorText(s); !strings.Contains(got, "cannot cast heal anymore today") {
+		t.Errorf("refusal message %q", got)
+	}
+	if !spendDailyCharge(s, "restore") || spendDailyCharge(s, "restore") {
+		t.Fatal("restore should spend its own counter")
+	}
+	if !spendDailyCharge(s, "vigor") {
+		t.Fatal("vigor has no daily limit")
+	}
+}
+
+// A self cast of heal with no charges left is refused before anything is spent.
+func TestCastHealOnSelfWithoutChargesRefused(t *testing.T) {
+	s := casterState("heal")
+	s.actor.Class = config.CLERIC
+	s.actor.Spells = []string{"heal"}
+	s.actor.ClassProps = map[string]int{"heals": 0}
+
+	cast{}.process(s)
+
+	if s.actor.Mana.Current != 100 {
+		t.Errorf("mana = %d, charged for a refused heal", s.actor.Mana.Current)
+	}
+	if got := actorText(s); !strings.Contains(got, "cannot cast heal anymore today") {
+		t.Errorf("message %q", got)
+	}
+}
+
+// Restore can never land on the caster, even with no target named.
+func TestCastRestoreOnSelfRefused(t *testing.T) {
+	s := casterState("restore")
+	s.actor.Class = config.CLERIC
+	s.actor.Spells = []string{"restore"}
+	s.actor.ClassProps = map[string]int{"restores": 5}
+
+	cast{}.process(s)
+
+	if s.actor.ClassProps["restores"] != 5 {
+		t.Errorf("restores = %d, charge spent on a refused self cast", s.actor.ClassProps["restores"])
+	}
+	if got := actorText(s); !strings.Contains(got, "only cast this spell on others") {
+		t.Errorf("message %q", got)
+	}
+}
+
+// Restore charges belong to the classes that can cast restore: cleric and bard.
+func TestRefreshGivesRestoresToClericAndBard(t *testing.T) {
+	for class, want := range map[int]int{config.CLERIC: 5, config.BARD: 5, config.PALADIN: 0} {
+		c := &objects.Character{Class: class, ClassProps: map[string]int{}}
+		c.Refresh()
+		if got := c.ClassProps["restores"]; got != want {
+			t.Errorf("class %d restores = %d, want %d", class, got, want)
+		}
+	}
+}

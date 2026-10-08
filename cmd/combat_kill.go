@@ -492,6 +492,13 @@ func BackstabMissChance(s *state, lvlDiff int, engaged int) int {
 	return missChance(s, weapon+config.BackstabMissPenaltyFor(stealth), lvlDiff, engaged)
 }
 
+// TodMissChance is the miss chance of a touch of death: the regular
+// hand-to-hand roll plus a penalty that tier and piety work off.
+func TodMissChance(s *state, lvlDiff int, engaged int) int {
+	weapon := config.WeaponMissChance(s.actor.Skills[config.HandSkill].Value)
+	return missChance(s, weapon+config.TodMissPenaltyFor(s.actor.Tier, s.actor.GetStat("pie")), lvlDiff, engaged)
+}
+
 // missChance builds a to-hit roll's miss chance from a skill-derived base.
 // Only the base differs between kinds of attack; the level penalty (which
 // loosens with the number of characters engaged, off in quest mode), dex,
