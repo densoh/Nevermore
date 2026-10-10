@@ -128,7 +128,7 @@ func (tod) process(s *state) {
 		whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
 		// Skill is credited the same way as a fighter's lethal: the share of
 		// the mob that was still standing, never less than the floor.
-		s.actor.AdvanceSkillExp(math.Max(remaining, config.LethalSkillFloor) * float64(whatMob.Experience))
+		s.actor.AdvanceSkillExp(math.Max(remaining, config.LethalSkillFloor) * float64(whatMob.Experience()))
 		whatMob.Stam.Current = 0
 		data.StoreCombatMetric("tod_whole", 0, 0, whatMob.Stam.Max, 0, whatMob.Stam.Max, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		todKillMessage(s, whatMob)
@@ -149,7 +149,7 @@ func (tod) process(s *state) {
 	actualDamage, _ := whatMob.ReceiveDamageNoArmor(damage)
 	resisted := 0
 	whatMob.AddThreatDamage(actualDamage, s.actor)
-	s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
+	s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 	if whatMob.CheckFlag("reflection") {
 		reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
 		stamDamage, vitDamage, reflResisted := s.actor.ReceiveDamage(reflectDamage)
