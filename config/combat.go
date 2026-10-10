@@ -419,6 +419,20 @@ const (
 	QuestLootRepairMultiplier = 1.5
 )
 
+// Meld pricing. A meld charges for the larger of the two items' template uses
+// (uses melded on earlier are never paid for twice), each at t² + MeldPriceBase, where t is the
+// lowest tier any class can cast the item's spell at; spell-less items (ammo)
+// fall back to a third of the template value per use. Prices sit near the
+// 40th percentile of the old value-based price (people meld their cheapest
+// items). Each full MeldPenaltyStep uses of the finished item adds
+// MeldPenaltyPerStep to the price once it is past one step: 101–199 uses
+// is +50%, 200 is +100%, 300 is +150%.
+const (
+	MeldPriceBase      = 3
+	MeldPenaltyStep    = 100
+	MeldPenaltyPerStep = .5
+)
+
 // CrushingChance is a barbarian's chance, out of 1000, that the first hit of
 // a regular attack round with a blunt or two-handed weapon is a crushing
 // blow, by weapon skill level: twice the critical chance.
@@ -538,7 +552,7 @@ func BreatheDamage(level int) int {
 
 var XP_Modifiers = map[string]float64{
 	"poisons":       .03,
-	"fast_moving":   .03,
+	"fast_moving":   .06,
 	"block_exit":    .06,
 	"follows":       .06,
 	"no_stun":       .03,

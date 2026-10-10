@@ -137,7 +137,7 @@ func dotTick(dot DoT, ctx *HitContext, target *Mob, triggers int) {
 	data.StoreCombatMetric(ctx.Element+"spell_"+dot.Effect, 0, 2, damage+resisted, resisted, damage, 0, credit.CharId, credit.Tier, 1, target.MobId)
 	target.AddThreatDamage(damage, credit)
 	if _, elemental := magicSkillMap[ctx.Element]; elemental && credit.Name == ctx.CasterName {
-		credit.AdvanceElementalExp(int(float64(damage)/float64(target.Stam.Max)*float64(target.Experience)), ctx.Element, credit.Class)
+		credit.AdvanceElementalExp(int(float64(damage)/float64(target.Stam.Max)*float64(target.Experience())), ctx.Element, credit.Class)
 	}
 	room.MessageAll(text.Red + target.Name + " " + dot.TickVerb + " for " + strconv.Itoa(damage) + " " + ctx.Element + " damage.\n" + text.Reset)
 	target.DeathCheck(credit)

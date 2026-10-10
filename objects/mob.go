@@ -31,10 +31,12 @@ type Mob struct {
 	MobSubType int // Melee, Ranged, Caster, Support
 
 	// ParentId is the room id for the room
-	ParentId   int
-	Gold       int
-	Experience int
-	Level      int
+	ParentId int
+	Gold     int
+	// ExpMultiplier scales config.MobBaseExperience for the mob's level;
+	// see Experience.
+	ExpMultiplier float64
+	Level         int
 
 	Stam Meter
 	Mana Meter
@@ -147,7 +149,7 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		0,
 		-1,
 		int(mobData["gold"].(int64)),
-		int(mobData["experience"].(int64)),
+		expMultiplier(mobData["exp_multiplier"]),
 		int(mobData["level"].(int64)),
 		Meter{int(mobData["hpmax"].(int64)), int(mobData["hpcur"].(int64))},
 		Meter{int(mobData["mpmax"].(int64)), int(mobData["mpcur"].(int64))},
@@ -515,9 +517,10 @@ func (m *Mob) Tick() {
 
 		// A paladin rescuing the target intercepts this attack: a melee mob is
 		// pulled onto the paladin and charges them, a ranged mob keeps its
-		// target but this shot lands on the paladin instead.
+		// target but this shot lands on the paladin instead. A ranged mob
+		// already standing on the paladin's square is pulled like a melee one.
 		if rescuer := target.Rescuer(); rescuer != nil {
-			if !ranged {
+			if !ranged || m.Placement == rescuer.Placement {
 				m.Charge(rescuer, target)
 				return
 			}
@@ -571,7 +574,7 @@ func (m *Mob) Tick() {
 				target.RunHook("attacked")
 				actualDamage, _, resisted := m.ReceiveDamage(int(math.Ceil(float64(target.InflictDamage()))))
 				data.StoreCombatMetric("melee_player_riposte", 0, 1, actualDamage+resisted, resisted, actualDamage, 0, target.CharId, target.Tier, 1, m.MobId)
-				target.AdvanceSkillExp((float64(actualDamage) / float64(m.Stam.Max) * float64(m.Experience)))
+				target.AdvanceSkillExp((float64(actualDamage) / float64(m.Stam.Max) * float64(m.Experience())))
 				target.writeCombat(text.Green + "You parry and riposte the attack from " + m.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + "\n" + text.Reset)
 				if m.DeathCheck(target) {
 					return
@@ -720,22 +723,43 @@ func (m *Mob) DeathCheck(target *Character) bool {
 	return false
 }
 
+// Experience is the mob's full exp value: the per-level table scaled by its
+// multiplier. Kill awards, weapon skill and elemental skill exp all start
+// from it.
+func (m *Mob) Experience() int {
+	return int(math.Round(float64(config.MobBaseExperience(m.Level)) * m.ExpMultiplier))
+}
+
+// expMultiplier reads exp_multiplier from a mob node. Neo4j hands back an
+// int64 when a whole number was written, and nil on a mob that predates the
+// field, which gets the plain table value.
+func expMultiplier(value interface{}) float64 {
+	switch v := value.(type) {
+	case float64:
+		return v
+	case int64:
+		return float64(v)
+	}
+	return 1
+}
+
 // KillExperience is the experience each member earns for killing the mob in
 // room, shared by melee kills and spell/callback kills. expReduce is the
 // number of players in the room, capped at 5.
 func (m *Mob) KillExperience(room *Room, expReduce int) int {
 	experienceAwarded := 0
+	baseExp := m.Experience()
 	if room.InQuestMode() {
-		experienceAwarded = m.Experience
+		experienceAwarded = baseExp
 	} else if m.CheckFlag("hostile") {
-		experienceAwarded = int(float64(m.Experience) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
+		experienceAwarded = int(float64(baseExp) * (config.ExperienceReduction[expReduce] + (float64(utils.Roll(10, 1, 0)) / 100)))
 	} else {
-		experienceAwarded = m.Experience / 10
+		experienceAwarded = baseExp / 10
 	}
 
 	for flag, modifier := range config.XP_Modifiers {
 		if m.CheckFlag(flag) {
-			experienceAwarded += int(float64(m.Experience) * modifier)
+			experienceAwarded += int(float64(baseExp) * modifier)
 		}
 	}
 
@@ -1492,7 +1516,7 @@ func (m *Mob) Save() {
 	mobData["mob_id"] = m.MobId
 	mobData["name"] = m.Name
 	mobData["description"] = m.Description
-	mobData["experience"] = m.Experience
+	mobData["exp_multiplier"] = m.ExpMultiplier
 	mobData["level"] = m.Level
 	mobData["gold"] = m.Gold
 	mobData["constitution"] = m.Con.Current
@@ -1561,8 +1585,8 @@ func (m *Mob) Eval() string {
 		descriptions = append(descriptions, "It currently has "+strconv.Itoa(m.Stam.Current)+" hit points remaining.")
 	}
 
-	if m.Experience > 0 {
-		descriptions = append(descriptions, "It is worth "+strconv.Itoa(m.Experience)+" experience points.")
+	if exp := m.Experience(); exp > 0 {
+		descriptions = append(descriptions, "It is worth "+strconv.Itoa(exp)+" experience points.")
 	}
 
 	if m.CheckFlag("poisons") {

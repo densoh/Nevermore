@@ -134,12 +134,17 @@ func CelebrationNight(target interface{}, singer *Character) {
 func ChampionsAnthem(target interface{}, singer *Character) {
 	switch target := target.(type) {
 	case *Character:
+		// The bonus is computed once when the anthem lands and the same amount
+		// is removed when it ends, so a piety change on the singer mid-song
+		// (pray starting or expiring) cannot leave a residue on the modifier.
+		bonus := 0
 		target.ApplyEffect(singer.Name+"_champions_anthem_song", "16", 0, 0,
 			func(triggers int) {
-				target.SetModifier("base_damage", singer.GetStat("pie")*config.ScalePerPiety)
+				bonus = singer.GetStat("pie") * config.ScalePerPiety
+				target.SetModifier("base_damage", bonus)
 			},
 			func() {
-				target.SetModifier("base_damage", -singer.GetStat("pie")*config.ScalePerPiety)
+				target.SetModifier("base_damage", -bonus)
 			})
 	}
 }
