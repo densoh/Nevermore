@@ -7,6 +7,7 @@ import (
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/utils"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -254,10 +255,14 @@ func (edit) process(s *state) {
 					value, _ := strconv.Atoi(s.words[3])
 					mob.Level = value
 					s.msg.Actor.SendGood("Change level")
-				case "experience":
-					types, _ := strconv.Atoi(s.words[3])
-					mob.Experience = types
-					s.msg.Actor.SendGood("Changed experience value.")
+				case "exp_multiplier":
+					value, err := strconv.ParseFloat(s.words[3], 64)
+					if err != nil || value < 0 {
+						s.msg.Actor.SendBad("The experience multiplier must be a number of 0 or more.")
+						return
+					}
+					mob.ExpMultiplier = math.Round(value*100) / 100
+					s.msg.Actor.SendGood("Changed experience multiplier; it is now worth " + strconv.Itoa(mob.Experience()) + " experience.")
 				case "gold":
 					value, _ := strconv.Atoi(s.words[3])
 					mob.Gold = value

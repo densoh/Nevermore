@@ -100,7 +100,7 @@ func (hamstring) process(s *state) {
 	whatMob.CurrentTarget = s.actor.Name
 	// Mobs carry no timed states, so a crippled mob stays crippled until it dies.
 	whatMob.FlagOn("crippled", "hamstring")
-	s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
+	s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 	s.msg.Actor.SendInfo("You hamstring the " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage, crippling it!" + text.Reset)
 	s.msg.Observers.SendInfo(s.actor.Name + " hamstrings " + whatMob.Name)
 	if whatMob.CheckFlag("reflection") {

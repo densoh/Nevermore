@@ -165,7 +165,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 			data.StoreCombatMetric("lethal", 0, 0, whatMob.Stam.Current, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
 			lethalFraction := math.Max(float64(whatMob.Stam.Current)/float64(whatMob.Stam.Max), config.LethalSkillFloor)
-			s.actor.AdvanceSkillExp(lethalFraction * float64(whatMob.Experience))
+			s.actor.AdvanceSkillExp(lethalFraction * float64(whatMob.Experience()))
 			whatMob.Stam.Current = 0
 			DeathCheck(s, whatMob)
 			s.actor.SetTimer("combat", config.CombatCooldown)
@@ -181,7 +181,7 @@ func performAttack(s *state, whatMob *objects.Mob) {
 			actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * config.CombatModifiers["snipe"])))
 			data.StoreCombatMetric("snipe", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			s.msg.Actor.SendInfo("You sniped the " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
-			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
+			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 			s.msg.Observers.SendInfo(s.actor.Name + " snipes " + whatMob.Name)
 			if whatMob.CheckFlag("reflection") {
 				reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
@@ -351,7 +351,7 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * mult)))
 		data.StoreCombatMetric(action, 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage, s.actor)
-		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience)))
+		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 		result.totalDamage += actualDamage
 		if whatMob.CheckFlag("reflection") {
 			reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)

@@ -1,5 +1,7 @@
 package config
 
+import "math"
+
 var LevelCap = 25
 var SkillCap = 36000000
 
@@ -24,11 +26,59 @@ var TierExpLevels = map[int]int{
 	18: 29000000,  //7200000
 	19: 37400000,  //8400000
 	20: 47400000,  //10000000
-	21: 60000000,  //12600000
-	22: 75000000,  //15000000
+	21: 59800000,  //12400000
+	22: 75000000,  //15200000
 	23: 93000000,  //18000000
 	24: 117000000, //24000000
 	25: 147000000, //30000000
+}
+
+// MobExpByLevel is the exp a mob of each level is worth at an exp_multiplier
+// of 1. The values are set so the solo kills a tier N player needs at level N
+// mobs (comment, at the 0.955 average solo award) rise smoothly and are
+// higher every tier than the one below. They depend on the TierExpLevels
+// gaps, so retune them together.
+var MobExpByLevel = map[int]int{
+	1:  10,    //47 kills
+	2:  23,    //48 kills
+	3:  49,    //53 kills
+	4:  92,    //68 kills
+	5:  155,   //101 kills
+	6:  285,   //184 kills
+	7:  550,   //286 kills
+	8:  710,   //406 kills
+	9:  920,   //569 kills
+	10: 1050,  //798 kills
+	11: 1150,  //1093 kills
+	12: 1350,  //1396 kills
+	13: 1650,  //1650 kills
+	14: 2125,  //1774 kills
+	15: 2725,  //1845 kills
+	16: 3350,  //1875 kills
+	17: 4000,  //1885 kills
+	18: 4600,  //1912 kills
+	19: 5300,  //1976 kills
+	20: 6075,  //2137 kills
+	21: 6725,  //2367 kills
+	22: 7300,  //2582 kills
+	23: 9450,  //2659 kills
+	24: 11700, //2685 kills
+	25: 13000,
+}
+
+// MobExpGrowthPastCap is the per-level growth of MobExpByLevel past level 25.
+var MobExpGrowthPastCap = 1.10
+
+// MobBaseExperience is MobExpByLevel for level, treating levels under 1 as 1
+// and growing by MobExpGrowthPastCap per level past the end of the table.
+func MobBaseExperience(level int) int {
+	if level < 1 {
+		level = 1
+	}
+	if level <= 25 {
+		return MobExpByLevel[level]
+	}
+	return int(math.Round(float64(MobExpByLevel[25]) * math.Pow(MobExpGrowthPastCap, float64(level-25))))
 }
 
 func MaxLoss(tier int) int {
