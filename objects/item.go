@@ -27,7 +27,8 @@ type Item struct {
 	Spell        string
 	StorePrice   int
 	Adjustment   int
-	Repairs      int // repairs since the last overhaul, see config.RepairsBeforeOverhaul
+	Repairs      int    // repairs since the last overhaul, see config.WeaponRepairsBeforeOverhaul
+	BoundTo      string // the character a worn ring bound itself to, see BindOnWear
 
 	Storage *ItemInventory
 	Weight  int
@@ -62,6 +63,7 @@ func LoadItem(itemData map[string]interface{}) (*Item, bool) {
 		0,
 		int(itemData["adjustment"].(int64)),
 		0,
+		"",
 		&ItemInventory{},
 		int(itemData["weight"].(int64)),
 	}
@@ -154,6 +156,31 @@ func (i *Item) DisplayName() string {
 	return preName + i.Name
 }
 
+// BindOnWear binds worn gear the first time it takes damage: quest loot is
+// soulbound (permanent), and a ring is bound to its wearer, who alone can pick
+// it up again.  It returns the message for the wearer, or "" when nothing
+// changed.
+func (i *Item) BindOnWear(owner string) string {
+	if i.Flags["quest_loot"] {
+		if i.Flags["permanent"] {
+			return ""
+		}
+		i.Flags["permanent"] = true
+		return "Your " + i.DisplayName() + " binds itself to your soul."
+	}
+	if i.ItemType == 24 && i.BoundTo == "" && owner != "" {
+		i.BoundTo = owner
+		return "Your " + i.DisplayName() + " binds itself to you."
+	}
+	return ""
+}
+
+// Bound reports whether the item is bound to its owner, either soulbound or a
+// ring bound by wear, and so can't be dropped, given, put away or sold.
+func (i *Item) Bound() bool {
+	return i.Flags["permanent"] || i.BoundTo != ""
+}
+
 func (i *Item) ToggleFlag(flagName string) bool {
 	if val, exists := i.Flags[flagName]; exists {
 		i.Flags[flagName] = !val
@@ -240,6 +267,12 @@ func ReturnItemInstanceProps(item *Item) map[string]interface{} {
 	}
 	if item.Repairs != 0 {
 		serialList["repairs"] = item.Repairs
+	}
+	if item.Flags["permanent"] {
+		serialList["permanent"] = 1
+	}
+	if item.BoundTo != "" {
+		serialList["bound_to"] = item.BoundTo
 	}
 	if item.ItemType == 9 {
 		serialList["contents"] = item.Storage.Jsonify()

@@ -161,7 +161,9 @@ func performAttack(s *state, whatMob *objects.Mob) {
 			// Sure did.  Kill this fool and bail.
 			s.msg.Actor.SendInfo("You landed a lethal blow on the " + whatMob.Name)
 			s.msg.Observers.SendInfo(s.actor.Name + " landed a lethal blow on " + whatMob.Name)
-			s.actor.Equipment.DamageWeapon("main", 1)
+			if weapMsg := s.actor.Equipment.DamageWeapon("main", 1); weapMsg != "" {
+				s.msg.Actor.SendInfo(weapMsg)
+			}
 			data.StoreCombatMetric("lethal", 0, 0, whatMob.Stam.Current, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
 			lethalFraction := math.Max(float64(whatMob.Stam.Current)/float64(whatMob.Stam.Max), config.LethalSkillFloor)

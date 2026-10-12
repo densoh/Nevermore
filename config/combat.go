@@ -408,17 +408,18 @@ func RollShatter() bool {
 }
 
 // Repair pricing. A repair costs RepairCostFraction of the item's value scaled
-// by the share of its uses that are gone. Every RepairsBeforeOverhaul
-// repairs a weapon or piece of armor needs an overhaul instead:
+// by the share of its uses that are gone. Every WeaponRepairsBeforeOverhaul
+// repairs a weapon (ArmorRepairsBeforeOverhaul for armor) needs an overhaul instead:
 // OverhaulCostMultiplier times the normal price, resetting the count, with an
-// OverhaulFailChance percent chance the item is destroyed (and no gold is taken). quest_loot items never need
-// an overhaul but pay QuestLootRepairMultiplier times the price.
+// OverhaulFailChance percent chance the item is destroyed (and no gold is taken). quest_loot items and rings
+// never need an overhaul but pay QuestLootRepairMultiplier times the price.
 const (
-	RepairCostFraction        = .3
-	RepairsBeforeOverhaul     = 10
-	OverhaulCostMultiplier    = 15
-	OverhaulFailChance        = 25
-	QuestLootRepairMultiplier = 1.5
+	RepairCostFraction          = .3
+	WeaponRepairsBeforeOverhaul = 10
+	ArmorRepairsBeforeOverhaul  = 5
+	OverhaulCostMultiplier      = 15
+	OverhaulFailChance          = 25
+	QuestLootRepairMultiplier   = 1.5
 )
 
 // Meld pricing. A meld charges for the larger of the two items' template uses

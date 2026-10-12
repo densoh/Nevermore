@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"log"
 	"strconv"
@@ -64,6 +65,9 @@ func (get) process(s *state) {
 			}
 			if roomInventory.Flags["no_take"] && !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 				s.msg.Actor.SendBad("You cannot take that!")
+				return
+			}
+			if boundElsewhere(s, roomInventory) {
 				return
 			}
 			// Check the mobs in the room to see if any of them block
@@ -130,6 +134,9 @@ func (get) process(s *state) {
 		if where != nil {
 			whereInventory := where.Storage.Search(targetStr, targetNum)
 			if whereInventory != nil {
+				if boundElsewhere(s, whereInventory) {
+					return
+				}
 				if whereInventory.ItemType == 10 {
 					s.actor.RunHook("act")
 					if err := where.Storage.Remove(whereInventory); err != nil {
@@ -166,4 +173,14 @@ func (get) process(s *state) {
 
 	s.msg.Actor.SendBad("Get what?")
 	s.ok = true
+}
+
+// boundElsewhere refuses an item bound to another character, such as a ring
+// left in its owner's corpse, and reports whether it did.
+func boundElsewhere(s *state, item *objects.Item) bool {
+	if item.BoundTo == "" || item.BoundTo == s.actor.Name || s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+		return false
+	}
+	s.msg.Actor.SendBad("That is bound to " + item.BoundTo + ".")
+	return true
 }

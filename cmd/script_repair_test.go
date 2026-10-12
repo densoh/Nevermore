@@ -27,12 +27,14 @@ func TestRepairQuote(t *testing.T) {
 		problem  bool
 	}{
 		{"half worn", weapon(50, 0, nil), 150, false, false},
-		{"last repair before overhaul", weapon(50, config.RepairsBeforeOverhaul-1, nil), 150, false, false},
-		{"overhaul due", weapon(50, config.RepairsBeforeOverhaul, nil), 2250, true, false},
-		{"quest loot never overhauls", weapon(50, config.RepairsBeforeOverhaul+4, map[string]bool{"quest_loot": true}), 225, false, false},
+		{"last repair before overhaul", weapon(50, config.WeaponRepairsBeforeOverhaul-1, nil), 150, false, false},
+		{"overhaul due", weapon(50, config.WeaponRepairsBeforeOverhaul, nil), 2250, true, false},
+		{"quest loot never overhauls", weapon(50, config.WeaponRepairsBeforeOverhaul+4, map[string]bool{"quest_loot": true}), 225, false, false},
 		{"pristine", weapon(100, 0, nil), 0, false, true},
 		{"always crit", weapon(50, 0, map[string]bool{"always_crit": true}), 0, false, true},
-		{"armor overhaul due", &objects.Item{ItemId: id, ItemType: 5, MaxUses: 50, Value: 1000, Repairs: config.RepairsBeforeOverhaul, Flags: map[string]bool{}}, 2250, true, false},
+		{"armor last repair before overhaul", &objects.Item{ItemId: id, ItemType: 5, MaxUses: 50, Value: 1000, Repairs: config.ArmorRepairsBeforeOverhaul - 1, Flags: map[string]bool{}}, 150, false, false},
+		{"armor overhaul due", &objects.Item{ItemId: id, ItemType: 5, MaxUses: 50, Value: 1000, Repairs: config.ArmorRepairsBeforeOverhaul, Flags: map[string]bool{}}, 2250, true, false},
+		{"ring never overhauls", &objects.Item{ItemId: id, ItemType: 24, MaxUses: 50, Value: 1000, Repairs: config.ArmorRepairsBeforeOverhaul + 4, Flags: map[string]bool{}}, 225, false, false},
 	}
 	for _, c := range cases {
 		cost, overhaul, problem := repairQuote(c.item)

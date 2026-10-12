@@ -304,6 +304,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 		FilledCharacter.SerialRestoreEffects(charData["effects"].(string))
 		FilledCharacter.SerialRestoreTimers(charData["timers"].(string))
 
+		FilledCharacter.Equipment.Owner = FilledCharacter.Name
 		FilledCharacter.Equipment.FlagOn = FilledCharacter.FlagOn
 		FilledCharacter.Equipment.FlagOff = FilledCharacter.FlagOff
 		FilledCharacter.Equipment.CanEquip = FilledCharacter.CanEquip
