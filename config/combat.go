@@ -115,7 +115,7 @@ var (
 
 	SurgeExtraDamage     = .15
 	SurgeDamageBonus     = .20 // Percentage added when using surge
-	InertialDamageIgnore = .20 // Percentage ignored when using inertial barrier
+	InertialDamageIgnore = .20 // Percentage a mob's inertial barrier ignores; players use InertialBarrierIgnore
 	ReflectDamagePerInt  = .02 // Percentage of damage reflected per int point
 	ReflectDamageFromMob = .15 // Percentage of damage reflected from mob
 	LethalSkillFloor     = .25 // Minimum fraction of a mob's exp granted as weapon skill on a lethal or touch of death kill
@@ -223,6 +223,7 @@ var (
 	ConHealRegenMod   = .10
 	ConFallDamageMod  = 1
 	ConArmorMod       = .005
+	DexArmorMod       = .005 // light armor only, for fighters, thieves and rangers
 
 	HitPerDex        = 1
 	MissPerDex       = 1
@@ -276,9 +277,10 @@ var (
 
 	ArmorReduction       = .007
 	ArmorReductionPoints = 10
-	// Player damage taken = constant / (constant + armor). 1000 matches the
-	// old linear formula through tier 14 at optimized gear.
-	ArmorReductionConstant = 1000
+	// Player damage taken = constant / (constant + armor). 1000 matched the
+	// old linear formula through tier 14 at optimized gear; 1100 offsets the
+	// class armor multipliers and heavy armor (2026-10-12).
+	ArmorReductionConstant = 1100
 
 	MobArmorReduction = .5
 
@@ -696,4 +698,26 @@ func OutlevelMissPenalty(lvlDiff int, engaged int) int {
 // given tier and piety, rounded to the nearest point.
 func SealCourageArmor(tier int, pie int) int {
 	return ((SealCourageArmorBase+SealCourageArmorPerLevel*tier)*(100+pie) + 50) / 100
+}
+
+// Inertial barrier, cast by a player on themselves: the share of incoming
+// damage ignored is InertialBase percent, plus a point for every
+// InertialTierDiv tiers above InertialTierStart, plus a point for every
+// InertialIntDiv int. Fractions count; a realistic tier 25 mage sits around
+// 25% and the theoretical top (tier 25, int 45) is 28%.
+const (
+	InertialBase      = 15.0
+	InertialTierStart = 9
+	InertialTierDiv   = 4.0
+	InertialIntDiv    = 5.0
+)
+
+// InertialBarrierIgnore is the fraction of damage a player's inertial barrier
+// ignores at the given tier and int.
+func InertialBarrierIgnore(tier int, intel int) float64 {
+	tierPart := 0.0
+	if tier > InertialTierStart {
+		tierPart = float64(tier-InertialTierStart) / InertialTierDiv
+	}
+	return (InertialBase + tierPart + float64(intel)/InertialIntDiv) / 100
 }

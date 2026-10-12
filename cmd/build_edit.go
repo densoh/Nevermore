@@ -171,6 +171,10 @@ func (edit) process(s *state) {
 					}
 					item.ItemType = types
 					s.msg.Actor.SendGood("Changed item type to " + config.ItemTypes[types])
+					if !config.ArmorClassValid(item.ItemType, item.Armor, item.ArmorClass) {
+						s.msg.Actor.SendInfo("A " + config.ItemTypes[types] + " can't be " + config.ArmorClassName(item.ArmorClass) + "; armor class reset to none.")
+						item.ArmorClass = 0
+					}
 				case "value":
 					value, _ := strconv.Atoi(s.words[3])
 					item.Value = value
@@ -181,6 +185,12 @@ func (edit) process(s *state) {
 					s.msg.Actor.SendGood("Changed number of dice")
 				case "armor":
 					value, _ := strconv.Atoi(s.words[3])
+					if item.ArmorClass == 3 && !config.HeavyArmorFits(item.ItemType, value) {
+						s.msg.Actor.SendBad("Heavy armor must stay above " +
+							strconv.Itoa(config.MaxArmor[config.HeavyArmorFloorBand][item.ItemType]) +
+							"; set its armor class to light or none first.")
+						return
+					}
 					item.Armor = value
 					s.msg.Actor.SendGood("Changed armor value")
 				case "pdice":
@@ -200,9 +210,25 @@ func (edit) process(s *state) {
 					item.MaxUses = value
 					s.msg.Actor.SendGood("Changed max_uses")
 				case "armor_class":
-					value, _ := strconv.Atoi(s.words[3])
+					value, ok := 0, false
+					if len(s.words) > 3 {
+						value, ok = config.ParseArmorClass(s.words[3])
+					}
+					if !ok {
+						s.msg.Actor.SendBad("Armor class must be none, light, heavy or robe (or 0, 1, 3, 4).")
+						return
+					}
+					if !config.ArmorClassFitsType(item.ItemType, value) {
+						s.msg.Actor.SendBad("Cloaks, shields and rings are always unclassed; their armor class can only be none.")
+						return
+					}
+					if value == 3 && !config.HeavyArmorFits(item.ItemType, item.Armor) {
+						s.msg.Actor.SendBad("Only tier 10-14 level armor and up can be heavy: this piece's armor must be above " +
+							strconv.Itoa(config.MaxArmor[config.HeavyArmorFloorBand][item.ItemType]) + ".")
+						return
+					}
 					item.ArmorClass = value
-					s.msg.Actor.SendGood("Changed armor class")
+					s.msg.Actor.SendGood("Changed armor class to " + config.ArmorClassName(value))
 				/*case "placement":
 				intKey, _ :=  strconv.Atoi(s.words[3])
 				if intKey >= 1 && intKey <= 5 {

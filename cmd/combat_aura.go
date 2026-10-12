@@ -10,10 +10,11 @@ import (
 
 func init() {
 	addHandler(aura{},
-		"Usage:  seal (courage|faith|justice|off) \n\n Invoke a holy seal upon yourself; only one seal can be held at a time.\n"+
-			" courage: requires a shield, hardens you against blows and lets you rescue allies.\n"+
-			" faith:   your healing draws on the full strength of your divinity and your health and mana recover as if blessed.\n"+
-			" justice: your blows deal extra damage scaling with piety and weapon skill, and land as if blessed.",
+		"Usage:  seal [courage|faith|justice|off] \n\n Invoke a holy seal upon yourself; only one seal can be held at a time.\n"+
+			" Typing seal on its own tells you which seal you currently bear.\n\n"+
+			" courage: you stand firm behind your shield, turning aside blows meant for you and your allies.\n"+
+			" faith:   your devotion is answered in full; your healing grows stronger and your body and spirit mend more swiftly.\n"+
+			" justice: your weapon is guided by righteous fury, striking truer and harder against the wicked.",
 		permissions.Paladin,
 		"seal")
 }
@@ -46,13 +47,17 @@ func (aura) process(s *state) {
 	if !s.requireTier(config.MinorAbilityTier) {
 		return
 	}
+	current := activeSeal(s.actor)
 	if len(s.input) < 1 {
-		s.msg.Actor.SendBad("What seal?")
+		if current == "" {
+			s.msg.Actor.SendInfo("You bear no seal.")
+		} else {
+			s.msg.Actor.SendInfo("You bear the seal of " + current + ".")
+		}
 		return
 	}
 
 	which := s.input[0]
-	current := activeSeal(s.actor)
 
 	if which == "off" || which == "none" {
 		if current == "" {

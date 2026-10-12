@@ -73,10 +73,14 @@ func TestParryChance(t *testing.T) {
 		{0, 20, true, 0}, // no skill, no parry at all
 		{1, 1, false, 1.5},
 		{1, 1, true, 2},
-		{7, 15, false, 10.5},
-		{7, 15, true, 18},
-		{10, 20, false, 15},
-		{10, 20, true, 25},
+		{6, 10, false, 9},    // last level at the full rate
+		{6, 10, true, 14},    // shield still at tier/2 through tier 10
+		{7, 15, false, 10},   // 9 + 1
+		{7, 15, true, 16.25}, // + 5 + 5*.25
+		{9, 19, true, 19.25}, // 12 + 7.25
+		{10, 20, false, 13},
+		{10, 20, true, 20.5}, // 13 + 7.5
+		{10, 25, true, 21.75},
 	}
 	for _, c := range cases {
 		if got := ParryChance(c.level, c.tier, c.shield); math.Abs(got-c.want) > 1e-9 {

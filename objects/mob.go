@@ -1012,7 +1012,7 @@ func (m *Mob) FollowLocked(name string) bool {
 
 // Teleport Special handler for handling a mobs cast of a teleport spell
 func (m *Mob) Teleport(target string) {
-	newRoom := Rooms[TeleportTable[rand.Intn(len(TeleportTable))]]
+	newRoom := RandomTeleportRoom(m.ParentId)
 	targetName := strings.Split(target, " ")
 	workingRoom := Rooms[m.ParentId]
 	targetChar := workingRoom.Chars.SearchAll(targetName[0])

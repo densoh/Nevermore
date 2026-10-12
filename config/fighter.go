@@ -36,12 +36,19 @@ const (
 	ExecuteMaxMultiplier = 2.0
 
 	// Parry: a fighter parries ParryPerWeaponLevel percent per weapon skill
-	// level, so 15% at grandmaster. A shield adds tier / ShieldParryTiersPerPoint
-	// points on top, half a point per character level. Parries that only
+	// level through ParryTaperLevel, then ParryPerLevelAfterTaper per level
+	// after it, so 13% at grandmaster. A shield adds tier /
+	// ShieldParryTiersPerPoint points through ShieldTaperTier, then
+	// ShieldPerTierAfterTaper per tier after it (7.25 at tier 19). Avoidance
+	// has accelerating returns, so both taper at the top. Parries that only
 	// landed because of the shield are blocks: they stop the hit but neither
 	// stun nor riposte.
 	ParryPerWeaponLevel      = 1.5
+	ParryTaperLevel          = 6
+	ParryPerLevelAfterTaper  = 1.0
 	ShieldParryTiersPerPoint = 2.0
+	ShieldTaperTier          = 10
+	ShieldPerTierAfterTaper  = 0.25
 
 	// Shield slam is shared with the paladin (see ShieldSlamStuns and
 	// SlamTimer in combat.go). Like bash it is an opener: it only works on a
@@ -119,9 +126,15 @@ func ParryChance(weaponLevel int, tier int, shield bool) float64 {
 	if weaponLevel <= 0 {
 		return 0
 	}
-	chance := float64(weaponLevel) * ParryPerWeaponLevel
+	chance := float64(min(weaponLevel, ParryTaperLevel)) * ParryPerWeaponLevel
+	if weaponLevel > ParryTaperLevel {
+		chance += float64(weaponLevel-ParryTaperLevel) * ParryPerLevelAfterTaper
+	}
 	if shield {
-		chance += float64(tier) / ShieldParryTiersPerPoint
+		chance += float64(min(tier, ShieldTaperTier)) / ShieldParryTiersPerPoint
+		if tier > ShieldTaperTier {
+			chance += float64(tier-ShieldTaperTier) * ShieldPerTierAfterTaper
+		}
 	}
 	return chance
 }

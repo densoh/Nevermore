@@ -4,8 +4,6 @@ import (
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/utils"
-	"github.com/jinzhu/copier"
-	"math/rand"
 	"strings"
 )
 
@@ -20,12 +18,7 @@ type scriptTeleport cmd
 
 func (scriptTeleport) process(s *state) {
 
-	var modTeleportTable []int
-	copier.Copy(&modTeleportTable, &objects.TeleportTable)
-	if utils.IntIn(s.actor.ParentId, modTeleportTable) {
-		modTeleportTable = utils.RemoveInt(modTeleportTable, s.actor.ParentId)
-	}
-	newRoom := objects.Rooms[objects.TeleportTable[rand.Intn(len(objects.TeleportTable))]]
+	newRoom := objects.RandomTeleportRoom(s.actor.ParentId)
 
 	if !utils.IntIn(newRoom.RoomId, s.rLocks) {
 		s.AddLocks(newRoom.RoomId)

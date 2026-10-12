@@ -49,6 +49,14 @@ const (
 	ThunkBaseMultiplier    = 5.0
 	ThunkBaseTier          = 5
 	ThunkMultiplierPerTier = 0.5
+
+	// Toughness: a barbarian's worn armor counts con twice (or dex in its
+	// place, when dex is higher), and from ToughnessTier every tier adds
+	// ToughnessPerTier more to the armor multiplier. It covers every worn
+	// piece, unclassed ones included: the toughness is the barbarian's, not
+	// the gear's.
+	ToughnessTier    = 10
+	ToughnessPerTier = 0.015
 )
 
 // ThunkMultiplier is the damage multiplier on a Thunk bash at the given tier.

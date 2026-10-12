@@ -14,7 +14,9 @@ import (
 )
 
 var (
-	TeleportTable = []int{117, 2567,
+	TeleportTable = []int{
+		117,  //  Outside Rymek Southern Gates
+		2567, //  Queen Ant's Chamber
 		2538, // Rymek Sewers
 		2530, //  Slimes
 		2761, //  Snake Pit
@@ -28,6 +30,19 @@ var (
 		2130, //  Trolls
 		2253, //  NorthEast Eldane Marsh
 		2699, //  Crabs
+		576,  //  Black Woods (L4-9)
+		1965, //  Anduin Plateau (L5-8)
+		1820, //  Mandrak Tended Corn Field (L4-9)
+		2791, //  Earthen Temple Underground (L4-9)
+		2548, //  Quickling's Village (L5-8)
+		2982, //  UnderCity Vzlun Street (L7)
+		2571, //  Island Troglodyte Cave (L7-10)
+		591,  //  Black Wood (L7-13)
+		2584, //  Island Wolverine Den (L7-10)
+		2728, //  Old Nexus University Foyer (L10-13)
+		612,  //  Blood Marsh (L10-15)
+		2784, //  Old Tigers & Bears Cave (L9-14)
+		2526, //  Crater (L11-14)
 
 		//Non Hostile Teleport Rooms:
 		2696, //  Twisted Maze in Mandrake Farm
@@ -44,9 +59,34 @@ var (
 		2015, //  NorthWest Crystal Mountains Path
 		1991, //  Along Tilnar's Veign (right before Drow)
 		2868, //  UnderCity Grotto
+		438,  //  Crimson Trail
+		1970, //  Sea of Tears Beach
+		2384, //  Worn Path
+		2192, //  Mud Road
+		2131, //  Common Road
+		2377, //  Elven Trail
+		2106, //  Processional Way
+		312,  //  Mandrak Farm Road
+		501,  //  Blackbone West Bank
+		2217, //  Mountain Road
+		2543, //  Island Trail
+		3018, //  Talmet Palace Center
+		2618, //  Thicket Path
 	}
 	RecallRoom = "77"
 )
+
+// RandomTeleportRoom picks a random room from TeleportTable, never the one
+// the target is standing in.
+func RandomTeleportRoom(currentRoomId int) *Room {
+	candidates := make([]int, 0, len(TeleportTable))
+	for _, roomId := range TeleportTable {
+		if roomId != currentRoomId {
+			candidates = append(candidates, roomId)
+		}
+	}
+	return Rooms[candidates[rand.Intn(len(candidates))]]
+}
 
 var Effects map[string]func(caller interface{}, target interface{}, magnitude int) string
 

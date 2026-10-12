@@ -141,6 +141,19 @@ func (e *Equipment) GetText(ref string) string {
 	return ""
 }
 
+// LightArmor is the total armor of the worn pieces that are light or lighter:
+// light, robes and unclassed pieces. Heavy and medium pieces don't count, and
+// neither do shields, whose armor is too large to scale on agility.
+func (e *Equipment) LightArmor() int {
+	total := 0
+	for _, item := range []*Item{e.Head, e.Chest, e.Neck, e.Legs, e.Feet, e.Arms, e.Hands, e.Ring1, e.Ring2, e.Main, e.Off} {
+		if item != nil && item.ArmorClass != 2 && item.ArmorClass != 3 && item.ItemType != 23 {
+			total += item.Armor
+		}
+	}
+	return total
+}
+
 func (e *Equipment) DamageRandomArmor() (retString string) {
 	armorList := make([]string, 0)
 	if e.Head != nil {
@@ -1019,59 +1032,25 @@ func RestoreEquipment(jsonString string, charClass int) (*Equipment, []Item) {
 }
 
 func (e *Equipment) CheckEquipment() {
-	if e.Head != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Head); !ok {
-			e.UnequipSpecific("head")
-		}
+	// Gear the wearer can no longer use (class rules, tier caps) goes back
+	// into the pack rather than vanishing.
+	slots := []struct {
+		alias string
+		item  *Item
+	}{
+		{"head", e.Head}, {"chest", e.Chest}, {"neck", e.Neck}, {"legs", e.Legs},
+		{"feet", e.Feet}, {"arms", e.Arms}, {"hands", e.Hands}, {"ring1", e.Ring1},
+		{"ring2", e.Ring2}, {"main", e.Main}, {"off", e.Off},
 	}
-	if e.Chest != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Chest); !ok {
-			e.UnequipSpecific("chest")
+	for _, slot := range slots {
+		if slot.item == (*Item)(nil) {
+			continue
 		}
-	}
-	if e.Neck != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Neck); !ok {
-			e.UnequipSpecific("neck")
-		}
-	}
-	if e.Legs != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Legs); !ok {
-			e.UnequipSpecific("legs")
-		}
-	}
-	if e.Feet != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Feet); !ok {
-			e.UnequipSpecific("feet")
-		}
-	}
-	if e.Arms != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Arms); !ok {
-			e.UnequipSpecific("arms")
-		}
-	}
-	if e.Hands != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Hands); !ok {
-			e.UnequipSpecific("hands")
-		}
-	}
-	if e.Ring1 != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Ring1); !ok {
-			e.UnequipSpecific("ring1")
-		}
-	}
-	if e.Ring2 != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Ring2); !ok {
-			e.UnequipSpecific("ring2")
-		}
-	}
-	if e.Main != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Main); !ok {
-			e.UnequipSpecific("main")
-		}
-	}
-	if e.Off != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Off); !ok {
-			e.UnequipSpecific("off")
+		if ok, _ := e.CanEquip(slot.item); !ok {
+			e.UnequipSpecific(slot.alias)
+			if e.ReturnToInventory != nil {
+				e.ReturnToInventory(slot.item)
+			}
 		}
 	}
 	// A weapon that became two-handed since the gear was saved pushes the off
