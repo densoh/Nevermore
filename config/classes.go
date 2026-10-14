@@ -110,7 +110,7 @@ var Classes = map[string]classDef{
 	},
 	"monk": {
 		Desc:              "The monk is the master of self-discipline. By calling upon inner strength, the monk can do grave damage to foes. A monk must spend his time in self-contemplation, growing stronger all the time. Every blow that lands builds chi, which the monk spends on flurries of strikes, leaps across the battlefield, and the fabled touch of death. The path of the monk is a hard one, but those few warriors who chose it will be rewarded with powers beyond most mortal men. As their Chi grows in strength they gain natural resistance to attacks.",
-		Skills:            "Meditate, Leap Strike, Sweep, Flurry, Touch of Death, Dodge, Feint",
+		Skills:            "Meditate, Leap Strike, Sweep, Flurry, Touch of Death, Dodge",
 		Stats:             "Piety, Constitution, Dexterity",
 		Armor:             "Constitution Based",
 		Races:             "Human, Dwarven",

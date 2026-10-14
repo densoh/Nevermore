@@ -30,9 +30,9 @@ func TestVitalStrikeRespectsInertialBarrier(t *testing.T) {
 	c.Int.Current = 30
 	c.Vit.Current, c.Vit.Max = 1000, 1000
 	c.Equipment = &Equipment{}
-	// No armor, so only the barrier applies: 1000 - ceil(1000 * .2375)
-	if got, _ := c.ReceiveVitalDamage(1000); got != 762 {
-		t.Errorf("vital damage through barrier = %d, want 762", got)
+	// No armor, so only the barrier applies: 1000 - ceil(1000 * .1595)
+	if got, _ := c.ReceiveVitalDamage(1000); got != 840 {
+		t.Errorf("vital damage through barrier = %d, want 840", got)
 	}
 }
 

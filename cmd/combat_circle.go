@@ -89,7 +89,7 @@ func (circle) process(s *state) {
 		}
 
 		whatMob.Stun(config.CircleStunFor(s.actor.Class, attackSkillLevel(s)))
-		whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
+		whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.LargeThreatPercent), s.actor)
 		whatMob.CurrentTarget = s.actor.Name
 		s.actor.SetTimer("combat_circle", config.CircleTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)

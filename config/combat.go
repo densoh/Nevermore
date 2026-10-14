@@ -115,7 +115,7 @@ var (
 
 	SurgeExtraDamage     = .15
 	SurgeDamageBonus     = .20 // Percentage added when using surge
-	InertialDamageIgnore = .20 // Percentage a mob's inertial barrier ignores; players use InertialBarrierIgnore
+	InertialDamageIgnore = .15 // Percentage a mob's inertial barrier ignores; players use InertialBarrierIgnore (2026-10-13: was .20)
 	ReflectDamagePerInt  = .02 // Percentage of damage reflected per int point
 	ReflectDamageFromMob = .15 // Percentage of damage reflected from mob
 	LethalSkillFloor     = .25 // Minimum fraction of a mob's exp granted as weapon skill on a lethal or touch of death kill
@@ -174,6 +174,10 @@ var (
 	// the paladin; RescueTimer is the cooldown between rescues.
 	RescueWindow = 8  // Seconds
 	RescueTimer  = 30 // Seconds
+	// A rescue lifts the rescuer to the mob's top threat plus this percent of
+	// it (at least 1), so the mob stays on them past a little extra damage
+	// from the rest of the party. (2026-10-13: was top + 1.)
+	RescueThreatMarginPercent = 10
 
 	ScalePerPiety  = 1
 	DurationPerCon = 10
@@ -185,16 +189,14 @@ var (
 	BashTimer   = 30
 
 	// Threat bumps, as a percent of the mob's max stamina, added on top of any
-	// damage the ability dealt. Taunts (circle, hamstring, shield slam)
-	// use TauntThreatPercent; bash and the monk's feint are lighter taunts, so
-	// a monk can peel a mob without out-holding the real tanks. A failed backstab hands
-	// the thief threat; a failed turn hands over the mob's current stamina,
-	// capped at FailedTurnThreatCapPercent.
-	TauntThreatPercent          = 50
-	BashThreatPercent           = 25
-	FeintThreatPercent          = 25
-	FailedBackstabThreatPercent = 25
-	FailedTurnThreatCapPercent  = 50
+	// damage the ability dealt. Abilities pick a size rather than owning a
+	// number. Large: the real taunts (circle, hamstring, shield slam) and the
+	// cap on a failed turn, which hands over the mob's current stamina. Small:
+	// lighter taunts that peel a mob without out-holding the real tanks (bash,
+	// the monk's sweep) and a failed backstab. (2026-10-13: was one constant
+	// per ability; the monk's taunt moved from feint back to sweep.)
+	SmallThreatPercent = 25
+	LargeThreatPercent = 50
 	// Heal threat is the amount healed split evenly across the mobs
 	// attacking the recipient (plus the healer's own target), but no single
 	// mob takes more than HealThreatCapPercent of the heal.
@@ -231,8 +233,16 @@ var (
 
 	FallDamage = .20
 
+	// A resist-fire/air/earth/water spell takes this share off magic damage of
+	// its element, for players and mobs alike. (2026-10-13: was 25%.)
+	ElementResistPercent = 20
+
+	// Every point of int above IntResistMagicBase blocks IntResistMagicPerPoint
+	// magic damage, times max(1, spell tier/IntResistMagicTierDiv); see
+	// IntMagicResist. (2026-10-14: was a flat int - 1 for any int above 10.)
 	IntResistMagicBase     = 10
 	IntResistMagicPerPoint = 1
+	IntResistMagicTierDiv  = 2
 	ManaPerStatPerTier     = .3 // Mana per point of the pool stat (int, or pie for divine casters and monks), per tier
 	IntSpellEffectDuration = 30 // Seconds to add
 	IntBroad               = 1  // Number of broadcasts per int point
@@ -571,6 +581,12 @@ func ThreatPercent(maxStam int, percent int) int {
 	return maxStam * percent / 100
 }
 
+// RescueThreat is the threat a rescue lifts the rescuer to on a mob whose top
+// threat is top: top plus RescueThreatMarginPercent of it, at least top + 1.
+func RescueThreat(top int) int {
+	return top + max(1, ThreatPercent(top, RescueThreatMarginPercent))
+}
+
 // BackstabMultiplier is the backstab damage multiplier at a stealth level.
 func BackstabMultiplier(stealthLevel int) float64 {
 	mult := BackstabDamageBase + float64(stealthLevel)*BackstabDamageSkillModifier
@@ -601,9 +617,9 @@ func TodMissPenaltyFor(tier int, pie int) int {
 }
 
 // FailedTurnThreat is the threat a failed turn hands the caster: the mob's
-// current stamina, capped at FailedTurnThreatCapPercent of its max.
+// current stamina, capped at LargeThreatPercent of its max.
 func FailedTurnThreat(current int, max int) int {
-	cap := ThreatPercent(max, FailedTurnThreatCapPercent)
+	cap := ThreatPercent(max, LargeThreatPercent)
 	if current > cap {
 		return cap
 	}
@@ -702,13 +718,16 @@ func SealCourageArmor(tier int, pie int) int {
 // Inertial barrier, cast by a player on themselves: the share of incoming
 // damage ignored is InertialBase percent, plus a point for every
 // InertialTierDiv tiers above InertialTierStart, plus a point for every
-// InertialIntDiv int. Fractions count; a realistic tier 25 mage sits around
-// 25% and the theoretical top (tier 25, int 45) is 28%.
+// InertialIntDiv int. Fractions count; a tier 20 mage with 25 int sits around
+// 15% and the theoretical top (tier 25, int 45) is about 19%. Tuned so a robed
+// mage with protection and the barrier stays slightly behind a thief in light
+// armor. (2026-10-13: was 15 + (tier-9)/4 + int/5, which put the mage 4-6
+// points ahead.)
 const (
-	InertialBase      = 15.0
+	InertialBase      = 10.0
 	InertialTierStart = 9
-	InertialTierDiv   = 4.0
-	InertialIntDiv    = 5.0
+	InertialTierDiv   = 5.0
+	InertialIntDiv    = 8.0
 )
 
 // InertialBarrierIgnore is the fraction of damage a player's inertial barrier
@@ -719,4 +738,32 @@ func InertialBarrierIgnore(tier int, intel int) float64 {
 		tierPart = float64(tier-InertialTierStart) / InertialTierDiv
 	}
 	return (InertialBase + tierPart + float64(intel)/InertialIntDiv) / 100
+}
+
+// CombustMagnitude is the magnitude code of combust, which deals damage
+// between a tier 4 and a tier 5 spell and counts as tier 4.
+const CombustMagnitude = 45
+
+// SpellTier is the tier of a damage spell from its magnitude code, or 0 for
+// anything that is not a tiered spell (breath, damage over time, scripts).
+func SpellTier(magnitude int) int {
+	if magnitude == CombustMagnitude {
+		return 4
+	}
+	if magnitude >= 1 && magnitude <= 7 {
+		return magnitude
+	}
+	return 0
+}
+
+// IntMagicResist is the flat magic damage a character's int blocks from a
+// hit of the given spell tier: (int - base) * perPoint, times
+// max(1, tier/IntResistMagicTierDiv), rounded down. Int at or below the base
+// blocks nothing, and tier 0 hits take the plain amount.
+func IntMagicResist(intel int, tier int) int {
+	if intel <= IntResistMagicBase {
+		return 0
+	}
+	scale := max(IntResistMagicTierDiv, tier)
+	return (intel - IntResistMagicBase) * IntResistMagicPerPoint * scale / IntResistMagicTierDiv
 }

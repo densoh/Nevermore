@@ -1,9 +1,11 @@
 package cmd
 
 import (
-	"github.com/ArcCS/Nevermore/permissions"
 	"log"
+	"slices"
 	"strconv"
+
+	"github.com/ArcCS/Nevermore/permissions"
 )
 
 func init() {
@@ -62,11 +64,6 @@ func (put) process(s *state) {
 		return
 	}
 
-	if target.Bound() && !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
-		s.msg.Actor.SendBad("You cannot get rid of this item.. it is bound to you.")
-		return
-	}
-
 	where := s.where.Items.Search(whereStr, whereNum)
 
 	if where == nil {
@@ -93,6 +90,15 @@ func (put) process(s *state) {
 
 	if target.ItemType == 9 {
 		s.msg.Actor.SendInfo("You cannot put a container into another container.")
+		return
+	}
+
+	// A bound item can only go into a soulbound container the owner carries,
+	// where it stays with them. Room fixtures can be flagged permanent too, so
+	// the container has to be in the actor's own inventory.
+	if target.Bound() && !(where.Bound() && slices.Contains(s.actor.Inventory.Contents, where)) &&
+		!s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+		s.msg.Actor.SendBad("You cannot get rid of this item.. it is bound to you.")
 		return
 	}
 

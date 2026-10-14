@@ -16,17 +16,19 @@ func TestBerserkDamageBonus(t *testing.T) {
 }
 
 func TestRecklessStamCost(t *testing.T) {
-	cases := []struct{ maxStam, tier, want int }{
-		{10, 20, 1},   // 5% of a tiny pool, floored at 1
-		{60, 20, 3},   // 5% is below the tier cap
-		{105, 5, 3},   // tier 5: 5% is 6, capped at 5/2+1
-		{345, 15, 8},  // tier 15: 5% is 18, capped at 15/2+1
-		{460, 20, 11}, // tier 20: 5% is 23, capped at 20/2+1
-		{200, 0, 1},   // tier 0 still pays the minimum
+	// 5% of base stamina (18 per tier), rounded up.
+	cases := []struct{ tier, want int }{
+		{1, 1},   // 0.9 rounds up to 1
+		{5, 5},   // 4.5
+		{10, 9},  // 9
+		{12, 11}, // 10.8
+		{15, 14}, // 13.5
+		{20, 18}, // 18
+		{0, 1},   // tier 0 still pays the minimum
 	}
 	for _, c := range cases {
-		if got := RecklessStamCost(c.maxStam, c.tier); got != c.want {
-			t.Errorf("RecklessStamCost(%d, %d) = %d, want %d", c.maxStam, c.tier, got, c.want)
+		if got := RecklessStamCost(c.tier); got != c.want {
+			t.Errorf("RecklessStamCost(%d) = %d, want %d", c.tier, got, c.want)
 		}
 	}
 }

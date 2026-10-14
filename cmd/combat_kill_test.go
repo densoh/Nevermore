@@ -62,13 +62,12 @@ func TestDetermineMissChanceWeaponSkill(t *testing.T) {
 	}
 }
 
-// A monk's follow-up swings are a flurry and take the flurry penalty; every
-// other class keeps the multi attack penalty.
+// A monk's flurry follow-ups take the same penalty as a fighter's multi attack.
 func TestFollowUpMissPenaltyByClass(t *testing.T) {
 	monk := attackerState(config.MONK, nil)
 	fighter := attackerState(config.FIGHTER, &objects.Item{ItemType: 1})
 	for skill := 5; skill <= 10; skill++ {
-		if got, want := followUpMissPenalty(monk, skill), config.FlurryMissPenaltyFor(skill); got != want {
+		if got, want := followUpMissPenalty(monk, skill), config.MultiAttackMissPenaltyFor(skill); got != want {
 			t.Errorf("monk skill %d penalty = %d, want %d", skill, got, want)
 		}
 		if got, want := followUpMissPenalty(fighter, skill), config.MultiAttackMissPenaltyFor(skill); got != want {

@@ -109,7 +109,7 @@ func (bash) process(s *state) {
 		whatMob.Stun(config.BashStuns * stunModifier)
 		actualDamage, _, resisted := whatMob.ReceiveDamage(config.BashDamage(s.actor.InflictDamage(), damageModifier, s.actor.Tier))
 		data.StoreCombatMetric("bash", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
-		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.BashThreatPercent), s.actor)
+		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.SmallThreatPercent), s.actor)
 		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 		s.msg.Actor.SendInfo(bashMsg)
 		whatMob.CurrentTarget = s.actor.Name

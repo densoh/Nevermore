@@ -10,8 +10,11 @@ import (
 )
 
 func init() {
+	if !config.FeintEnabled {
+		return
+	}
 	addHandler(feint{},
-		"Usage:  feint target # \n\n Strike at a target with a light, baiting blow that draws its attention onto you if it lands, and sets you to slip its next few attacks.  Spends your attack.  Throws extra strikes while flurrying, though a flurried feint builds no chi.",
+		"Usage:  feint [target #] \n\n Strike at a target with a light, baiting blow that sets you to slip its next few attacks.  Spends your attack.  Throws extra strikes while flurrying, though a flurried feint builds no chi.  With no target named, you feint at the foe you are already fighting.",
 		permissions.Monk,
 		"feint")
 }
@@ -19,7 +22,7 @@ func init() {
 type feint cmd
 
 func (feint) process(s *state) {
-	if len(s.input) < 1 {
+	if !hasMobTarget(s) {
 		s.msg.Actor.SendBad("Feint at what exactly?")
 		return
 	}
@@ -47,15 +50,7 @@ func (feint) process(s *state) {
 		return
 	}
 
-	name := s.input[0]
-	nameNum := 1
-	if len(s.words) > 1 {
-		if val, err := strconv.Atoi(s.words[1]); err == nil {
-			nameNum = val
-		}
-	}
-
-	whatMob := s.where.Mobs.Search(name, nameNum, s.actor)
+	whatMob := mobTarget(s)
 	if whatMob == nil {
 		s.msg.Actor.SendInfo("Feint at what?")
 		s.ok = true
@@ -98,10 +93,6 @@ func (feint) process(s *state) {
 		gainChiFromHits(s, result.chiHits())
 	}
 
-	// A light taunt: the half-damage blow carries little threat of its own.
-	whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.FeintThreatPercent), s.actor)
-	whatMob.CurrentTarget = s.actor.Name
-	s.msg.Actor.SendInfo(whatMob.Name + " turns its attention to you.")
-	s.msg.Observers.SendInfo(s.actor.Name + " feints at " + whatMob.Name + ", drawing its attention.")
+	s.msg.Observers.SendInfo(s.actor.Name + " feints at " + whatMob.Name + ".")
 	DeathCheck(s, whatMob)
 }
