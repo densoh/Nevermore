@@ -774,7 +774,7 @@ func (c *Character) GetStat(stat string) int {
 		if c.Class == config.MONK {
 			return c.Modifiers["armor"] + config.MonkNaturalArmor(c.Tier, c.GetStat("con"))
 		}
-		return c.Modifiers["armor"] + config.GearArmor(c.Class, c.Tier, c.Con.Current, c.Dex.Current, c.Equipment.Armor, c.Equipment.LightArmor())
+		return c.Equipment.Armor + c.Modifiers["armor"] + int(float64(c.Con.Current)*config.ConArmorMod*float64(c.Equipment.Armor))
 	default:
 		return 0
 	}
@@ -1100,17 +1100,11 @@ func (c *Character) CanEquip(item *Item) (bool, string) {
 			return false, "This armor would disrupt the flow of your chi"
 		}
 	}
-	if c.Class == config.MAGE && !config.MageCanWearArmorType(item.ItemType) {
-		return false, "Mages can only wear robes, cloaks and rings."
-	}
 	if utils.IntIn(item.ItemType, []int{5, 19, 20, 21, 22, 23, 24, 25, 26}) {
 		if !utils.IntIn(item.ArmorClass, config.ArmorRestrictions[c.Class]) {
 			return false, "You cannot equip armor of this class."
 		}
-		if item.ArmorClass == 3 && c.Tier < config.HeavyArmorTier {
-			return false, "You are not yet seasoned enough to fight in heavy armor."
-		}
-		if !config.CheckArmor(item.ItemType, c.Tier, item.BaseArmor(), item.ArmorClass) {
+		if !config.CheckArmor(item.ItemType, c.Tier, item.BaseArmor()) {
 			return false, "You are unsure of how to maximize the benefit of this armor and cannot wear it."
 		}
 

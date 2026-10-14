@@ -223,7 +223,6 @@ var (
 	ConHealRegenMod   = .10
 	ConFallDamageMod  = 1
 	ConArmorMod       = .005
-	DexArmorMod       = .005 // light armor only, for fighters, thieves and rangers
 
 	HitPerDex        = 1
 	MissPerDex       = 1
@@ -277,10 +276,9 @@ var (
 
 	ArmorReduction       = .007
 	ArmorReductionPoints = 10
-	// Player damage taken = constant / (constant + armor). 1000 matched the
-	// old linear formula through tier 14 at optimized gear; 1100 offsets the
-	// class armor multipliers and heavy armor (2026-10-12).
-	ArmorReductionConstant = 1100
+	// Player damage taken = constant / (constant + armor). 1000 matches the
+	// old linear formula through tier 14 at optimized gear.
+	ArmorReductionConstant = 1000
 
 	MobArmorReduction = .5
 

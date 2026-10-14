@@ -145,19 +145,6 @@ func (e *Equipment) GetText(ref string) string {
 	return ""
 }
 
-// LightArmor is the total armor of the worn pieces that are light or lighter:
-// light, robes and unclassed pieces. Heavy and medium pieces don't count, and
-// neither do shields, whose armor is too large to scale on agility.
-func (e *Equipment) LightArmor() int {
-	total := 0
-	for _, item := range []*Item{e.Head, e.Chest, e.Neck, e.Legs, e.Feet, e.Arms, e.Hands, e.Ring1, e.Ring2, e.Main, e.Off} {
-		if item != nil && item.ArmorClass != 2 && item.ArmorClass != 3 && item.ItemType != 23 {
-			total += item.Armor
-		}
-	}
-	return total
-}
-
 func (e *Equipment) DamageRandomArmor() (retString string) {
 	armorList := make([]string, 0)
 	if e.Head != nil {
