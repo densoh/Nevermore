@@ -110,8 +110,9 @@ func ParseArmorClass(value string) (int, bool) {
 // total armor of every worn piece and lightArmor the part of it on pieces
 // that are light or lighter (light, robe, unclassed) and aren't shields.
 // Everyone multiplies their gear by con. Fighters, thieves and rangers add dex
-// on those pieces only, since moving well in light armor is a technique. Barbarians add max(dex, con) and their toughness on
-// everything. Monks don't wear armor and are handled by MonkNaturalArmor.
+// on those pieces only, since moving well in light armor is a technique.
+// Barbarians add max(dex, con) and their toughness on everything. Monks don't
+// wear armor and are handled by MonkNaturalArmor.
 func GearArmor(class, tier, con, dex, gearArmor, lightArmor int) int {
 	bonus := float64(gearArmor) * float64(con) * ConArmorMod
 	switch class {
