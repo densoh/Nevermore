@@ -52,8 +52,8 @@ func MultiAttackMissPenaltyFor(skillLevel int) int {
 	return penalty
 }
 
-// MajorAbilityTier gates the tier 10 class abilities (berserk, flurry, touch
-// of death, the long leap, the meditate save). A const so other config
+// MajorAbilityTier gates the tier 10 class abilities (berserk, touch of
+// death, the long leap, the meditate save). A const so other config
 // constants can build on it.
 const MajorAbilityTier = 10
 

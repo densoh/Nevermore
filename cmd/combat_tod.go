@@ -14,7 +14,7 @@ import (
 
 func init() {
 	addHandler(tod{},
-		"Usage:  tod target # \n\n Commit your chi to a touch of death.  The more chi you bring and the weaker the target, the likelier it dies outright; a touch that fails to kill still wounds, but one that misses entirely leaves you open to a savage blow.",
+		"Usage:  tod target # \n\n Commit your chi to a touch of death.  You may strike with a touch at any time, but an unharmed foe cannot be slain by it; the more wounded your target and the more chi you bring, the likelier it dies outright.  A touch that fails to kill still wounds, but one that misses entirely leaves you open to a savage blow.  Your attuned senses can tell when a touch of death has a high chance to slay an enemy.  This is only a sign; you need not wait for it.",
 		permissions.Monk,
 		"tod", "touch-of-death")
 }
