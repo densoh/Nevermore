@@ -12,13 +12,20 @@ import "math"
 // out of combat for a while.
 const (
 	// Tier gates.
+	// Flurry comes early (2026-10-14: was MajorAbilityTier) so a monk learns
+	// the chi loop before touch of death adds a second use for it.
 	MonkLeapTier     = 5
 	MonkSweepTier    = 5
-	MonkFlurryTier   = MajorAbilityTier
+	MonkFlurryTier   = 5
 	MonkTodTier      = MajorAbilityTier
 	MonkLongLeapTier = MajorAbilityTier
 	MonkDodgeTier    = 15
 	MonkFeintTier    = 15
+	// FeintEnabled registers the feint command. Off since 2026-10-14: with the
+	// taunt moved to sweep, feint was a defensive button pressed every other
+	// round while offtanking, and monks already have plenty to manage. The
+	// code is kept so it can be switched back on.
+	FeintEnabled = false
 	// From this tier a monk's discipline blunts vital and critical strikes.
 	MonkIronBodyTier = 15
 	// From this tier, afflictions aimed at a meditating monk must beat a save.
@@ -39,8 +46,16 @@ const (
 	ChiGainCapPercent    = 15 // no single chi award exceeds this share of max chi; only bites on tiny tier 1-3 pools (was 10 until 2026-09-27)
 
 	// Meditate: instant restore of (base + pie/div + tier*perTier)% of each pool,
-	// then a trance that halts chi decay and boosts chi generation.
-	MeditateTime            = 300 // cooldown seconds
+	// then a trance that halts chi decay and boosts chi generation. Meditate
+	// recharges over MeditateChargeTime: the restore and the trance length
+	// scale with the share of it that has passed since the last cast, so
+	// casting early trades power for timing without adding to the total. It
+	// can be used again once the trance has ended and at least
+	// MeditateMinCharge seconds have passed; the affliction purge happens on
+	// every cast at full strength. (2026-10-13: was a flat 300s cooldown with
+	// a full restore and trance every time.)
+	MeditateChargeTime      = 300 // seconds to recover a full meditate
+	MeditateMinCharge       = 30  // seconds since the last cast before meditate can be used
 	MeditateBasePercent     = 20
 	MeditatePieDiv          = 3
 	MeditatePercentPerTier  = 1
@@ -68,21 +83,20 @@ const (
 	FlurryChiCostExpert = 8
 	FlurryExpertSkill   = 7
 	FlurryMaxDuration   = 3600 // safety expiry for the stance, seconds
-	// Flurry swings after the first miss more often, but by less than a
-	// fighter's multi attack (25 falling to 10) because the monk pays chi for
-	// them. The penalty is FlurryMissPenalty through Expert and drops to
-	// FlurryMissPenaltyFloor from FlurryMissFloorSkill up.
-	FlurryMissPenalty      = 15 // percentage points, through Expert
-	FlurryMissPenaltyFloor = 10 // percentage points, Specialist and above
-	FlurryMissFloorSkill   = 8
+	// Flurry swings after the first take the fighter's multi attack miss
+	// penalty (MultiAttackMissPenaltyFor). (2026-10-13: was a flurry-only 15
+	// through Expert and 10 from Specialist.)
 
 	// Leap strike.
 	LeapFreeDistance = 2  // squares closable at no chi cost
 	LongLeapChiCost  = 10 // chi for a leap beyond LeapFreeDistance
 	LeapTimer        = 30 // cooldown seconds; 0 means none beyond the combat round
 
-	// Sweep.
-	SweepTimer = 30
+	// Sweep: a full attack round that stuns and taunts when it lands. The stun
+	// costs the monk no damage (circle spends the round), so the timer is long:
+	// a 12s stun every 60s denies the mob roughly one attack in eight.
+	// (2026-10-13: was 30s.)
+	SweepTimer = 60
 	SweepStuns = 12 // seconds
 
 	// Touch of death. The cooldown starts at TodTimerBase and drops
@@ -135,6 +149,18 @@ const (
 	FeintTimer            = 16
 	FeintSafetyDuration   = 60 // seconds before unused feint charges lapse
 
+	// Chi ward: from MonkMagicResistTier a monk's chi turns aside
+	// MonkMagicResistBase + con/MonkMagicResistConDiv percent of magic damage
+	// (capped at MonkMagicResistCap), after every other resist. It costs a
+	// chi for every ChiWardDamagePerChi damage turned aside, rounded to the
+	// nearest chi, and stops when the chi runs out. Priced at about half a
+	// monk's vigor (1 chi for 17-22 stamina) because it needs no cast.
+	MonkMagicResistTier   = MajorAbilityTier
+	MonkMagicResistBase   = 10
+	MonkMagicResistConDiv = 5
+	MonkMagicResistCap    = 19
+	ChiWardDamagePerChi   = 10
+
 	// Natural armor.
 	MonkArmorPerLevel = 15
 	ConMonkArmor      = 2
@@ -152,20 +178,23 @@ const (
 	// its range. The flat cut is a large share of a low-tier hit and a small
 	// share of a high-tier one, so the monk lands near three quarters of a
 	// geared melee hit from tier 5 up instead of drifting down with level
-	// (2026-09-27: was 2 dice with no cut). Below flurry the cut is lighter
-	// so tiers 6-9 stay playable before the kit is complete (2026-10-01: was
-	// 8 at every tier).
+	// (2026-09-27: was 2 dice with no cut). Below MonkFullCutTier the cut is
+	// lighter so tiers 6-9 stay playable before the kit is complete (2026-10-01:
+	// was 8 at every tier; 2026-10-13: 8/6 -> 6/4 after low-tier damage
+	// complaints; 2026-10-14: gate split from MonkFlurryTier when flurry moved
+	// to tier 5).
 	MonkDamageDivisor    = 2
 	MonkRollDivisor      = 3
 	MonkDamageDice       = 3
-	MonkDamageFlatCut    = 8
-	MonkDamageFlatCutLow = 6 // below MonkFlurryTier
+	MonkDamageFlatCut    = 6
+	MonkDamageFlatCutLow = 4 // below MonkFullCutTier
+	MonkFullCutTier      = MajorAbilityTier
 	MonkDamageFloor      = 1
 )
 
 // MonkDamageCut is the flat cut taken off a monk's unarmed hit at a tier.
 func MonkDamageCut(tier int) int {
-	if tier < MonkFlurryTier {
+	if tier < MonkFullCutTier {
 		return MonkDamageFlatCutLow
 	}
 	return MonkDamageFlatCut
@@ -186,6 +215,27 @@ func MonkCriticalReduction(tier int) float64 {
 		return 0
 	}
 	return float64(tier) * MonkCriticalReductionPerTier
+}
+
+// MonkMagicResistPercent is the share of magic damage a monk's chi ward turns
+// aside at the given constitution.
+func MonkMagicResistPercent(con int) int {
+	return min(MonkMagicResistCap, MonkMagicResistBase+con/MonkMagicResistConDiv)
+}
+
+// ChiWard is how much of a magic hit (already past every other resist) a
+// monk's chi turns aside, and the chi that costs, given the ward percentage
+// and the chi on hand. Cost is the damage over ChiWardDamagePerChi rounded to
+// the nearest chi, so turning aside 1-4 is free; with no chi there is no ward.
+func ChiWard(damage int, percent int, chi int) (absorbed int, cost int) {
+	if damage <= 0 || chi <= 0 {
+		return 0, 0
+	}
+	absorbed = damage * percent / 100
+	if most := chi*ChiWardDamagePerChi + ChiWardDamagePerChi/2 - 1; absorbed > most {
+		absorbed = most
+	}
+	return absorbed, (absorbed + ChiWardDamagePerChi/2) / ChiWardDamagePerChi
 }
 
 // MonkNaturalArmor is a monk's armor before spell modifiers. The tier and
@@ -223,8 +273,8 @@ func MonkUnarmedRange(tier int, str int) (int, int) {
 }
 
 // FlurryMinSkill is the unarmed skill level a flurry swings at when the monk's
-// own skill is lower: Ace, the first row of the fighter multi-attack table.
-const FlurryMinSkill = 5
+// own skill is lower: Adept. (2026-10-13: was Ace.)
+const FlurryMinSkill = 6
 
 // FlurryChiCost is the chi a flurried attack round costs at an unarmed skill level.
 func FlurryChiCost(skill int) int {
@@ -234,37 +284,18 @@ func FlurryChiCost(skill int) int {
 	return FlurryChiCostBase
 }
 
-// FlurryMissPenaltyFor returns the extra miss chance, in percentage points,
-// on every flurry swing after the first at an unarmed skill level.
-func FlurryMissPenaltyFor(skill int) int {
-	if skill >= FlurryMissFloorSkill {
-		return FlurryMissPenaltyFloor
-	}
-	return FlurryMissPenalty
-}
-
-// FlurryMaxSwings caps how many swings a flurry throws. Monks have touch of
-// death, leap and sweep on top of flurry, so a Master or Grandmaster keeps
-// that row's multipliers for its first three swings but never gets the
-// fighter's fourth and fifth.
-const FlurryMaxSwings = 3
-
 // MonkFlurryFor returns the swing multipliers for a flurried round. Flurry
-// follows the fighter multi-attack table for the monk's unarmed skill, except
-// that a monk below Ace still swings as an Ace and no row is longer than
-// FlurryMaxSwings.
+// follows the fighter multi-attack table for the monk's unarmed skill, all
+// five Grandmaster swings included, except that a monk below Adept still
+// swings as an Adept. (2026-10-13: flurry was capped at three swings.)
 func MonkFlurryFor(skill int) []float64 {
 	if skill < FlurryMinSkill {
 		skill = FlurryMinSkill
 	}
-	mults, ok := MultiAttackMultipliers[skill]
-	if !ok {
-		return []float64{1}
+	if mults, ok := MultiAttackMultipliers[skill]; ok {
+		return mults
 	}
-	if len(mults) > FlurryMaxSwings {
-		mults = mults[:FlurryMaxSwings]
-	}
-	return mults
+	return []float64{1}
 }
 
 // MonkMaxChi is the monk's chi pool at a tier and piety: the shared mana
@@ -328,9 +359,21 @@ func MeditateSaveChance(tier int, attackerLevel int, con int) int {
 	return chance
 }
 
-// MeditateDuration is the trance length in seconds.
+// MeditateDuration is the full trance length in seconds.
 func MeditateDuration(tier int) int {
 	return MeditateBaseDuration + tier*MeditateDurationPerTier
+}
+
+// MeditateCharge is the share (0..1) of a full meditate recovered after the
+// given number of seconds since the last cast.
+func MeditateCharge(elapsed float64) float64 {
+	return math.Min(math.Max(elapsed/MeditateChargeTime, 0), 1)
+}
+
+// MeditateTranceFor is the trance length in seconds at a tier and charge,
+// never less than one second.
+func MeditateTranceFor(tier int, charge float64) int {
+	return max(1, int(math.Round(float64(MeditateDuration(tier))*charge)))
 }
 
 // TodReference is R: the chi commitment a touch of death is measured against.

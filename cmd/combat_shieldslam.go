@@ -91,7 +91,7 @@ func (slam) process(s *state) {
 		shield := s.actor.Equipment.Off
 		actualDamage, _, resisted := whatMob.ReceiveDamage(config.ShieldSlamDamage(config.ShieldSlamStat(s.actor.Class, s.actor.GetStat("str"), s.actor.GetStat("pie")), s.actor.Tier, config.RollShieldArmor(shield.Armor)))
 		data.StoreCombatMetric("shieldslam", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
-		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
+		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.LargeThreatPercent), s.actor)
 		whatMob.Stun(config.ShieldSlamStuns)
 		whatMob.CurrentTarget = s.actor.Name
 		s.msg.Actor.SendInfo("You slammed the " + whatMob.Name + " with your shield for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)

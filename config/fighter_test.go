@@ -135,10 +135,10 @@ func TestShieldSlamDamage(t *testing.T) {
 }
 
 func TestThreatBumps(t *testing.T) {
-	if got := ThreatPercent(400, TauntThreatPercent); got != 200 {
+	if got := ThreatPercent(400, LargeThreatPercent); got != 200 {
 		t.Errorf("taunt threat on 400 max = %d, want 200", got)
 	}
-	if got := ThreatPercent(400, BashThreatPercent); got != 100 {
+	if got := ThreatPercent(400, SmallThreatPercent); got != 100 {
 		t.Errorf("bash threat on 400 max = %d, want 100", got)
 	}
 	if got := FailedTurnThreat(350, 400); got != 200 {
@@ -167,6 +167,15 @@ func TestShieldSlamStat(t *testing.T) {
 	for _, c := range cases {
 		if got := ShieldSlamStat(c.class, c.str, c.pie); got != c.want {
 			t.Errorf("ShieldSlamStat(%d, %d, %d) = %d, want %d", c.class, c.str, c.pie, got, c.want)
+		}
+	}
+}
+
+func TestRescueThreat(t *testing.T) {
+	cases := map[int]int{0: 1, 5: 6, 9: 10, 10: 11, 200: 220, 1234: 1357}
+	for top, want := range cases {
+		if got := RescueThreat(top); got != want {
+			t.Errorf("RescueThreat(%d) = %d, want %d", top, got, want)
 		}
 	}
 }

@@ -146,7 +146,7 @@ func (backstab) process(s *state) {
 		} else {
 			s.msg.Actor.SendBad("You failed to backstab ", whatMob.Name, ", and are vulnerable to attack!")
 			s.msg.Observers.SendBad(s.actor.Name+" failed to backstab ", whatMob.Name, ", and is vulnerable to attack!")
-			whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.FailedBackstabThreatPercent), s.actor)
+			whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.SmallThreatPercent), s.actor)
 			s.actor.SetTimer("combat", config.CombatCooldown)
 			landed, _ := whatMob.RevengeVital(s.actor, config.MobBSRevengeVitalChance, func() {
 				whatMob.CurrentTarget = s.actor.Name

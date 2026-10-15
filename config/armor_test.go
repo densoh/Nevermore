@@ -36,12 +36,12 @@ func TestInertialBarrierIgnore(t *testing.T) {
 		tier, intel int
 		want        float64
 	}{
-		{9, 20, .19},    // tier term starts above 9
-		{10, 20, .1925}, // 15 + 0.25 + 4
-		{15, 25, .215},  // 15 + 1.5 + 5
-		{20, 30, .2375}, // 15 + 2.75 + 6
-		{25, 45, .28},   // theoretical top
-		{5, 20, .19},    // never negative below the start tier
+		{9, 20, .125},    // tier term starts above 9
+		{10, 20, .127},   // 10 + 0.2 + 2.5
+		{15, 25, .14325}, // 10 + 1.2 + 3.125
+		{20, 30, .1595},  // 10 + 2.2 + 3.75
+		{25, 45, .18825}, // theoretical top
+		{5, 20, .125},    // never negative below the start tier
 	}
 	for _, c := range cases {
 		got := InertialBarrierIgnore(c.tier, c.intel)
@@ -51,6 +51,7 @@ func TestInertialBarrierIgnore(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestCheckArmorHeavyUsesNextBand(t *testing.T) {
 	const light, heavy = 1, 3
 	cases := []struct {
@@ -98,6 +99,8 @@ func TestHeavyArmorFits(t *testing.T) {
 	}
 }
 
+=======
+>>>>>>> master
 func TestArmorDescription(t *testing.T) {
 	cases := map[[2]int]string{
 		{5, 3}:  "heavy body armor",
@@ -111,6 +114,7 @@ func TestArmorDescription(t *testing.T) {
 		}
 	}
 }
+<<<<<<< HEAD
 
 func TestArmorClassValid(t *testing.T) {
 	cases := []struct {
@@ -172,3 +176,5 @@ func TestParseArmorClass(t *testing.T) {
 		}
 	}
 }
+=======
+>>>>>>> master

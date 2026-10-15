@@ -67,3 +67,64 @@ func TestTickChiStopsAtFloor(t *testing.T) {
 		t.Fatalf("decay above the floor left %d chi, want 20", c.Mana.Current)
 	}
 }
+
+// wardMonk is a tier 10 monk with 20 con (a 14% ward), the given chi and
+// plenty of stamina to take a hit.
+func wardMonk(chi int) *Character {
+	c := monk(100)
+	c.Tier = 10
+	c.Modifiers = map[string]int{}
+	c.Con = Meter{Max: 20, Current: 20}
+	c.Mana.Current = chi
+	c.Stam = Meter{Max: 1000, Current: 1000}
+	c.Vit = Meter{Max: 100, Current: 100}
+	return c
+}
+
+// The ward takes its share of a magic hit and charges chi for it.
+func TestChiWardAbsorbsMagic(t *testing.T) {
+	c := wardMonk(50)
+	stam, _, resisted := c.ReceiveMagicDamage(100, "fire", 0)
+	if resisted != 14 || stam != 86 {
+		t.Errorf("100 fire on a 14%% ward: took %d, resisted %d; want 86 and 14", stam, resisted)
+	}
+	if c.Mana.Current != 49 {
+		t.Errorf("chi after turning aside 14 = %d, want 49", c.Mana.Current)
+	}
+}
+
+// The ward works on what the other resists let through.
+func TestChiWardAfterOtherResists(t *testing.T) {
+	c := wardMonk(50)
+	c.Flags["resist-fire"] = true
+	stam, _, resisted := c.ReceiveMagicDamage(100, "fire", 0)
+	// 20 resisted by the spell, then 14% of the remaining 80 is 11.
+	if resisted != 31 || stam != 69 {
+		t.Errorf("warded resist-fire monk took %d, resisted %d; want 69 and 31", stam, resisted)
+	}
+}
+
+// Below tier 10, or with no chi, there is no ward.
+func TestChiWardNeedsTierAndChi(t *testing.T) {
+	low := wardMonk(50)
+	low.Tier = 9
+	if stam, _, _ := low.ReceiveMagicDamage(100, "fire", 0); stam != 100 {
+		t.Errorf("tier 9 monk took %d, want the full 100", stam)
+	}
+	empty := wardMonk(0)
+	if stam, _, _ := empty.ReceiveMagicDamage(100, "fire", 0); stam != 100 {
+		t.Errorf("chi-less monk took %d, want the full 100", stam)
+	}
+}
+
+// Int blocks a flat amount scaled by the spell's tier, and the chi ward
+// works on what is left.
+func TestIntResistThenChiWard(t *testing.T) {
+	c := wardMonk(50)
+	c.Int = Meter{Max: 20, Current: 20}
+	// Tier 7: int blocks 10 * 3.5 = 35 of 350, then the 14% ward takes 44 of 315.
+	stam, _, resisted := c.ReceiveMagicDamage(350, "fire", 7)
+	if stam != 271 || resisted != 44 {
+		t.Errorf("tier 7 hit on a 20 int monk: took %d, resisted %d; want 271 and 44", stam, resisted)
+	}
+}

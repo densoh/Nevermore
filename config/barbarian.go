@@ -27,16 +27,18 @@ const (
 
 	// Reckless: a toggled melee stance that trades stamina for accuracy and
 	// damage. Every attack thrown while it is up costs RecklessStamPercent of
-	// max stamina, capped at tier/RecklessCapTierDiv + 1; the stance drops on
-	// its own when the barbarian cannot cover the cost or draws a ranged
-	// weapon. The cap binds from tier 5 up, and keeps a solo barbarian's
-	// stamina just short of breaking even for kills about 15% faster. The damage bonus scales the weapon
-	// roll only, before the berserk flat bonus is added, so it is worth the
-	// same in and out of rage.
+	// the barbarian's base stamina (tier times the class's per-tier stamina,
+	// before con), so building con for toughness does not raise the price.
+	// The stance drops on its own when the barbarian cannot cover the cost or
+	// draws a ranged weapon. Solo, it costs roughly 15% (tier 5-10) to 25%
+	// (tier 15) more stamina per kill than fighting without it, which has to
+	// be bought back with heals. (2026-10-13: was 5% of max stamina capped at
+	// tier/2 + 1, which faster kills fully repaid, and a 25% damage bonus.)
+	// The damage bonus scales the weapon roll only, before the berserk flat
+	// bonus is added, so it is worth the same in and out of rage.
 	RecklessTier          = 5
-	RecklessStamPercent   = 5    // of max stamina, per attack, minimum 1
-	RecklessCapTierDiv    = 2    // cost is capped at tier/this + 1
-	RecklessDamagePercent = 25   // added to the weapon roll
+	RecklessStamPercent   = 5    // of base stamina, per attack, minimum 1
+	RecklessDamagePercent = 20   // added to the weapon roll
 	RecklessMissReduction = 10   // percentage points off the miss chance
 	RecklessMaxDuration   = 3600 // safety expiry for the stance, seconds
 
@@ -73,13 +75,11 @@ func BashDamage(hit int, multiplier float64, tier int) int {
 	return int(math.Ceil(float64(hit)*multiplier)) + tier*BashDamagePerTier
 }
 
-// RecklessStamCost is the stamina one reckless attack costs at the given max
-// stamina and tier.
-func RecklessStamCost(maxStam int, tier int) int {
-	cost := (maxStam*RecklessStamPercent + 99) / 100
-	if limit := tier/RecklessCapTierDiv + 1; cost > limit {
-		cost = limit
-	}
+// RecklessStamCost is the stamina one reckless attack costs at the given
+// tier: RecklessStamPercent of the barbarian's base stamina, rounded up.
+func RecklessStamCost(tier int) int {
+	base := tier * Classes[AvailableClasses[BARBARIAN]].Stamina
+	cost := (base*RecklessStamPercent + 99) / 100
 	if cost < 1 {
 		cost = 1
 	}

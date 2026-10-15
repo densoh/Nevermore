@@ -395,10 +395,8 @@ func shatterWeapon(s *state) {
 }
 
 // followUpMissPenalty is the extra miss chance on every swing after the first.
+// A monk's flurry takes the same penalty as a fighter's multi attack.
 func followUpMissPenalty(s *state, skillLevel int) int {
-	if s.actor.Class == config.MONK {
-		return config.FlurryMissPenaltyFor(skillLevel)
-	}
 	return config.MultiAttackMissPenaltyFor(skillLevel)
 }
 

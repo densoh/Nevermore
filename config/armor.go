@@ -203,3 +203,13 @@ var ArmorRestrictions = map[int][]int{
 	BARD:      {0, 1, 4},
 	MONK:      {0, 4},
 }
+
+// ArmorDescription names a piece of armor for players: "heavy body armor",
+// or just "ring armor" when it is unclassed.
+func ArmorDescription(itemType int, armorClass int) string {
+	desc := ItemTypes[itemType] + " armor"
+	if armorClass != 0 {
+		desc = strings.ToLower(ArmorClass[armorClass]) + " " + desc
+	}
+	return desc
+}

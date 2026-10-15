@@ -94,18 +94,15 @@ func TestTodCooldown(t *testing.T) {
 }
 
 func TestMonkFlurryFollowsFighterTable(t *testing.T) {
-	ace := MultiAttackMultipliers[FlurryMinSkill]
+	adept := MultiAttackMultipliers[FlurryMinSkill]
 	for skill := 0; skill < FlurryMinSkill; skill++ {
 		got := MonkFlurryFor(skill)
-		if len(got) != len(ace) || got[0] != ace[0] || got[1] != ace[1] {
-			t.Errorf("skill %d flurry = %v, want the Ace row %v", skill, got, ace)
+		if len(got) != len(adept) || got[0] != adept[0] || got[1] != adept[1] {
+			t.Errorf("skill %d flurry = %v, want the Adept row %v", skill, got, adept)
 		}
 	}
 	for skill := FlurryMinSkill; skill <= 10; skill++ {
 		want := MultiAttackMultipliers[skill]
-		if len(want) > FlurryMaxSwings {
-			want = want[:FlurryMaxSwings]
-		}
 		got := MonkFlurryFor(skill)
 		if len(got) != len(want) {
 			t.Errorf("skill %d flurry = %v, want %v", skill, got, want)
@@ -118,12 +115,11 @@ func TestMonkFlurryFollowsFighterTable(t *testing.T) {
 			}
 		}
 	}
-	// Master and Grandmaster keep their row's multipliers but never a fourth swing.
-	if got := MonkFlurryFor(10); len(got) != 3 || got[2] != MultiAttackMultipliers[10][2] {
-		t.Errorf("Grandmaster flurry = %v, want the first three of %v", got, MultiAttackMultipliers[10])
+	if got := MonkFlurryFor(10); len(got) != 5 {
+		t.Errorf("Grandmaster flurry = %v, want all five swings", got)
 	}
 	if len(MonkFlurryFor(8)) <= len(MonkFlurryFor(5)) {
-		t.Error("Specialist flurry should out-swing Ace")
+		t.Error("Specialist flurry should out-swing Adept")
 	}
 }
 
@@ -184,6 +180,25 @@ func TestMeditateHelpers(t *testing.T) {
 	}
 }
 
+func TestMeditateCharge(t *testing.T) {
+	cases := map[float64]float64{-5: 0, 0: 0, 30: 0.1, 150: 0.5, 300: 1, 900: 1}
+	for elapsed, want := range cases {
+		if got := MeditateCharge(elapsed); got != want {
+			t.Errorf("MeditateCharge(%v) = %v, want %v", elapsed, got, want)
+		}
+	}
+	// Tier 10's full trance is 110s: 11s at the minimum charge, 55s at half.
+	if got := MeditateTranceFor(10, 0.1); got != 11 {
+		t.Errorf("tier 10 trance at 10%% = %d, want 11", got)
+	}
+	if got := MeditateTranceFor(10, 0.5); got != 55 {
+		t.Errorf("tier 10 trance at half = %d, want 55", got)
+	}
+	if got := MeditateTranceFor(10, 0); got != 1 {
+		t.Errorf("trance never drops below a second, got %d", got)
+	}
+}
+
 func TestMonkReachesGrandmaster(t *testing.T) {
 	if WeaponLevel(SkillExpLevels[10], MONK, HandSkill) != 10 {
 		t.Error("monk capped below weapon level 10")
@@ -200,21 +215,21 @@ func TestMonkReachesGrandmaster(t *testing.T) {
 }
 
 func TestMonkUnarmedRange(t *testing.T) {
-	// Tier 9, str 20: base 27, str share 12, roll 3d9, less the lighter 6 -> 36..60.
-	if lo, hi := MonkUnarmedRange(9, 20); lo != 36 || hi != 60 {
-		t.Errorf("tier 9 str 20 range = %d..%d, want 36..60", lo, hi)
+	// Tier 9, str 20: base 27, str share 12, roll 3d9, less the lighter 4 -> 38..62.
+	if lo, hi := MonkUnarmedRange(9, 20); lo != 38 || hi != 62 {
+		t.Errorf("tier 9 str 20 range = %d..%d, want 38..62", lo, hi)
 	}
-	// Tier 10, str 20: base 30, str share 14, roll 3d10, less 8 -> 39..66.
-	if lo, hi := MonkUnarmedRange(10, 20); lo != 39 || hi != 66 {
-		t.Errorf("tier 10 str 20 range = %d..%d, want 39..66", lo, hi)
+	// Tier 10, str 20: base 30, str share 14, roll 3d10, less 6 -> 41..68.
+	if lo, hi := MonkUnarmedRange(10, 20); lo != 41 || hi != 68 {
+		t.Errorf("tier 10 str 20 range = %d..%d, want 41..68", lo, hi)
 	}
-	// Tier 21, str 20: base 57, str share 26, roll 3d19, less 8 -> 78..132.
-	if lo, hi := MonkUnarmedRange(21, 20); lo != 78 || hi != 132 {
-		t.Errorf("tier 21 str 20 range = %d..%d, want 78..132", lo, hi)
+	// Tier 21, str 20: base 57, str share 26, roll 3d19, less 6 -> 80..134.
+	if lo, hi := MonkUnarmedRange(21, 20); lo != 80 || hi != 134 {
+		t.Errorf("tier 21 str 20 range = %d..%d, want 80..134", lo, hi)
 	}
-	// Tier 20, str 30: base 55, str share 37, roll 3d18, less 8 -> 87..138.
-	if lo, hi := MonkUnarmedRange(20, 30); lo != 87 || hi != 138 {
-		t.Errorf("tier 20 str 30 range = %d..%d, want 87..138", lo, hi)
+	// Tier 20, str 30: base 55, str share 37, roll 3d18, less 6 -> 89..140.
+	if lo, hi := MonkUnarmedRange(20, 30); lo != 89 || hi != 140 {
+		t.Errorf("tier 20 str 30 range = %d..%d, want 89..140", lo, hi)
 	}
 	// The flat cut never drives a hit below the floor.
 	if lo, _ := MonkUnarmedRange(1, 0); lo < MonkDamageFloor {
@@ -313,24 +328,39 @@ func TestChiDecayFloorIsTierCappedAtTen(t *testing.T) {
 	}
 }
 
-func TestFlurryMissPenaltyLadder(t *testing.T) {
-	want := map[int]int{0: 15, 5: 15, 7: 15, 8: 10, 9: 10, 10: 10}
-	for skill, penalty := range want {
-		if got := FlurryMissPenaltyFor(skill); got != penalty {
-			t.Errorf("FlurryMissPenaltyFor(%d) = %d, want %d", skill, got, penalty)
-		}
-		if fighter := MultiAttackMissPenaltyFor(skill); FlurryMissPenaltyFor(skill) > fighter {
-			t.Errorf("skill %d flurry penalty %d is above the fighter's %d", skill, FlurryMissPenaltyFor(skill), fighter)
-		}
-	}
-}
-
 func TestTodMissPenaltyFor(t *testing.T) {
 	// 30 less tier/2 less pie/4: 25 at tier 10 with no piety, 15 at tier 15 with pie 32.
 	cases := []struct{ tier, pie, want int }{{10, 0, 25}, {10, 12, 22}, {15, 32, 15}, {20, 15, 17}}
 	for _, c := range cases {
 		if got := TodMissPenaltyFor(c.tier, c.pie); got != c.want {
 			t.Errorf("tier %d pie %d penalty = %d, want %d", c.tier, c.pie, got, c.want)
+		}
+	}
+}
+
+func TestMonkMagicResistPercent(t *testing.T) {
+	cases := map[int]int{0: 10, 15: 13, 20: 14, 44: 18, 45: 19, 60: 19}
+	for con, want := range cases {
+		if got := MonkMagicResistPercent(con); got != want {
+			t.Errorf("MonkMagicResistPercent(%d) = %d, want %d", con, got, want)
+		}
+	}
+}
+
+func TestChiWard(t *testing.T) {
+	cases := []struct{ damage, percent, chi, absorbed, cost int }{
+		{20, 14, 50, 2, 0},   // 1-4 turned aside is free
+		{40, 14, 50, 5, 1},   // 5 rounds up to a chi
+		{100, 14, 50, 14, 1}, // 14 rounds down
+		{150, 19, 50, 28, 3}, // 28 rounds up
+		{150, 19, 1, 14, 1},  // one chi covers at most 14
+		{150, 19, 0, 0, 0},   // no chi, no ward
+		{0, 19, 50, 0, 0},
+	}
+	for _, c := range cases {
+		absorbed, cost := ChiWard(c.damage, c.percent, c.chi)
+		if absorbed != c.absorbed || cost != c.cost {
+			t.Errorf("ChiWard(%d, %d, %d) = %d, %d; want %d, %d", c.damage, c.percent, c.chi, absorbed, cost, c.absorbed, c.cost)
 		}
 	}
 }

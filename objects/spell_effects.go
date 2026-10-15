@@ -634,7 +634,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 	}
 	switch target := target.(type) {
 	case *Character:
-		stamDam, vitDam, resisted := target.ReceiveMagicDamage(damage, magicType)
+		stamDam, vitDam, resisted := target.ReceiveMagicDamage(damage, magicType, config.SpellTier(magnitude))
 		data.StoreCombatMetric(magicType+"spell_"+strconv.Itoa(magnitude), 0, spellType, stamDam+vitDam+resisted, resisted, stamDam+vitDam, callerType, id, level, 0, target.CharId)
 		returnString := text.Bad + name + "'s spell struck you for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality. You resisted " + strconv.Itoa(resisted) + "damage." + text.Reset
 		// Reflect
@@ -642,7 +642,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 		case *Character:
 			if target.CheckFlag("reflection") {
 				reflectDamage := int(float64(actualDamage) * (float64(target.GetStat("int")) * config.ReflectDamagePerInt))
-				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType)
+				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType, config.SpellTier(magnitude))
 				data.StoreCombatMetric("spell_player_reflect", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 0, target.CharId, target.Tier, 0, caller.CharId)
 				returnString += "\n" + text.Cyan + "You reflect " + strconv.Itoa(reflectDamage) + " damage back to " + caller.Name + "!\n" + text.Reset
 				if _, err := caller.Write([]byte(text.Red + target.Name + " reflects " + strconv.Itoa(reflectDamage) + " damage back to you!\n" + text.Reset)); err != nil {
@@ -682,7 +682,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 		case *Character:
 			if target.CheckFlag("reflection") {
 				reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
-				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType)
+				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType, config.SpellTier(magnitude))
 				data.StoreCombatMetric("spell_mob_reflect", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 1, target.MobId, target.Level, 0, caller.CharId)
 				returnString += "\n" + text.Red + target.Name + " reflects " + strconv.Itoa(reflectDamage) + " damage back to you!"
 				caller.DeathCheck(" was slain by reflection!")
@@ -735,7 +735,7 @@ func elementalDamage(magnitude int, intel int) (damage int) {
 	} else if magnitude == 7 {
 		power = utils.Roll(14, 10, 0)
 		damage = 275 + power
-	} else if magnitude == 45 { // combust
+	} else if magnitude == config.CombustMagnitude {
 		power = utils.Roll(12, 6, 0)
 		damage = 95 + power
 	}
@@ -1427,11 +1427,16 @@ func reflection(caller interface{}, target interface{}, magnitude int) string {
 
 // meditate is the monk trance: while it lasts, chi does not bleed away out of
 // combat and every chi gain is boosted. The instant restore happens in the
-// command; this is only the lingering buff.
+// command; this is only the lingering buff. A positive magnitude is the
+// trance length in seconds, otherwise it runs the full duration for the tier.
 func meditate(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
-		target.ApplyEffect("meditate", strconv.Itoa(config.MeditateDuration(target.Tier)), 0, 0,
+		duration := config.MeditateDuration(target.Tier)
+		if magnitude > 0 {
+			duration = magnitude
+		}
+		target.ApplyEffect("meditate", strconv.Itoa(duration), 0, 0,
 			func(triggers int) {
 				target.FlagOnAndMsg("meditate", "meditate", text.Cyan+"You settle into a meditative trance; your chi flows freely.\n")
 			},
