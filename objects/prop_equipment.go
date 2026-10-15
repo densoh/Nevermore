@@ -36,6 +36,10 @@ type Equipment struct {
 	// breaking it also releases the weapon prepared alongside it.
 	Drawn *Item
 
+	// Owner is the wearer's name, which a ring binds itself to when it is
+	// first damaged.
+	Owner string
+
 	FlagOn            func(flagName string, provider string)
 	FlagOff           func(flagName string, provider string)
 	CanEquip          func(item *Item) (bool, string)
@@ -201,98 +205,18 @@ func (e *Equipment) DamageRandomArmor() (retString string) {
 
 	if len(armorList) > 0 {
 		damageItem := armorList[rand.Intn(len(armorList))]
-		if damageItem == "head" {
-			e.Head.MaxUses -= 1
-			if e.Head.MaxUses <= 0 {
-				retString = "Your " + e.Head.DisplayName() + " falls apart."
-				e.UnequipSpecific("head")
-				return
+		damaged := map[string]*Item{"head": e.Head, "chest": e.Chest, "neck": e.Neck, "legs": e.Legs, "feet": e.Feet,
+			"arms": e.Arms, "hands": e.Hands, "ring1": e.Ring1, "ring2": e.Ring2, "off": e.Off, "main": e.Main}[damageItem]
+		damaged.MaxUses -= 1
+		if damaged.MaxUses <= 0 {
+			retString = "Your " + damaged.DisplayName() + " falls apart."
+			e.UnequipSpecific(damageItem)
+			if damageItem == "main" {
+				retString += e.ReleaseOnBreak(damaged)
 			}
-			return ""
-		} else if damageItem == "chest" {
-			e.Chest.MaxUses -= 1
-			if e.Chest.MaxUses <= 0 {
-				retString = "Your " + e.Chest.DisplayName() + " falls apart."
-				e.UnequipSpecific("chest")
-				return
-			}
-			return ""
-		} else if damageItem == "neck" {
-			e.Neck.MaxUses -= 1
-			if e.Neck.MaxUses <= 0 {
-				retString = "Your " + e.Neck.DisplayName() + " falls apart."
-				e.UnequipSpecific("neck")
-				return
-			}
-			return ""
-		} else if damageItem == "legs" {
-			e.Legs.MaxUses -= 1
-			if e.Legs.MaxUses <= 0 {
-				retString = "Your " + e.Legs.DisplayName() + " falls apart."
-				e.UnequipSpecific("legs")
-				return
-			}
-			return ""
-		} else if damageItem == "feet" {
-			e.Feet.MaxUses -= 1
-			if e.Feet.MaxUses <= 0 {
-				retString = "Your " + e.Feet.DisplayName() + " falls apart."
-				e.UnequipSpecific("feet")
-				return
-			}
-			return ""
-		} else if damageItem == "arms" {
-			e.Arms.MaxUses -= 1
-			if e.Arms.MaxUses <= 0 {
-				retString = "Your " + e.Arms.DisplayName() + " falls apart."
-				e.UnequipSpecific("arms")
-				return
-			}
-			return ""
-		} else if damageItem == "hands" {
-			e.Hands.MaxUses -= 1
-			if e.Hands.MaxUses <= 0 {
-				retString = "Your " + e.Hands.DisplayName() + " falls apart."
-				e.UnequipSpecific("hands")
-				return
-			}
-			return ""
-		} else if damageItem == "ring1" {
-			e.Ring1.MaxUses -= 1
-			if e.Ring1.MaxUses <= 0 {
-				retString = "Your " + e.Ring1.DisplayName() + " falls apart."
-				e.UnequipSpecific("ring1")
-				return
-			}
-			return ""
-		} else if damageItem == "ring2" {
-			e.Ring2.MaxUses -= 1
-			if e.Ring2.MaxUses <= 0 {
-				retString = "Your " + e.Ring2.DisplayName() + " falls apart."
-				e.UnequipSpecific("ring2")
-				return
-			}
-			return ""
-		} else if damageItem == "off" {
-			e.Off.MaxUses -= 1
-			if e.Off.MaxUses <= 0 {
-				retString = "Your " + e.Off.DisplayName() + " falls apart."
-				e.UnequipSpecific("off")
-				return
-			}
-			return ""
-		} else if damageItem == "main" {
-			e.Main.MaxUses -= 1
-			if e.Main.MaxUses <= 0 {
-				broken := e.Main
-				retString = "Your " + e.Main.DisplayName() + " falls apart."
-				e.UnequipSpecific("main")
-				retString += e.ReleaseOnBreak(broken)
-				return
-			}
-			return ""
+			return
 		}
-
+		return damaged.BindOnWear(e.Owner)
 	}
 
 	return ""
@@ -307,12 +231,18 @@ func (e *Equipment) DamageWeapon(whichHand string, damage int) string {
 			e.Main = (*Item)(nil)
 			return "Your weapon breaks!" + e.ReleaseOnBreak(broken)
 		}
+		if damage > 0 {
+			return e.Main.BindOnWear(e.Owner)
+		}
 	} else if whichHand == "off" {
 		e.Off.MaxUses -= damage
 		if e.Off.MaxUses <= 0 {
 			e.ReturnToInventory(e.Off)
 			e.Off = (*Item)(nil)
 			return "Your instrument breaks!"
+		}
+		if damage > 0 {
+			return e.Off.BindOnWear(e.Owner)
 		}
 	}
 	return ""
@@ -1010,6 +940,12 @@ func RestoreEquipment(jsonString string, charClass int) (*Equipment, []Item) {
 		if _, ok := item["repairs"]; ok {
 			newItem.Repairs = int(item["repairs"].(float64))
 		}
+		if _, ok := item["permanent"]; ok {
+			newItem.Flags["permanent"] = true
+		}
+		if boundTo, ok := item["bound_to"].(string); ok {
+			newItem.BoundTo = boundTo
+		}
 		ok := NewEquipment.Equip(&newItem, charClass)
 		if !ok {
 			ErroredEquipment = append(ErroredEquipment, newItem)
@@ -1019,59 +955,25 @@ func RestoreEquipment(jsonString string, charClass int) (*Equipment, []Item) {
 }
 
 func (e *Equipment) CheckEquipment() {
-	if e.Head != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Head); !ok {
-			e.UnequipSpecific("head")
-		}
+	// Gear the wearer can no longer use (class rules, tier caps) goes back
+	// into the pack rather than vanishing.
+	slots := []struct {
+		alias string
+		item  *Item
+	}{
+		{"head", e.Head}, {"chest", e.Chest}, {"neck", e.Neck}, {"legs", e.Legs},
+		{"feet", e.Feet}, {"arms", e.Arms}, {"hands", e.Hands}, {"ring1", e.Ring1},
+		{"ring2", e.Ring2}, {"main", e.Main}, {"off", e.Off},
 	}
-	if e.Chest != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Chest); !ok {
-			e.UnequipSpecific("chest")
+	for _, slot := range slots {
+		if slot.item == (*Item)(nil) {
+			continue
 		}
-	}
-	if e.Neck != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Neck); !ok {
-			e.UnequipSpecific("neck")
-		}
-	}
-	if e.Legs != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Legs); !ok {
-			e.UnequipSpecific("legs")
-		}
-	}
-	if e.Feet != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Feet); !ok {
-			e.UnequipSpecific("feet")
-		}
-	}
-	if e.Arms != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Arms); !ok {
-			e.UnequipSpecific("arms")
-		}
-	}
-	if e.Hands != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Hands); !ok {
-			e.UnequipSpecific("hands")
-		}
-	}
-	if e.Ring1 != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Ring1); !ok {
-			e.UnequipSpecific("ring1")
-		}
-	}
-	if e.Ring2 != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Ring2); !ok {
-			e.UnequipSpecific("ring2")
-		}
-	}
-	if e.Main != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Main); !ok {
-			e.UnequipSpecific("main")
-		}
-	}
-	if e.Off != (*Item)(nil) {
-		if ok, _ := e.CanEquip(e.Off); !ok {
-			e.UnequipSpecific("off")
+		if ok, _ := e.CanEquip(slot.item); !ok {
+			e.UnequipSpecific(slot.alias)
+			if e.ReturnToInventory != nil {
+				e.ReturnToInventory(slot.item)
+			}
 		}
 	}
 	// A weapon that became two-handed since the gear was saved pushes the off

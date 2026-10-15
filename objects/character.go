@@ -304,6 +304,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 		FilledCharacter.SerialRestoreEffects(charData["effects"].(string))
 		FilledCharacter.SerialRestoreTimers(charData["timers"].(string))
 
+		FilledCharacter.Equipment.Owner = FilledCharacter.Name
 		FilledCharacter.Equipment.FlagOn = FilledCharacter.FlagOn
 		FilledCharacter.Equipment.FlagOff = FilledCharacter.FlagOff
 		FilledCharacter.Equipment.CanEquip = FilledCharacter.CanEquip
@@ -462,6 +463,12 @@ func (c *Character) TimerReadyIgnoreGlobal(timer string) (bool, string) {
 		return ready, msg
 	}
 	return c.timerReady(timer, false)
+}
+
+// TimerRemaining is how many seconds are left on the named timer, zero when
+// it has expired or was never set.
+func (c *Character) TimerRemaining(timer string) float64 {
+	return math.Max(0, time.Until(c.Timers[timer]).Seconds())
 }
 
 // SetStanceTimer starts the cooldown between stance toggles. It is a fixed
@@ -1100,11 +1107,11 @@ func (c *Character) CanEquip(item *Item) (bool, string) {
 		}
 	}
 	if utils.IntIn(item.ItemType, []int{5, 19, 20, 21, 22, 23, 24, 25, 26}) {
-		if !config.CheckArmor(item.ItemType, c.Tier, item.Armor) {
-			return false, "You are unsure of how to maximize the benefit of this armor and cannot wear it."
-		}
 		if !utils.IntIn(item.ArmorClass, config.ArmorRestrictions[c.Class]) {
 			return false, "You cannot equip armor of this class."
+		}
+		if !config.CheckArmor(item.ItemType, c.Tier, item.BaseArmor()) {
+			return false, "You are unsure of how to maximize the benefit of this armor and cannot wear it."
 		}
 
 	}
@@ -1260,7 +1267,7 @@ func (c *Character) ReceiveDamage(damage int) (int, int, int) {
 		damage += int(math.Ceil(float64(damage) * config.SurgeExtraDamage))
 	}
 	if c.CheckFlag("inertial-barrier") {
-		damage -= int(math.Ceil(float64(damage) * config.InertialDamageIgnore))
+		damage -= int(math.Ceil(float64(damage) * config.InertialBarrierIgnore(c.Tier, c.Int.Current)))
 	}
 	stamDamage, vitalDamage := 0, 0
 	mitigation := float64(config.ArmorReductionConstant) / (float64(config.ArmorReductionConstant) + float64(c.GetStat("armor")))
@@ -1319,6 +1326,9 @@ func (c *Character) ReceiveDamageNoArmor(damage int) (int, int) {
 }
 
 func (c *Character) ReceiveVitalDamage(damage int) (int, int) {
+	if c.CheckFlag("inertial-barrier") {
+		damage -= int(math.Ceil(float64(damage) * config.InertialBarrierIgnore(c.Tier, c.Int.Current)))
+	}
 	msg := c.Equipment.DamageRandomArmor()
 	if msg != "" {
 		if _, err := c.Write([]byte(text.Info + msg + "\n" + text.Reset)); err != nil {
@@ -1360,7 +1370,9 @@ func (c *Character) ReceiveVitalDamageNoArmor(damage int) int {
 	return damage
 }
 
-func (c *Character) ReceiveMagicDamage(damage int, element string) (int, int, int) {
+// ReceiveMagicDamage applies a magic hit of the given spell tier (0 for
+// breath, damage over time and scripts; see config.SpellTier).
+func (c *Character) ReceiveMagicDamage(damage int, element string, tier int) (int, int, int) {
 	resisting := 0.0
 	// dodge spell
 	if c.CheckFlag("dodge") {
@@ -1381,19 +1393,19 @@ func (c *Character) ReceiveMagicDamage(damage int, element string) (int, int, in
 	switch element {
 	case "fire":
 		if c.CheckFlag("resist-fire") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 	case "air":
 		if c.CheckFlag("resist-air") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 	case "earth":
 		if c.CheckFlag("resist-earth") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 	case "water":
 		if c.CheckFlag("resist-water") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 	}
 
@@ -1402,10 +1414,21 @@ func (c *Character) ReceiveMagicDamage(damage int, element string) (int, int, in
 	}
 
 	resisted := int(math.Ceil(float64(damage) * resisting))
-	if c.GetStat("int") > config.IntResistMagicBase {
-		damage -= c.GetStat("int") - config.IntResistMagicPerPoint
+	damage -= config.IntMagicResist(c.GetStat("int"), tier)
+	damage -= resisted
+	// A monk's chi ward takes its share of whatever the other resists let through.
+	if c.Class == config.MONK && c.Tier >= config.MonkMagicResistTier {
+		absorbed, cost := config.ChiWard(damage, config.MonkMagicResistPercent(c.GetStat("con")), c.Mana.Current)
+		if absorbed > 0 {
+			c.Mana.Subtract(cost)
+			damage -= absorbed
+			resisted += absorbed
+			if _, err := c.Write([]byte(text.Cyan + "Your chi turns aside " + strconv.Itoa(absorbed) + " damage." + text.Reset + "\n")); err != nil {
+				log.Println("Error writing to player: ", err)
+			}
+		}
 	}
-	stamDam, vitDam := c.ReceiveDamageNoArmor(damage - resisted)
+	stamDam, vitDam := c.ReceiveDamageNoArmor(damage)
 	return stamDam, vitDam, resisted
 }
 

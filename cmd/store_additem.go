@@ -41,6 +41,10 @@ func (additem) process(s *state) {
 
 		whatItem := s.actor.Inventory.Search(targetStr, targetNum)
 		if whatItem != nil {
+			if whatItem.Bound() && !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+				s.msg.Actor.SendBad("You cannot sell this item.. it is bound to you.")
+				return
+			}
 			if s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 				if err := s.actor.Inventory.Remove(whatItem); err != nil {
 					s.msg.Actor.SendBad("You can't remove that item from your inventory.")

@@ -108,10 +108,25 @@ func (confirmRepair) process(s *state) {
 	s.msg.Actor.SendInfo("Your item was repaired.")
 }
 
+// overhaulExempt reports whether the item never needs an overhaul and pays the
+// quest loot price on every repair instead: quest loot and rings.
+func overhaulExempt(what *objects.Item) bool {
+	return what.Flags["quest_loot"] || what.ItemType == 24
+}
+
 // countsRepairs reports whether the item keeps a repair count toward an
-// overhaul: every weapon and piece of armor but quest loot.
+// overhaul: every weapon and piece of armor but the overhaul exempt.
 func countsRepairs(what *objects.Item) bool {
-	return (utils.IntIn(what.ItemType, config.WeaponTypes) || utils.IntIn(what.ItemType, config.ArmorTypes)) && !what.Flags["quest_loot"]
+	return (utils.IntIn(what.ItemType, config.WeaponTypes) || utils.IntIn(what.ItemType, config.ArmorTypes)) && !overhaulExempt(what)
+}
+
+// repairsBeforeOverhaul is how many repairs the item takes before it needs an
+// overhaul.
+func repairsBeforeOverhaul(what *objects.Item) int {
+	if utils.IntIn(what.ItemType, config.ArmorTypes) {
+		return config.ArmorRepairsBeforeOverhaul
+	}
+	return config.WeaponRepairsBeforeOverhaul
 }
 
 // repairCountNote tells the player how many repairs an item has left before it
@@ -120,7 +135,7 @@ func repairCountNote(what *objects.Item) string {
 	if !countsRepairs(what) {
 		return ""
 	}
-	left := config.RepairsBeforeOverhaul - what.Repairs
+	left := repairsBeforeOverhaul(what) - what.Repairs
 	if left == 1 {
 		return "  After this repair it will need an overhaul."
 	}
@@ -141,11 +156,11 @@ func repairQuote(what *objects.Item) (cost int, overhaul bool, problem string) {
 		return 0, false, "That item doesn't need repairing."
 	}
 	price := config.RepairCostFraction * float64(what.Value) * float64(maxUses-what.MaxUses) / float64(maxUses)
-	overhaul = countsRepairs(what) && what.Repairs >= config.RepairsBeforeOverhaul
+	overhaul = countsRepairs(what) && what.Repairs >= repairsBeforeOverhaul(what)
 	if overhaul {
 		price *= config.OverhaulCostMultiplier
 	}
-	if what.Flags["quest_loot"] {
+	if overhaulExempt(what) {
 		price *= config.QuestLootRepairMultiplier
 	}
 	return int(math.Round(price)), overhaul, ""

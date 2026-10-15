@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"strconv"
-
 	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/data"
 	"github.com/ArcCS/Nevermore/permissions"
@@ -10,7 +8,7 @@ import (
 
 func init() {
 	addHandler(sweep{},
-		"Usage:  sweep target # \n\n Strike low to knock a target off its feet, stunning it if the sweep lands.  Throws extra strikes while flurrying, though a flurried sweep builds no chi.",
+		"Usage:  sweep [target #] \n\n Strike low to knock a target off its feet, stunning it and drawing its attention onto you if the sweep lands.  Throws extra strikes while flurrying, though a flurried sweep builds no chi.  With no target named, you sweep the foe you are already fighting.",
 		permissions.Monk,
 		"sweep")
 }
@@ -18,7 +16,7 @@ func init() {
 type sweep cmd
 
 func (sweep) process(s *state) {
-	if len(s.input) < 1 {
+	if !hasMobTarget(s) {
 		s.msg.Actor.SendBad("Sweep what exactly?")
 		return
 	}
@@ -46,15 +44,7 @@ func (sweep) process(s *state) {
 		return
 	}
 
-	name := s.input[0]
-	nameNum := 1
-	if len(s.words) > 1 {
-		if val, err := strconv.Atoi(s.words[1]); err == nil {
-			nameNum = val
-		}
-	}
-
-	whatMob := s.where.Mobs.Search(name, nameNum, s.actor)
+	whatMob := mobTarget(s)
 	if whatMob == nil {
 		s.msg.Actor.SendInfo("Sweep what?")
 		s.ok = true
@@ -85,8 +75,11 @@ func (sweep) process(s *state) {
 	// A landed sweep always stuns, like circle and bash.
 	whatMob.Stun(config.SweepStuns)
 	data.StoreCombatMetric("sweep-stun", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
-	s.msg.Actor.SendGood("You sweep " + whatMob.Name + " off its feet!")
-	s.msg.Observers.SendInfo(s.actor.Name + " sweeps " + whatMob.Name + " off its feet!")
+	// A light taunt: the mob turns on the monk without out-holding the real tanks.
+	whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.SmallThreatPercent), s.actor)
+	whatMob.CurrentTarget = s.actor.Name
+	s.msg.Actor.SendGood("You sweep " + whatMob.Name + " off its feet, and it turns its attention to you!")
+	s.msg.Observers.SendInfo(s.actor.Name + " sweeps " + whatMob.Name + " off its feet, drawing its attention!")
 
 	DeathCheck(s, whatMob)
 	s.actor.SetTimer("combat_sweep", config.SweepTimer)

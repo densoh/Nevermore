@@ -32,7 +32,7 @@ func TestRecklessAttackCharges(t *testing.T) {
 	if !s.actor.CheckFlag("reckless") {
 		t.Fatal("stance dropped on a swing it could afford")
 	}
-	want := 200 - config.RecklessStamCost(200, 15)
+	want := 200 - config.RecklessStamCost(15)
 	if got := s.actor.Stam.Current; got != want {
 		t.Errorf("stamina after one reckless attack = %d, want %d", got, want)
 	}
@@ -41,7 +41,7 @@ func TestRecklessAttackCharges(t *testing.T) {
 // When the barbarian cannot cover the cost the stance drops instead, before
 // the roll, so nothing is charged and the bonuses are not applied.
 func TestRecklessAttackDropsWhenTired(t *testing.T) {
-	s := recklessState(&objects.Item{ItemType: 1}, config.RecklessStamCost(200, 15)-1)
+	s := recklessState(&objects.Item{ItemType: 1}, config.RecklessStamCost(15)-1)
 	before := s.actor.Stam.Current
 
 	recklessAttack(s)

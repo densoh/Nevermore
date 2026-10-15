@@ -14,7 +14,9 @@ import (
 )
 
 var (
-	TeleportTable = []int{117, 2567,
+	TeleportTable = []int{
+		117,  //  Outside Rymek Southern Gates
+		2567, //  Queen Ant's Chamber
 		2538, // Rymek Sewers
 		2530, //  Slimes
 		2761, //  Snake Pit
@@ -28,6 +30,19 @@ var (
 		2130, //  Trolls
 		2253, //  NorthEast Eldane Marsh
 		2699, //  Crabs
+		576,  //  Black Woods (L4-9)
+		1965, //  Anduin Plateau (L5-8)
+		1820, //  Mandrak Tended Corn Field (L4-9)
+		2791, //  Earthen Temple Underground (L4-9)
+		2548, //  Quickling's Village (L5-8)
+		2982, //  UnderCity Vzlun Street (L7)
+		2571, //  Island Troglodyte Cave (L7-10)
+		591,  //  Black Wood (L7-13)
+		2584, //  Island Wolverine Den (L7-10)
+		2728, //  Old Nexus University Foyer (L10-13)
+		612,  //  Blood Marsh (L10-15)
+		2784, //  Old Tigers & Bears Cave (L9-14)
+		2526, //  Crater (L11-14)
 
 		//Non Hostile Teleport Rooms:
 		2696, //  Twisted Maze in Mandrake Farm
@@ -44,9 +59,34 @@ var (
 		2015, //  NorthWest Crystal Mountains Path
 		1991, //  Along Tilnar's Veign (right before Drow)
 		2868, //  UnderCity Grotto
+		438,  //  Crimson Trail
+		1970, //  Sea of Tears Beach
+		2384, //  Worn Path
+		2192, //  Mud Road
+		2131, //  Common Road
+		2377, //  Elven Trail
+		2106, //  Processional Way
+		312,  //  Mandrak Farm Road
+		501,  //  Blackbone West Bank
+		2217, //  Mountain Road
+		2543, //  Island Trail
+		3018, //  Talmet Palace Center
+		2618, //  Thicket Path
 	}
 	RecallRoom = "77"
 )
+
+// RandomTeleportRoom picks a random room from TeleportTable, never the one
+// the target is standing in.
+func RandomTeleportRoom(currentRoomId int) *Room {
+	candidates := make([]int, 0, len(TeleportTable))
+	for _, roomId := range TeleportTable {
+		if roomId != currentRoomId {
+			candidates = append(candidates, roomId)
+		}
+	}
+	return Rooms[candidates[rand.Intn(len(candidates))]]
+}
 
 var Effects map[string]func(caller interface{}, target interface{}, magnitude int) string
 
@@ -594,7 +634,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 	}
 	switch target := target.(type) {
 	case *Character:
-		stamDam, vitDam, resisted := target.ReceiveMagicDamage(damage, magicType)
+		stamDam, vitDam, resisted := target.ReceiveMagicDamage(damage, magicType, config.SpellTier(magnitude))
 		data.StoreCombatMetric(magicType+"spell_"+strconv.Itoa(magnitude), 0, spellType, stamDam+vitDam+resisted, resisted, stamDam+vitDam, callerType, id, level, 0, target.CharId)
 		returnString := text.Bad + name + "'s spell struck you for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality. You resisted " + strconv.Itoa(resisted) + "damage." + text.Reset
 		// Reflect
@@ -602,7 +642,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 		case *Character:
 			if target.CheckFlag("reflection") {
 				reflectDamage := int(float64(actualDamage) * (float64(target.GetStat("int")) * config.ReflectDamagePerInt))
-				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType)
+				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType, config.SpellTier(magnitude))
 				data.StoreCombatMetric("spell_player_reflect", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 0, target.CharId, target.Tier, 0, caller.CharId)
 				returnString += "\n" + text.Cyan + "You reflect " + strconv.Itoa(reflectDamage) + " damage back to " + caller.Name + "!\n" + text.Reset
 				if _, err := caller.Write([]byte(text.Red + target.Name + " reflects " + strconv.Itoa(reflectDamage) + " damage back to you!\n" + text.Reset)); err != nil {
@@ -642,7 +682,7 @@ func spellDamage(caller interface{}, target interface{}, magnitude int, magicTyp
 		case *Character:
 			if target.CheckFlag("reflection") {
 				reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
-				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType)
+				stamDamage, vitDamage, resisted := caller.ReceiveMagicDamage(reflectDamage, magicType, config.SpellTier(magnitude))
 				data.StoreCombatMetric("spell_mob_reflect", 0, 0, stamDamage+vitDamage+resisted, resisted, stamDamage+vitDamage, 1, target.MobId, target.Level, 0, caller.CharId)
 				returnString += "\n" + text.Red + target.Name + " reflects " + strconv.Itoa(reflectDamage) + " damage back to you!"
 				caller.DeathCheck(" was slain by reflection!")
@@ -695,7 +735,7 @@ func elementalDamage(magnitude int, intel int) (damage int) {
 	} else if magnitude == 7 {
 		power = utils.Roll(14, 10, 0)
 		damage = 275 + power
-	} else if magnitude == 45 { // combust
+	} else if magnitude == config.CombustMagnitude {
 		power = utils.Roll(12, 6, 0)
 		damage = 95 + power
 	}
@@ -1387,11 +1427,16 @@ func reflection(caller interface{}, target interface{}, magnitude int) string {
 
 // meditate is the monk trance: while it lasts, chi does not bleed away out of
 // combat and every chi gain is boosted. The instant restore happens in the
-// command; this is only the lingering buff.
+// command; this is only the lingering buff. A positive magnitude is the
+// trance length in seconds, otherwise it runs the full duration for the tier.
 func meditate(caller interface{}, target interface{}, magnitude int) string {
 	switch target := target.(type) {
 	case *Character:
-		target.ApplyEffect("meditate", strconv.Itoa(config.MeditateDuration(target.Tier)), 0, 0,
+		duration := config.MeditateDuration(target.Tier)
+		if magnitude > 0 {
+			duration = magnitude
+		}
+		target.ApplyEffect("meditate", strconv.Itoa(duration), 0, 0,
 			func(triggers int) {
 				target.FlagOnAndMsg("meditate", "meditate", text.Cyan+"You settle into a meditative trance; your chi flows freely.\n")
 			},

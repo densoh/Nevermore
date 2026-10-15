@@ -43,7 +43,7 @@ func (drop) process(s *state) {
 		return
 	}
 
-	if target.Flags["permanent"] && !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+	if target.Bound() && !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 		s.msg.Actor.SendBad("You cannot drop this item.. it is bound to you.")
 		return
 	}

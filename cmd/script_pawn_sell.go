@@ -45,6 +45,11 @@ func (sell) process(s *state) {
 			return
 		}
 
+		if target.Bound() {
+			s.msg.Actor.SendBad("You cannot sell this item.. it is bound to you.")
+			return
+		}
+
 		if target.ItemType == 9 {
 			s.msg.Actor.SendInfo("Sorry, I have enough bags already")
 			return
@@ -100,6 +105,10 @@ func (sellConfirm) process(s *state) {
 	}
 
 	if target != nil {
+		if target.Bound() {
+			s.msg.Actor.SendBad("You cannot sell this item.. it is bound to you.")
+			return
+		}
 		if ok := s.actor.Inventory.Remove(target); ok == nil {
 			s.actor.Gold.Add(targetPrice)
 			data.StoreItemSale(target.ItemId, s.actor.CharId, s.actor.Tier, targetPrice)

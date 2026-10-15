@@ -1,5 +1,7 @@
 package config
 
+import "strings"
+
 // MaxArmor Max Damage Reduction for level group and armor type
 var MaxArmor = map[int]map[int]int{
 	// Level int ref is cap
@@ -54,4 +56,14 @@ var ArmorRestrictions = map[int][]int{
 	6: {0, 1, 2, 3},
 	7: {0, 1},
 	8: {0},
+}
+
+// ArmorDescription names a piece of armor for players: "heavy body armor",
+// or just "ring armor" when it is unclassed.
+func ArmorDescription(itemType int, armorClass int) string {
+	desc := ItemTypes[itemType] + " armor"
+	if armorClass != 0 {
+		desc = strings.ToLower(ArmorClass[armorClass]) + " " + desc
+	}
+	return desc
 }

@@ -96,7 +96,7 @@ func (hamstring) process(s *state) {
 	actualDamage, _, resisted := whatMob.ReceiveDamage(config.HamstringDamage(s.actor.InflictDamage()))
 	data.StoreCombatMetric("hamstring", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 	// The taunt: a threat bump on top of the damage.
-	whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.TauntThreatPercent), s.actor)
+	whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.LargeThreatPercent), s.actor)
 	whatMob.CurrentTarget = s.actor.Name
 	// Mobs carry no timed states, so a crippled mob stays crippled until it dies.
 	whatMob.FlagOn("crippled", "hamstring")

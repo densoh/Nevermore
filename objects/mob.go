@@ -403,7 +403,7 @@ func (m *Mob) Tick() {
 					if utils.StringIn(m.BreathWeapon, []string{"fire", "air", "earth", "water"}) {
 						t.RunHook("attacked")
 						breathDamage := int(math.Ceil(float64(damageTotal) * m.rollMonkBreathDodge(t)))
-						stamDam, vitDam, resisted := t.ReceiveMagicDamage(breathDamage, m.BreathWeapon)
+						stamDam, vitDam, resisted := t.ReceiveMagicDamage(breathDamage, m.BreathWeapon, 0)
 						if _, err := t.Write([]byte(text.Bad + m.Name + "'s breath  struck you for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality. You resisted " + strconv.Itoa(resisted) + "damage." + text.Reset + "\n")); err != nil {
 							log.Println("Error writing to player:", err)
 						}
@@ -625,8 +625,8 @@ func (m *Mob) Charge(rescuer *Character, rescued *Character) {
 			top = threat
 		}
 	}
-	if m.ThreatTable[rescuer.Name] <= top {
-		m.addThreat(top-m.ThreatTable[rescuer.Name]+1, rescuer)
+	if want := config.RescueThreat(top); m.ThreatTable[rescuer.Name] < want {
+		m.addThreat(want-m.ThreatTable[rescuer.Name], rescuer)
 	}
 	if m.Placement != rescuer.Placement {
 		if m.CheckFlag("immobile") {
@@ -1012,7 +1012,7 @@ func (m *Mob) FollowLocked(name string) bool {
 
 // Teleport Special handler for handling a mobs cast of a teleport spell
 func (m *Mob) Teleport(target string) {
-	newRoom := Rooms[TeleportTable[rand.Intn(len(TeleportTable))]]
+	newRoom := RandomTeleportRoom(m.ParentId)
 	targetName := strings.Split(target, " ")
 	workingRoom := Rooms[m.ParentId]
 	targetChar := workingRoom.Chars.SearchAll(targetName[0])
@@ -1421,22 +1421,22 @@ func (m *Mob) ReceiveMagicDamage(damage int, element string) (int, int, int) {
 	case "fire":
 		resisting = float64(m.FireResistance) / 100
 		if m.CheckFlag("resist-fire") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 	case "air":
 		resisting = float64(m.AirResistance) / 100
 		if m.CheckFlag("resist-air") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 	case "earth":
 		resisting = float64(m.EarthResistance) / 100
 		if m.CheckFlag("resist-earth") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 	case "water":
 		resisting = float64(m.WaterResistance) / 100
 		if m.CheckFlag("resist-water") {
-			resisting += .25
+			resisting += float64(config.ElementResistPercent) / 100
 		}
 		/*if resisting > 0 {
 			resisting = (float64(m.Int.Current) / 30) * resisting

@@ -73,10 +73,14 @@ func TestParryChance(t *testing.T) {
 		{0, 20, true, 0}, // no skill, no parry at all
 		{1, 1, false, 1.5},
 		{1, 1, true, 2},
-		{7, 15, false, 10.5},
-		{7, 15, true, 18},
-		{10, 20, false, 15},
-		{10, 20, true, 25},
+		{6, 10, false, 9},    // last level at the full rate
+		{6, 10, true, 14},    // shield still at tier/2 through tier 10
+		{7, 15, false, 10},   // 9 + 1
+		{7, 15, true, 16.25}, // + 5 + 5*.25
+		{9, 19, true, 19.25}, // 12 + 7.25
+		{10, 20, false, 13},
+		{10, 20, true, 20.5}, // 13 + 7.5
+		{10, 25, true, 21.75},
 	}
 	for _, c := range cases {
 		if got := ParryChance(c.level, c.tier, c.shield); math.Abs(got-c.want) > 1e-9 {
@@ -131,10 +135,10 @@ func TestShieldSlamDamage(t *testing.T) {
 }
 
 func TestThreatBumps(t *testing.T) {
-	if got := ThreatPercent(400, TauntThreatPercent); got != 200 {
+	if got := ThreatPercent(400, LargeThreatPercent); got != 200 {
 		t.Errorf("taunt threat on 400 max = %d, want 200", got)
 	}
-	if got := ThreatPercent(400, BashThreatPercent); got != 100 {
+	if got := ThreatPercent(400, SmallThreatPercent); got != 100 {
 		t.Errorf("bash threat on 400 max = %d, want 100", got)
 	}
 	if got := FailedTurnThreat(350, 400); got != 200 {
@@ -163,6 +167,15 @@ func TestShieldSlamStat(t *testing.T) {
 	for _, c := range cases {
 		if got := ShieldSlamStat(c.class, c.str, c.pie); got != c.want {
 			t.Errorf("ShieldSlamStat(%d, %d, %d) = %d, want %d", c.class, c.str, c.pie, got, c.want)
+		}
+	}
+}
+
+func TestRescueThreat(t *testing.T) {
+	cases := map[int]int{0: 1, 5: 6, 9: 10, 10: 11, 200: 220, 1234: 1357}
+	for top, want := range cases {
+		if got := RescueThreat(top); got != want {
+			t.Errorf("RescueThreat(%d) = %d, want %d", top, got, want)
 		}
 	}
 }

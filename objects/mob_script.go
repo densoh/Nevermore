@@ -607,7 +607,7 @@ func (r *mobRun) hurt(targets []*Character, args []string) {
 		case "true":
 			stam, vit = t.ReceiveDamageNoArmor(amount)
 		case "fire", "air", "earth", "water":
-			stam, vit, _ = t.ReceiveMagicDamage(amount, kind)
+			stam, vit, _ = t.ReceiveMagicDamage(amount, kind, 0)
 		default:
 			stam, vit, _ = t.ReceiveDamage(amount)
 		}
