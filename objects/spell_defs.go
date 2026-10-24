@@ -548,7 +548,7 @@ var Spells = map[string]Spell{
 		Chant:       "Sprite arrive, and bring excitement.",
 		Magnitude:   1,
 		Effect:      "attraction",
-		Classes:     map[string]int{"mage": 7},
+		Classes:     map[string]int{"mage": 7, "bard": 8, "ranger": 12},
 	},
 	"inertial-barrier": {
 		Name:        "inertial-barrier",
