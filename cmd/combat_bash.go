@@ -38,12 +38,7 @@ func (bash) process(s *state) {
 	}
 
 	// Check some timers
-	ready, msg := s.actor.TimerReady("combat_bash")
-	if !ready {
-		s.msg.Actor.SendBad(msg)
-		return
-	}
-	ready, msg = s.actor.TimerReady("combat")
+	ready, msg := s.actor.TimerReady("combat")
 	if !ready {
 		s.msg.Actor.SendBad(msg)
 		return
@@ -126,7 +121,6 @@ func (bash) process(s *state) {
 			shatterWeapon(s)
 		}
 		DeathCheck(s, whatMob)
-		s.actor.SetTimer("combat_bash", config.BashTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)
 		return
 	}

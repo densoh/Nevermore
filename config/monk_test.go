@@ -329,8 +329,8 @@ func TestChiDecayFloorIsTierCappedAtTen(t *testing.T) {
 }
 
 func TestTodMissPenaltyFor(t *testing.T) {
-	// 30 less tier/2 less pie/4: 25 at tier 10 with no piety, 15 at tier 15 with pie 32.
-	cases := []struct{ tier, pie, want int }{{10, 0, 25}, {10, 12, 22}, {15, 32, 15}, {20, 15, 17}}
+	// 30 less tier/2 less pie/3: 25 at tier 10 with no piety, 13 at tier 15 with pie 32.
+	cases := []struct{ tier, pie, want int }{{10, 0, 25}, {10, 12, 21}, {15, 32, 13}, {20, 15, 15}}
 	for _, c := range cases {
 		if got := TodMissPenaltyFor(c.tier, c.pie); got != c.want {
 			t.Errorf("tier %d pie %d penalty = %d, want %d", c.tier, c.pie, got, c.want)

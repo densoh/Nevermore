@@ -2,6 +2,7 @@ package objects
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ArcCS/Nevermore/config"
 )
@@ -65,6 +66,40 @@ func TestTickChiStopsAtFloor(t *testing.T) {
 	c.tickChi()
 	if c.Mana.Current != 20 {
 		t.Fatalf("decay above the floor left %d chi, want 20", c.Mana.Current)
+	}
+}
+
+// Out of combat a pool below the floor recovers up to it at the decay rate,
+// never past it.
+func TestTickChiRecoversToFloor(t *testing.T) {
+	c := monk(50) // 5 chi per tick
+	c.Tier = 15   // floor 10
+	c.Mana.Current = 0
+	c.tickChi()
+	if c.Mana.Current != 5 {
+		t.Fatalf("first recovery tick left %d chi, want 5", c.Mana.Current)
+	}
+	c.Mana.Current = 8
+	c.tickChi()
+	if c.Mana.Current != 10 {
+		t.Fatalf("recovery past the floor left %d chi, want 10", c.Mana.Current)
+	}
+}
+
+// Recovery waits for the same grace as decay and stops while meditating.
+func TestTickChiRecoveryWaitsForGrace(t *testing.T) {
+	c := monk(100)
+	c.Tier = 10
+	c.MarkCombat()
+	c.tickChi()
+	if c.Mana.Current != 0 {
+		t.Fatalf("recovery inside the grace left %d chi, want 0", c.Mana.Current)
+	}
+	c.LastCombat = time.Time{}
+	c.Flags["meditate"] = true
+	c.tickChi()
+	if c.Mana.Current != 0 {
+		t.Fatalf("recovery while meditating left %d chi, want 0", c.Mana.Current)
 	}
 }
 

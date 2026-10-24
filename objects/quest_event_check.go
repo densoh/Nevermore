@@ -156,6 +156,22 @@ func CheckQuestEvent(name string) (QuestEventReport, error) {
 			}
 		}
 	}
+	for _, n := range e.stageNumbers() {
+		for _, rf := range e.Stages[n].Flags {
+			state := "off"
+			if rf.On {
+				state = "on"
+			}
+			label := "stage " + strconv.Itoa(n) + " switches " + rf.Flag + " " + state + " in room " + strconv.Itoa(rf.Room)
+			if room, ok := Rooms[rf.Room]; !ok {
+				problem(label + ", but that room no longer exists")
+			} else if room.Flags[rf.Flag] == rf.On {
+				note(label + ", which is already " + state + " there")
+			} else {
+				note(label + " until the event ends")
+			}
+		}
+	}
 	for _, sc := range scripts {
 		if sc.verb == "$IFSTAGE" && sc.stage > 1 && !reachable[sc.stage] {
 			note(sc.where + " waits for stage " + strconv.Itoa(sc.stage) + ", which only a DM can reach")

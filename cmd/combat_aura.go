@@ -12,7 +12,7 @@ func init() {
 	addHandler(aura{},
 		"Usage:  seal [courage|faith|justice|off] \n\n Invoke a holy seal upon yourself; only one seal can be held at a time.\n"+
 			" Typing seal on its own tells you which seal you currently bear.\n\n"+
-			" courage: you stand firm behind your shield, turning aside blows meant for you and your allies.\n"+
+			" courage: you stand firm behind your shield, turning aside blows meant for you and your allies and drawing your foes' wrath.\n"+
 			" faith:   your devotion is answered in full; your healing grows stronger and your body and spirit mend more swiftly.\n"+
 			" justice: your weapon is guided by righteous fury, striking truer and harder against the wicked.",
 		permissions.Paladin,

@@ -62,3 +62,24 @@ func TestParseEventExpiry(t *testing.T) {
 		t.Error("a bad date was accepted")
 	}
 }
+
+func TestSplitFlagArgs(t *testing.T) {
+	ids, flag, on, remove, err := splitFlagArgs([]string{"2518", "2519-2525", "WATER", "OFF"})
+	if err != nil || len(ids) != 2 || flag != "water" || on || remove {
+		t.Errorf("switch off = %v %q on=%v remove=%v err=%v", ids, flag, on, remove, err)
+	}
+	ids, flag, on, remove, err = splitFlagArgs([]string{"REMOVE", "2518", "WATER"})
+	if err != nil || len(ids) != 1 || flag != "water" || !remove {
+		t.Errorf("remove = %v %q on=%v remove=%v err=%v", ids, flag, on, remove, err)
+	}
+	for _, bad := range [][]string{
+		{"2518", "WATER"},          // no on/off
+		{"2518", "WATER", "MAYBE"}, // bad state
+		{"2518", "ACTIVE", "OFF"},  // not a switchable flag
+		{"REMOVE", "WATER"},        // no rooms
+	} {
+		if _, _, _, _, err := splitFlagArgs(bad); err == nil {
+			t.Errorf("splitFlagArgs(%v) accepted", bad)
+		}
+	}
+}

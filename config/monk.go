@@ -42,7 +42,7 @@ const (
 	// keeps its chi; the bleed starts on the third tick.
 	ChiDecayGraceSeconds = 20
 	ChiDecayPercent      = 10 // of max chi, per tick, once out of combat
-	ChiDecayFloorCap     = 10 // decay never takes chi below min(tier, this)
+	ChiDecayFloorCap     = 10 // out of combat chi settles at min(tier, this): decays down to it, recovers up to it (recovery since 2026-10-15)
 	ChiGainCapPercent    = 15 // no single chi award exceeds this share of max chi; only bites on tiny tier 1-3 pools (was 10 until 2026-09-27)
 
 	// Meditate: instant restore of (base + pie/div + tier*perTier)% of each pool,
@@ -84,8 +84,12 @@ const (
 	FlurryExpertSkill   = 7
 	FlurryMaxDuration   = 3600 // safety expiry for the stance, seconds
 	// Flurry swings after the first take the fighter's multi attack miss
-	// penalty (MultiAttackMissPenaltyFor). (2026-10-13: was a flurry-only 15
-	// through Expert and 10 from Specialist.)
+	// penalty and floor (FollowUpMissChance), but the penalty never exceeds
+	// FlurryMaxMissPenalty: monks fight at low hand-to-hand skill, where the
+	// fighter's 35 would land on top of a base that dex can't yet floor.
+	// (2026-10-13: was a flurry-only 15 through Expert and 10 from Specialist;
+	// 2026-10-14: cap added with the fighter penalty going 25 -> 35.)
+	FlurryMaxMissPenalty = 25
 
 	// Leap strike.
 	LeapFreeDistance = 2  // squares closable at no chi cost
@@ -129,7 +133,7 @@ const (
 	TodFailMinPercent = 5
 	TodFailMaxPercent = 25
 	TodFailHits       = 1
-	TodHitPieDiv      = 4  // miss chance -= pie/4
+	TodHitPieDiv      = 3  // miss chance -= pie/3 (2026-10-15: was pie/4)
 	TodMissPenalty    = 30 // extra miss over a regular swing, less tier/TodMissTierDiv
 	TodMissTierDiv    = 2
 	TodMissRefund     = 0.5 // share of the committed chi returned when the touch whiffs
@@ -322,9 +326,9 @@ func ChiGainCap(max int) int {
 	return cap
 }
 
-// ChiDecayFloor is the chi a monk always keeps: out-of-combat decay stops
-// once the pool is at or below tier, capped at ChiDecayFloorCap, so there
-// is always a little left for a basic spell.
+// ChiDecayFloor is the chi an out-of-combat monk settles at: tier, capped at
+// ChiDecayFloorCap. Decay stops there and a lower pool recovers up to it, so
+// there is always enough for a basic spell or an opening long leap.
 func ChiDecayFloor(tier int) int {
 	if tier > ChiDecayFloorCap {
 		return ChiDecayFloorCap

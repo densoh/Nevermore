@@ -62,16 +62,52 @@ func TestDetermineMissChanceWeaponSkill(t *testing.T) {
 	}
 }
 
-// A monk's flurry follow-ups take the same penalty as a fighter's multi attack.
-func TestFollowUpMissPenaltyByClass(t *testing.T) {
-	monk := attackerState(config.MONK, nil)
-	fighter := attackerState(config.FIGHTER, &objects.Item{ItemType: 1})
-	for skill := 5; skill <= 10; skill++ {
-		if got, want := followUpMissPenalty(monk, skill), config.MultiAttackMissPenaltyFor(skill); got != want {
-			t.Errorf("monk skill %d penalty = %d, want %d", skill, got, want)
+// Follow-up swings add the penalty before the clamp, so dex works it off down
+// to the skill level's floor. Monk flurries follow the same rule on the
+// hand-to-hand skill.
+func TestFollowUpMissChance(t *testing.T) {
+	cases := []struct {
+		name              string
+		class, level, dex int
+		lvlDiff, engaged  int
+		want              int
+	}{
+		{"master 20 dex hits the master floor", config.FIGHTER, 9, 20, 0, 1, 15},
+		{"ace 10 dex", config.FIGHTER, 5, 10, 0, 1, 20 + 35 - 10},
+		{"specialist 40 dex hits the floor", config.FIGHTER, 8, 40, 0, 1, 20},
+		{"expert 15 dex", config.FIGHTER, 7, 15, 0, 1, 10 + 35 - 15},
+		{"monk hand level 4 13 dex takes the capped 25", config.MONK, 4, 13, 0, 1, 22 + 25 - 13},
+		{"adept monk 13 dex takes the capped 25", config.MONK, 6, 13, 0, 1, 15 + 25 - 13},
+		{"specialist monk 30 dex hits the floor", config.MONK, 8, 30, 0, 1, 20},
+		{"grandmaster monk keeps the lower 20", config.MONK, 10, 0, 0, 1, 0 + 20},
+	}
+	for _, c := range cases {
+		var main *objects.Item
+		skill := config.HandSkill
+		if c.class != config.MONK {
+			main = &objects.Item{ItemType: 1}
+			skill = 1
 		}
-		if got, want := followUpMissPenalty(fighter, skill), config.MultiAttackMissPenaltyFor(skill); got != want {
-			t.Errorf("fighter skill %d penalty = %d, want %d", skill, got, want)
+		s := attackerState(c.class, main)
+		s.actor.Skills[skill].Value = config.SkillExpLevels[c.level]
+		s.actor.Dex.Current = c.dex
+		if got := FollowUpMissChance(s, c.lvlDiff, c.engaged, c.level); got != c.want {
+			t.Errorf("%s: follow-up miss = %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+// Dex soaks the out-level penalty on follow-ups too, so a mob past the free
+// range adds its full penalty to a follow-up that was above the floor.
+func TestFollowUpMissChanceOutlevel(t *testing.T) {
+	s := attackerState(config.FIGHTER, &objects.Item{ItemType: 1})
+	s.actor.Skills[1].Value = config.SkillExpLevels[7]
+	s.actor.Dex.Current = 15
+	even := FollowUpMissChance(s, 0, 1, 7)
+	for diff := 1; diff <= 6; diff++ {
+		penalty := config.OutlevelMissPenalty(diff, 1)
+		if got := FollowUpMissChance(s, diff, 1, 7); got != even+penalty {
+			t.Errorf("mob +%d: follow-up miss = %d, want %d", diff, got, even+penalty)
 		}
 	}
 }

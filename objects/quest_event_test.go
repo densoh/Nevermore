@@ -397,3 +397,66 @@ func TestRedirectExitFor(t *testing.T) {
 		t.Errorf("after clearing: leads to %d, want the event's -122", got)
 	}
 }
+
+// A stage switches a room's elemental flag for players while it applies;
+// the room's own flag never changes.
+func TestQuestRoomFlag(t *testing.T) {
+	room := &Room{RoomId: -130, Flags: map[string]bool{"water": true}}
+	Rooms[-130] = room
+	defer delete(Rooms, -130)
+	e := &QuestEvent{Name: "harvest", Expires: hour(1), Stages: map[int]*Stage{
+		1: {Flags: []RoomFlag{{Room: -130, Flag: "water", On: false}}},
+		3: {Flags: []RoomFlag{{Room: -130, Flag: "water", On: true}}},
+	}}
+	withQuestEvents(t, e)
+
+	steps := []struct {
+		label string
+		set   func()
+		water bool
+	}{
+		{"before start", func() {}, true},
+		{"in preview", func() { e.Active, e.Preview, e.Stage = true, true, 1 }, true},
+		{"running, stage 1", func() { e.Preview = false }, false},
+		{"running, stage 2", func() { e.Stage = 2 }, false},
+		{"running, stage 3 switches it back", func() { e.Stage = 3 }, true},
+		{"ended", func() { e.Active, e.Stage = false, 0 }, true},
+	}
+	for _, step := range steps {
+		step.set()
+		if got := room.FlagOn("water"); got != step.water {
+			t.Errorf("%s: water = %v, want %v", step.label, got, step.water)
+		}
+	}
+	if !room.Flags["water"] {
+		t.Error("the overlay changed the room's own flag")
+	}
+	if room.FlagOn("fire") {
+		t.Error("an unswitched flag reads on")
+	}
+}
+
+// Players don't see an exit while an event keeps it sealed; staff do.
+func TestLookHidesSealedExit(t *testing.T) {
+	for _, id := range []int{-140, -141} {
+		Rooms[id] = &Room{RoomId: id, Flags: map[string]bool{"active": true}, Exits: map[string]*Exit{}}
+		defer delete(Rooms, id)
+	}
+	room := Rooms[-140]
+	room.Exits["gangplank"] = &Exit{Object: Object{Name: "gangplank"}, ParentId: -140, ToId: -141, Flags: map[string]bool{}}
+	room.Exits["north"] = &Exit{Object: Object{Name: "north"}, ParentId: -140, ToId: -141, Flags: map[string]bool{}}
+	e := &QuestEvent{Name: "harvest", Expires: hour(1),
+		Stages: map[int]*Stage{1: {Exits: []ExitGate{{Room: -140, Exit: "gangplank"}}}}}
+	withQuestEvents(t, e)
+
+	if got := room.Look(player); strings.Contains(got, "gangplank") || !strings.Contains(got, "north") {
+		t.Errorf("before the event, players see: %q", got)
+	}
+	if got := room.Look(staff); !strings.Contains(got, "gangplank") {
+		t.Errorf("before the event, staff see: %q", got)
+	}
+	e.Active, e.Stage = true, 1
+	if got := room.Look(player); !strings.Contains(got, "gangplank") {
+		t.Errorf("while running, players see: %q", got)
+	}
+}

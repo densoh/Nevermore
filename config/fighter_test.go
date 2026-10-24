@@ -112,6 +112,23 @@ func TestRollFighterParryShieldBlocksNeverRiposte(t *testing.T) {
 	}
 }
 
+func TestShieldSlamStunFailChance(t *testing.T) {
+	cases := []struct{ lvlDiff, engaged, want int }{
+		{0, 1, 0},
+		{1, 1, 0},  // solo allowance
+		{2, 1, 10}, // first level past it
+		{5, 1, 40},
+		{5, 2, 30}, // a duo gets one more level
+		{-5, 1, 0}, // mob below you
+		{30, 1, ShieldSlamStunFailCap},
+	}
+	for _, c := range cases {
+		if got := ShieldSlamStunFailChance(c.lvlDiff, c.engaged); got != c.want {
+			t.Errorf("ShieldSlamStunFailChance(%d, %d) = %d, want %d", c.lvlDiff, c.engaged, got, c.want)
+		}
+	}
+}
+
 func TestShieldSlamDamage(t *testing.T) {
 	cases := []struct{ str, tier, roll, want int }{
 		{20, 5, 0, 42},    // no shield armor; half the tier, rounded down
@@ -150,10 +167,19 @@ func TestThreatBumps(t *testing.T) {
 }
 
 func TestMultiAttackMissPenaltyLadder(t *testing.T) {
-	want := map[int]int{5: 25, 6: 25, 7: 25, 8: 20, 9: 15, 10: 10}
+	want := map[int]int{5: 35, 6: 35, 7: 35, 8: 30, 9: 25, 10: 20}
 	for level, penalty := range want {
 		if got := MultiAttackMissPenaltyFor(level); got != penalty {
 			t.Errorf("MultiAttackMissPenaltyFor(%d) = %d, want %d", level, got, penalty)
+		}
+	}
+}
+
+func TestFollowUpMissFloorLadder(t *testing.T) {
+	want := map[int]int{5: 20, 6: 20, 7: 20, 8: 20, 9: 15, 10: 15}
+	for level, floor := range want {
+		if got := FollowUpMissFloorFor(level); got != floor {
+			t.Errorf("FollowUpMissFloorFor(%d) = %d, want %d", level, got, floor)
 		}
 	}
 }

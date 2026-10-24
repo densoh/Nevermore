@@ -8,6 +8,7 @@ import (
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/text"
+	"github.com/ArcCS/Nevermore/utils"
 )
 
 func init() {
@@ -92,9 +93,18 @@ func (slam) process(s *state) {
 		actualDamage, _, resisted := whatMob.ReceiveDamage(config.ShieldSlamDamage(config.ShieldSlamStat(s.actor.Class, s.actor.GetStat("str"), s.actor.GetStat("pie")), s.actor.Tier, config.RollShieldArmor(shield.Armor)))
 		data.StoreCombatMetric("shieldslam", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage+config.ThreatPercent(whatMob.Stam.Max, config.LargeThreatPercent), s.actor)
-		whatMob.Stun(config.ShieldSlamStuns)
 		whatMob.CurrentTarget = s.actor.Name
 		s.msg.Actor.SendInfo("You slammed the " + whatMob.Name + " with your shield for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
+		// The slam always lands; a mob out of level may shrug off the stun.
+		failChance := 0
+		if !s.where.InQuestMode() {
+			failChance = config.ShieldSlamStunFailChance(whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor))
+		}
+		if failChance > 0 && utils.Roll(100, 1, 0) <= failChance {
+			s.msg.Actor.SendBad(whatMob.Name + " shrugs off the blow, unstunned!")
+		} else {
+			whatMob.Stun(config.ShieldSlamStuns)
+		}
 		s.msg.Observers.SendInfo(s.actor.Name + " slams " + config.TextPosPronoun[s.actor.Gender] + " shield into " + whatMob.Name)
 		if whatMob.CheckFlag("reflection") {
 			reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)

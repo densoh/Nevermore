@@ -43,13 +43,7 @@ func (backstab) process(s *state) {
 		return
 	}
 
-	ready, msg := s.actor.TimerReady("combat_backstab")
-	if !ready {
-		s.msg.Actor.SendBad(msg)
-		return
-	}
-
-	ready, msg = s.actor.TimerReady("combat")
+	ready, msg := s.actor.TimerReady("combat")
 	if !ready {
 		s.msg.Actor.SendBad(msg)
 		return
@@ -126,6 +120,7 @@ func (backstab) process(s *state) {
 			s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 			s.actor.AdvanceStealthExp(int(float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 			whatMob.AddThreatDamage(actualDamage, s.actor)
+			whatMob.CurrentTarget = s.actor.Name
 			s.msg.Actor.SendInfo("You backstabbed the " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage!" + text.Reset)
 			s.msg.Observers.SendInfo(s.actor.Name + " backstabs " + whatMob.Name)
 			if whatMob.CheckFlag("reflection") {
@@ -136,7 +131,6 @@ func (backstab) process(s *state) {
 				s.actor.DeathCheck(" was killed by reflection!")
 			}
 			DeathCheck(s, whatMob)
-			s.actor.SetTimer("combat_backstab", config.BackstabCooldown)
 			s.actor.SetTimer("combat", config.CombatCooldown)
 			msg := s.actor.Equipment.DamageWeapon("main", 4)
 			if msg != "" {
@@ -147,9 +141,9 @@ func (backstab) process(s *state) {
 			s.msg.Actor.SendBad("You failed to backstab ", whatMob.Name, ", and are vulnerable to attack!")
 			s.msg.Observers.SendBad(s.actor.Name+" failed to backstab ", whatMob.Name, ", and is vulnerable to attack!")
 			whatMob.AddThreatDamage(config.ThreatPercent(whatMob.Stam.Max, config.SmallThreatPercent), s.actor)
+			whatMob.CurrentTarget = s.actor.Name
 			s.actor.SetTimer("combat", config.CombatCooldown)
 			landed, _ := whatMob.RevengeVital(s.actor, config.MobBSRevengeVitalChance, func() {
-				whatMob.CurrentTarget = s.actor.Name
 				s.msg.Actor.SendInfo(whatMob.Name + " turns it's attention to you.")
 				s.msg.Observers.SendInfo(whatMob.Name + " turns to " + s.actor.Name + ".")
 			}, objects.StrikeOpts{
