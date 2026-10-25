@@ -290,18 +290,16 @@ func (r hitResult) chiHits() int {
 // the outcome. metric names the combat metric family ("kill", "leap", ...).
 //
 // It resolves in two passes. Every swing rolls to hit first, with the first
-// swing at the normal miss chance and follow-ups at a penalised one (a monk's
-// extra swings are always a flurry, which has its own penalty). The damage
+// swing at the normal miss chance and follow-ups (multi attack or flurry) at
+// FollowUpMissChance. The damage
 // multipliers are then handed out to the landed hits in order, so whichever
 // swing connects first always takes the full damage slot and any critical or
 // double roll rides on it. Damage and reflection are totalled and reported once.
 func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel int, metric string) hitResult {
 	result := hitResult{weaponDamage: 1}
-	baseMiss := DetermineMissChance(s, whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor))
-	followUpMiss := baseMiss + followUpMissPenalty(s, skillLevel)
-	if followUpMiss > 95 {
-		followUpMiss = 95
-	}
+	lvlDiff, engaged := whatMob.Level-s.actor.Tier, whatMob.EngagedCount(s.actor)
+	baseMiss := DetermineMissChance(s, lvlDiff, engaged)
+	followUpMiss := FollowUpMissChance(s, lvlDiff, engaged, skillLevel)
 	for swing := range attacks {
 		missChance := baseMiss
 		if swing > 0 {
@@ -394,12 +392,6 @@ func shatterWeapon(s *state) {
 	s.msg.Observers.SendInfo(s.actor.Name + "'s weapon shatters!")
 }
 
-// followUpMissPenalty is the extra miss chance on every swing after the first.
-// A monk's flurry takes the same penalty as a fighter's multi attack.
-func followUpMissPenalty(s *state, skillLevel int) int {
-	return config.MultiAttackMissPenaltyFor(skillLevel)
-}
-
 // DeathCheck Universal death check for mobs on whatever the current state is
 func DeathCheck(s *state, m *objects.Mob) {
 	if m.Stam.Current <= 0 {
@@ -477,11 +469,30 @@ func DeathCheck(s *state, m *objects.Mob) {
 // DetermineMissChance is the miss chance of a weapon attack: the weapon skill
 // sets the base and the shared modifiers do the rest.
 func DetermineMissChance(s *state, lvlDiff int, engaged int) int {
-	skill := 5
+	return missChance(s, weaponMiss(s), lvlDiff, engaged)
+}
+
+// FollowUpMissChance is the miss chance of every swing after the first in a
+// multi attack or flurry: the weapon roll plus the follow-up penalty, added
+// before the clamp so dex works it off, floored at the skill level's
+// follow-up floor instead of 5. A monk's flurry penalty never exceeds
+// config.FlurryMaxMissPenalty.
+func FollowUpMissChance(s *state, lvlDiff int, engaged int, skillLevel int) int {
+	penalty := config.MultiAttackMissPenaltyFor(skillLevel)
+	if s.actor.Class == config.MONK {
+		penalty = min(penalty, config.FlurryMaxMissPenalty)
+	}
+	return missChanceFloor(s, weaponMiss(s)+penalty, lvlDiff, engaged, config.FollowUpMissFloorFor(skillLevel))
+}
+
+// weaponMiss is the skill-derived base miss of a regular swing: the
+// hand-to-hand skill for monks, the wielded weapon's skill for everyone else.
+func weaponMiss(s *state) int {
+	skill := config.HandSkill
 	if s.actor.Class != config.MONK {
 		skill = s.actor.Equipment.Main.ItemType
 	}
-	return missChance(s, config.WeaponMissChance(s.actor.Skills[skill].Value), lvlDiff, engaged)
+	return config.WeaponMissChance(s.actor.Skills[skill].Value)
 }
 
 // BackstabMissChance is the miss chance of a backstab: the regular weapon
@@ -504,6 +515,11 @@ func TodMissChance(s *state, lvlDiff int, engaged int) int {
 // loosens with the number of characters engaged, off in quest mode), dex,
 // combat flags such as bless and reckless, and the 5-95 clamp are shared.
 func missChance(s *state, baseMiss int, lvlDiff int, engaged int) int {
+	return missChanceFloor(s, baseMiss, lvlDiff, engaged, 5)
+}
+
+// missChanceFloor is missChance with a different lower clamp.
+func missChanceFloor(s *state, baseMiss int, lvlDiff int, engaged int, floor int) int {
 	missChance := baseMiss
 	if !s.where.InQuestMode() {
 		missChance += config.OutlevelMissPenalty(lvlDiff, engaged)
@@ -520,8 +536,8 @@ func missChance(s *state, baseMiss int, lvlDiff int, engaged int) int {
 	if missChance >= 100 {
 		missChance = 95
 	}
-	if missChance < 5 {
-		missChance = 5
+	if missChance < floor {
+		missChance = floor
 	}
 	return missChance
 }

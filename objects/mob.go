@@ -764,7 +764,7 @@ func (m *Mob) KillExperience(room *Room, expReduce int) int {
 	}
 
 	// Check for elemental damage in the room and add bonus experience
-	if room.Flags["earth"] || room.Flags["fire"] || room.Flags["water"] || room.Flags["air"] {
+	if room.FlagOn("earth") || room.FlagOn("fire") || room.FlagOn("water") || room.FlagOn("air") {
 		experienceAwarded = int(float64(experienceAwarded) * 1.06) // 6% bonus for elemental rooms
 	}
 	return experienceAwarded
@@ -1114,10 +1114,15 @@ func (m *Mob) DropInventory() string {
 }
 
 // AddThreatDamage adds threat for an offensive action and records the
-// attacker as having attacked this mob.
+// attacker as having attacked this mob. The seal of courage raises it by
+// SealCourageThreatPercent.
 func (m *Mob) AddThreatDamage(damage int, attacker *Character) {
 	m.MarkAttackedBy(attacker)
-	m.addThreat(damage, attacker)
+	threat := damage
+	if damage > 0 && attacker.CheckFlag("seal-courage") {
+		threat += config.ThreatPercent(damage, config.SealCourageThreatPercent)
+	}
+	m.addThreat(threat, attacker)
 	if damage > 0 {
 		m.RunScript("HIT", attacker)
 	}

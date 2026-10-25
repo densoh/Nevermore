@@ -51,12 +51,13 @@ func (link) process(s *state) {
 					s.msg.Actor.SendBad("Exit back creation failed.")
 					return
 				}
-				exitData := data.LoadExit(strings.ToLower(s.words[0]), roomRef, s.where.RoomId)
+				// The exit back carries the third word's name, not the first's.
+				exitData := data.LoadExit(strings.ToLower(s.words[2]), roomRef, s.where.RoomId)
 				if exitData == nil {
 					s.msg.Actor.SendBad("Exit back creation failed.")
 					return
 				}
-				room.Exits[strings.ToLower(s.words[0])] = objects.NewExit(room.RoomId, exitData)
+				room.Exits[strings.ToLower(s.words[2])] = objects.NewExit(room.RoomId, exitData)
 			}
 			s.msg.Actor.SendGood("Exits created and loaded into game.")
 		} else {

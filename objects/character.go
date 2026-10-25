@@ -382,21 +382,24 @@ func (c *Character) GainChi(amount int, force bool) int {
 	return c.Mana.Current - before
 }
 
-// tickChi bleeds chi away once the monk has been out of combat long enough,
-// never taking the pool below config.ChiDecayFloor.
+// tickChi settles chi toward config.ChiDecayFloor once the monk has been out
+// of combat long enough: a pool above it bleeds down to it, and one below it
+// recovers up to it, at the same rate, so a rested monk always has enough
+// chi to open a fight with a leap.
 func (c *Character) tickChi() {
-	floor := config.ChiDecayFloor(c.Tier)
-	if c.Mana.Current <= floor || c.CheckFlag("meditate") {
+	floor := min(config.ChiDecayFloor(c.Tier), c.Mana.Max)
+	if c.Mana.Current == floor || c.CheckFlag("meditate") {
 		return
 	}
 	if time.Since(c.LastCombat) < time.Duration(config.ChiDecayGraceSeconds)*time.Second {
 		return
 	}
 	amount := config.ChiDecayAmount(c.Mana.Max)
-	if c.Mana.Current-amount < floor {
-		amount = c.Mana.Current - floor
+	if c.Mana.Current < floor {
+		c.Mana.Add(min(amount, floor-c.Mana.Current))
+		return
 	}
-	c.Mana.Subtract(amount)
+	c.Mana.Subtract(min(amount, c.Mana.Current-floor))
 }
 
 // ConsumeFeintCharge spends one feint charge; the flag drops with the last
@@ -1597,7 +1600,8 @@ func (c *Character) SealJusticeBonus() float64 {
 	if c.Equipment.Main != (*Item)(nil) {
 		weaponLevel = config.WeaponLevel(c.Skills[c.Equipment.Main.ItemType].Value, c.Class, c.Equipment.Main.ItemType)
 	}
-	percent := config.SealJusticeBase + float64(c.Tier)/config.SealJusticeTierDiv + float64(c.GetStat("pie"))/config.SealJusticePieDiv + float64(weaponLevel)/config.SealJusticeWeaponDiv
+	tierPart := math.Max(0, float64(c.Tier-config.SealJusticeTierStart)) / config.SealJusticeTierDiv
+	percent := tierPart + float64(c.GetStat("pie"))/config.SealJusticePieDiv + float64(weaponLevel)/config.SealJusticeWeaponDiv
 	return percent / 100
 }
 

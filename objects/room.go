@@ -152,7 +152,8 @@ func (r *Room) Look(looker *Character) (buildText string) {
 				} else {
 					if exiti.Flags["invisible"] != true &&
 						exiti.Flags["hidden"] != true &&
-						nextRoom.Flags["active"] == true {
+						nextRoom.Flags["active"] == true &&
+						!QuestExitSealed(r.RoomId, exiti.Name) {
 						if len(strings.Split(exiti.Name, " ")) >= 3 {
 							longExit = append(longExit, "You see "+exiti.Name)
 						} else {
@@ -270,6 +271,16 @@ func (r *Room) FindExit(exitName string, observer *Character) *Exit {
 // mode is on, or this room has the quest_mode flag. Safe on a nil room.
 func (r *Room) InQuestMode() bool {
 	return config.QuestMode || (r != nil && (r.Flags["quest_mode"] || QuestEventRoom(r.RoomId)))
+}
+
+// FlagOn is the flag as gameplay should read it: a running quest event can
+// switch an elemental flag for a while (see QuestRoomFlag), and otherwise
+// it is the room's own. Builder and save code keep reading Flags directly.
+func (r *Room) FlagOn(flagName string) bool {
+	if on, ok := QuestRoomFlag(r.RoomId, flagName); ok {
+		return on
+	}
+	return r.Flags[flagName]
 }
 
 func (r *Room) ToggleFlag(flagName string) bool {
@@ -410,7 +421,7 @@ func (r *Room) ElementalDamage() {
 	for _, c := range r.Chars.Contents {
 		if !c.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
 			envDamage := math.Ceil(.20 * float64(c.Stam.Max+c.Vit.Max))
-			if r.Flags["earth"] {
+			if r.FlagOn("earth") {
 				if !c.Flags["resist-earth"] {
 					if _, err := c.Write([]byte(text.Brown + "The earth swells up around you." + "\n")); err != nil {
 						log.Println("Error writing to player:", err)
@@ -422,7 +433,7 @@ func (r *Room) ElementalDamage() {
 						log.Println("Error writing to player:", err)
 					}
 				}
-			} else if r.Flags["fire"] {
+			} else if r.FlagOn("fire") {
 				if !c.Flags["resist-fire"] {
 					if _, err := c.Write([]byte(text.Brown + "Burning flames overwhelm you." + "\n")); err != nil {
 						log.Println("Error writing to player:", err)
@@ -434,7 +445,7 @@ func (r *Room) ElementalDamage() {
 						log.Println("Error writing to player:", err)
 					}
 				}
-			} else if r.Flags["water"] {
+			} else if r.FlagOn("water") {
 				if !c.Flags["resist-water"] {
 					if _, err := c.Write([]byte(text.Brown + "The water overwhelms you, choking you." + "\n")); err != nil {
 						log.Println("Error writing to player:", err)
@@ -446,7 +457,7 @@ func (r *Room) ElementalDamage() {
 						log.Println("Error writing to player:", err)
 					}
 				}
-			} else if r.Flags["air"] {
+			} else if r.FlagOn("air") {
 				if !c.Flags["resist-air"] {
 					if _, err := c.Write([]byte(text.Brown + "The icy air buffets you." + "\n")); err != nil {
 						log.Println("Error writing to player:", err)

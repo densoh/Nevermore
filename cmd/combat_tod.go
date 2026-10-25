@@ -107,6 +107,7 @@ func (tod) process(s *state) {
 			s.actor.Mana.Add(refund)
 		}
 		whatMob.AddThreatDamage(1, s.actor)
+		whatMob.CurrentTarget = s.actor.Name
 		data.StoreCombatMetric("tod-miss", 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		s.actor.SetTimer("combat_tod", config.TodMissTimer)
 		s.actor.SetTimer("combat", config.CombatCooldown)
@@ -149,6 +150,7 @@ func (tod) process(s *state) {
 	actualDamage, _ := whatMob.ReceiveDamageNoArmor(damage)
 	resisted := 0
 	whatMob.AddThreatDamage(actualDamage, s.actor)
+	whatMob.CurrentTarget = s.actor.Name
 	s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 	if whatMob.CheckFlag("reflection") {
 		reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)

@@ -57,7 +57,23 @@ const (
 	// 2d(shield armor) roll, so a heavier shield hits harder.
 	ShieldSlamStrMult = 2
 	ShieldSlamTierDiv = 2
+	// A slam always lands its damage and taunt; only the stun can fail, and
+	// only on a mob out of level: ShieldSlamStunFailPerLevel percent per level
+	// past the same group allowance as OutlevelMissPenalty, capped at
+	// ShieldSlamStunFailCap so a stun is always possible.
+	ShieldSlamStunFailPerLevel = 10
+	ShieldSlamStunFailCap      = 95
 )
+
+// ShieldSlamStunFailChance is the percent chance a slam's stun fails on a mob
+// lvlDiff levels above the slammer with engaged characters fighting it.
+func ShieldSlamStunFailChance(lvlDiff int, engaged int) int {
+	over := lvlDiff - engaged
+	if over <= 0 {
+		return 0
+	}
+	return min(over*ShieldSlamStunFailPerLevel, ShieldSlamStunFailCap)
+}
 
 // HamstringDamage is the damage a hamstring does from the given weapon roll.
 // It rounds up so a weak roll still lands for at least one point.

@@ -52,15 +52,32 @@ func MultiAttackMissPenaltyFor(skillLevel int) int {
 	return penalty
 }
 
+// FollowUpMissFloorFor is the lowest miss chance a follow-up swing can roll
+// at a weapon skill level. The follow-up penalty is added before the clamp,
+// so spare dex works it off down to this floor.
+func FollowUpMissFloorFor(skillLevel int) int {
+	if skillLevel >= FollowUpMissFloorMasterLevel {
+		return FollowUpMissFloorMaster
+	}
+	return FollowUpMissFloor
+}
+
 // MajorAbilityTier gates the tier 10 class abilities (berserk, touch of
 // death, the long leap, the meditate save). A const so other config
 // constants can build on it.
 const MajorAbilityTier = 10
 
 var (
-	MultiAttackMissPenalty        = 25 // Percentage points added to follow-up swing miss chance
+	// Follow-up swings add the penalty before the 5-95 clamp, like backstab,
+	// then floor at FollowUpMissFloor (FollowUpMissFloorMaster from Master).
+	// (2026-10-14: was 25 added after the clamp, so dex past the floor did
+	// nothing for follow-ups.)
+	MultiAttackMissPenalty        = 35 // Percentage points added to follow-up swing miss chance
 	MultiAttackMissReduction      = 5  // Points removed from the penalty per skill level past the threshold
-	MultiAttackMissReductionLevel = 7  // Skill level at which the penalty starts falling off: 30% follow-up miss through Expert, then 25/20/15 at Specialist/Master/Grandmaster
+	MultiAttackMissReductionLevel = 7  // Skill level at which the penalty starts falling off: 35 through Expert, then 30/25/20 at Specialist/Master/Grandmaster
+	FollowUpMissFloor             = 20
+	FollowUpMissFloorMaster       = 15
+	FollowUpMissFloorMasterLevel  = 9
 	BaselineStatValue             = 10
 	ProximityChance               = 80
 	ProximityStep                 = 10
@@ -148,19 +165,23 @@ var (
 	MobTurnRevengeVitalChance   = 25
 	MobTodRevengeVitalChance    = 25
 	VitalStrikeScale            = 1.75 // every punishment vital: follow, failed backstab/steal/turn/touch
-	BackstabCooldown            = 30
 	QuickdrawCooldown           = 30
 	TrackCooldown               = 16
 	TrackChance                 = 20
 	TrackChancePerLevel         = 5
 	TrackChancePerPoint         = 1
 
-	TurnMax            = 50
-	TurnScaleDown      = 10
-	DisintegrateChance = 5
-	TurnTimer          = 60
-	SlamTimer          = 30
-	ShieldSlamStuns    = 16 // seconds
+	TurnBase            = 40
+	TurnScaleDown       = 10
+	TurnPiePerChance    = 2
+	TurnDivinityPerRank = 1
+	TurnMinChance       = 5 // percent; any turn can land
+	TurnDivinityExpMult = 0.5
+	DisintegrateShare   = 10 // percent of the turn success chance that disintegrates instead
+	DisintegrateMin     = 3  // percent of all turns that disintegrate at least, even when a turn would fail
+	TurnTimer           = 60
+	SlamTimer           = 30
+	ShieldSlamStuns     = 16 // seconds
 
 	// Paladin seals persist until dropped, so the effect gets a duration it
 	// will never reach.
@@ -170,6 +191,9 @@ var (
 	// point of piety (see SealCourageArmor).
 	SealCourageArmorBase     = 50
 	SealCourageArmorPerLevel = 2
+	// Offensive threat a paladin under the seal of courage generates is raised
+	// by this percent, so the shield bearer holds mobs off the party.
+	SealCourageThreatPercent = 10
 	// RescueWindow is how long attacks aimed at a rescued ally are drawn onto
 	// the paladin; RescueTimer is the cooldown between rescues.
 	RescueWindow = 8  // Seconds
@@ -186,7 +210,6 @@ var (
 	CircleStuns = 6
 	CircleTimer = 16
 	BashStuns   = 16
-	BashTimer   = 30
 
 	// Threat bumps, as a percent of the mob's max stamina, added on top of any
 	// damage the ability dealt. Abilities pick a size rather than owning a
@@ -257,12 +280,14 @@ var (
 	MinorHealDivinityMod = .3 // Vigor/mend get 30% of the divinity bonus of detraumatize/renewal
 	PaladinDivinityMod   = .5 // Paladins get this share of their divinity bonus without the seal of faith
 
-	// Seal of justice adds (base + pie/pieDiv + weaponLevel/weaponDiv) percent damage.
-	// Seal of justice damage bonus, in percent: base + tier/TierDiv +
-	// pie/PieDiv + weaponLevel/WeaponDiv. About 15% at tier 10 and 27% at 20.
-	SealJusticeBase        = 5.0
-	SealJusticeTierDiv     = 2.0
-	SealJusticePieDiv      = 4.0
+	// Seal of justice damage bonus, in percent: (tier - TierStart)/TierDiv +
+	// pie/PieDiv + weaponLevel/WeaponDiv. About 10% at tier 10 and 25.5% at 20,
+	// so a justice paladin leads a fighter less while fighters lack multi
+	// attack. (2026-10-15: was 5 + tier/2 + pie/4 + weaponLevel/2, about 15.5%
+	// at tier 10.)
+	SealJusticeTierStart   = 7
+	SealJusticeTierDiv     = 1.0
+	SealJusticePieDiv      = 3.0
 	SealJusticeWeaponDiv   = 2.0
 	MinorHealTierDiv       = 4 // Vigor/mend gain +1 base per this many tiers
 	CasterMinorHealTierDiv = 3 // MinorHealTierDiv for classes in MinorHealCasterClasses
@@ -676,6 +701,31 @@ func StunSpellDuration(intel int) int {
 // Results outside 0-100 are left as-is; the roll treats them as never/always.
 func StunSpellSuccessChance(tier int, mobLevel int, intel int, mobInt int) int {
 	return StunSpellChance + (tier-mobLevel)*StunSpellChancePerLevel + (intel-mobInt)/StunSpellIntPerChance
+}
+
+// TurnSuccessChance is the percent chance a turn lands on an undead mob,
+// never below TurnMinChance. Results over 100 are left as-is; the roll treats
+// them as always.
+func TurnSuccessChance(tier int, mobLevel int, pie int, divinityRank int) int {
+	return max(TurnMinChance, TurnBase+(tier-mobLevel)*TurnScaleDown+pie/TurnPiePerChance+divinityRank*TurnDivinityPerRank)
+}
+
+// TurnDisintegratePerMille is the chance, out of 1000, that a turn with the
+// given success chance destroys the undead outright: DisintegrateShare of the
+// (clamped) success chance, never below DisintegrateMin percent. Rolled on the
+// same d1000 as the success chance, at the bottom of its band.
+func TurnDisintegratePerMille(successChance int) int {
+	return max(DisintegrateMin*10, min(100, max(0, successChance))*10*DisintegrateShare/100)
+}
+
+// TurnDivinityExp is the divinity exp a turn earns for the damage it did:
+// the weapon skill formula (share of the mob's max stamina times its exp)
+// at TurnDivinityExpMult in place of a class advancement rate.
+func TurnDivinityExp(damage int, mobMaxStam int, mobExp int) int {
+	if mobMaxStam <= 0 {
+		return 0
+	}
+	return int(float64(damage) / float64(mobMaxStam) * float64(mobExp) * TurnDivinityExpMult)
 }
 
 // Fighting a mob above your level gets harder the further up it is, but every

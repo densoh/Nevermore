@@ -10,6 +10,7 @@ import (
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"github.com/ArcCS/Nevermore/text"
+	"github.com/ArcCS/Nevermore/utils"
 )
 
 func init() {
@@ -36,6 +37,8 @@ func init() {
 			"  event stage <name> <n> exit add|remove <room_id> <exit>   sealed to players until stage n\n"+
 			"  event stage <name> <n> redirect add <room_id> <exit> <to_room_id>   exit leads elsewhere from stage n\n"+
 			"  event stage <name> <n> redirect remove <room_id> <exit>             (stage 1 = the whole event; back to normal when it ends)\n"+
+			"  event stage <name> <n> flag <room_ids> <flag> on|off    rooms read the flag so from stage n (earth, fire, water or air)\n"+
+			"  event stage <name> <n> flag remove <room_ids> <flag>\n"+
 			"  event stage <name> <n> delete\n"+
 			"  Scripts: $IFSTAGE <name> <n> stops a script below stage n; $EVENTSTAGE <name> <n> advances it.\n"+
 			"  ids: 100 101 or 100-120 or 100,105-110",
@@ -222,6 +225,13 @@ func eventShow(s *state, name string) {
 		}
 		for _, rd := range stage.Redirects {
 			line += " sends " + rd.Exit + " in room " + strconv.Itoa(rd.Room) + " to room " + strconv.Itoa(rd.To) + ";"
+		}
+		for _, rf := range stage.Flags {
+			state := "off"
+			if rf.On {
+				state = "on"
+			}
+			line += " " + rf.Flag + " " + state + " in room " + strconv.Itoa(rf.Room) + ";"
 		}
 		s.msg.Actor.SendInfo(line)
 		if stage.Message != "" {
@@ -419,8 +429,54 @@ func eventStage(name string, args, input []string) error {
 			stage.Redirects = kept
 			return nil
 		})
+	case "FLAG":
+		idWords, flag, on, remove, err := splitFlagArgs(rest)
+		if err != nil {
+			return err
+		}
+		ids, err := parseIds(idWords, "ROOM")
+		if err != nil {
+			return err
+		}
+		return edit(func(stage *objects.Stage) error {
+			kept := stage.Flags[:0:0]
+			for _, rf := range stage.Flags {
+				if rf.Flag != flag || !utils.IntIn(rf.Room, ids) {
+					kept = append(kept, rf)
+				}
+			}
+			if !remove {
+				for _, id := range ids {
+					kept = append(kept, objects.RoomFlag{Room: id, Flag: flag, On: on})
+				}
+			}
+			stage.Flags = kept
+			return nil
+		})
 	}
-	return errors.New("stages take at, message, room, exit, redirect or delete")
+	return errors.New("stages take at, message, room, exit, redirect, flag or delete")
+}
+
+// splitFlagArgs reads "<room_ids> <flag> on|off" or "remove <room_ids>
+// <flag>" into its parts; the flag must be one an event can switch.
+func splitFlagArgs(rest []string) (idWords []string, flag string, on bool, remove bool, err error) {
+	usage := errors.New("flag <room_ids> <flag> on|off, or flag remove <room_ids> <flag>")
+	if len(rest) > 0 && rest[0] == "REMOVE" {
+		if len(rest) < 3 {
+			return nil, "", false, false, usage
+		}
+		idWords, flag, remove = rest[1:len(rest)-1], rest[len(rest)-1], true
+	} else {
+		if len(rest) < 3 || (rest[len(rest)-1] != "ON" && rest[len(rest)-1] != "OFF") {
+			return nil, "", false, false, usage
+		}
+		idWords, flag, on = rest[:len(rest)-2], rest[len(rest)-2], rest[len(rest)-1] == "ON"
+	}
+	flag = strings.ToLower(flag)
+	if !utils.StringIn(flag, objects.QuestRoomFlagNames) {
+		return nil, "", false, false, errors.New("events can switch " + strings.Join(objects.QuestRoomFlagNames, ", ") + ", not " + flag)
+	}
+	return idWords, flag, on, remove, nil
 }
 
 // eventMembers handles "event room|mob|item <name> add|remove <ids>".

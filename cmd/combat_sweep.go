@@ -8,7 +8,7 @@ import (
 
 func init() {
 	addHandler(sweep{},
-		"Usage:  sweep [target #] \n\n Strike low to knock a target off its feet, stunning it and drawing its attention onto you if the sweep lands.  Throws extra strikes while flurrying, though a flurried sweep builds no chi.  With no target named, you sweep the foe you are already fighting.",
+		"Usage:  sweep [target #] \n\n Strike low to knock a target off its feet, stunning it and drawing its attention onto you.  Throws extra strikes while flurrying, though a flurried sweep builds no chi.  With no target named, you sweep the foe you are already fighting.",
 		permissions.Monk,
 		"sweep")
 }
@@ -64,6 +64,9 @@ func (sweep) process(s *state) {
 	result := resolveHits(s, whatMob, attacks, skillLevel, "sweep")
 	if result.hits == 0 {
 		s.msg.Observers.SendBad(s.actor.Name + " fails to sweep " + whatMob.Name)
+		// A missed sweep still draws the mob's attention, with no threat bump.
+		whatMob.AddThreatDamage(1, s.actor)
+		whatMob.CurrentTarget = s.actor.Name
 		s.actor.SetTimer("combat", config.CombatCooldown)
 		return
 	}

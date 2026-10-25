@@ -37,6 +37,12 @@ import (
 // moment the event ends. Nothing about the exit itself is changed or saved,
 // so there is nothing to put back. A later stage can re-point the same exit.
 //
+// In the same way a stage can switch a room's elemental flag (earth, fire,
+// water, air) on or off: the room reads as if the flag were so while the
+// event is at that stage or later, and as itself again the moment the event
+// ends. The flag on the room is never changed or saved. Gameplay reads these
+// flags through Room.FlagOn; see QuestRoomFlagNames for which ones it covers.
+//
 // In preview the event runs for staff only: spawns roll only where staff
 // stand, only staff see its messages, quest mode is off and its exits stay
 // sealed to players. It lets a DM walk the event before players can.
@@ -68,6 +74,7 @@ type Stage struct {
 	Exits   []ExitGate // exits sealed to players until this stage
 
 	Redirects []ExitRedirect // exits that lead elsewhere from this stage
+	Flags     []RoomFlag     // room flags that read differently from this stage
 }
 
 // An ExitRedirect sends one exit to a different room while it applies.
@@ -76,6 +83,17 @@ type ExitRedirect struct {
 	Exit string
 	To   int
 }
+
+// A RoomFlag makes one room's flag read as On while it applies.
+type RoomFlag struct {
+	Room int
+	Flag string
+	On   bool
+}
+
+// QuestRoomFlagNames are the room flags an event stage can switch: the ones
+// gameplay reads through Room.FlagOn.
+var QuestRoomFlagNames = []string{"earth", "fire", "water", "air"}
 
 // An ExitGate names one exit, by its room and lowercased exit name.
 type ExitGate struct {
@@ -163,6 +181,9 @@ var (
 	// exitRedirects maps "room/exit" to the events and stages redirecting
 	// it, in event name order.
 	exitRedirects = map[string][]exitRedirectRef{}
+	// roomFlags maps "room/flag" to the events and stages switching it, in
+	// event name order.
+	roomFlags = map[string][]roomFlagRef{}
 	// timedExits maps "room/exit" to a destination a script gave it for a
 	// while. They live in memory only, so a reboot puts every exit back.
 	timedExits = map[string]timedExit{}
@@ -174,6 +195,12 @@ type exitRedirectRef struct {
 	event string
 	stage int
 	to    int
+}
+
+type roomFlagRef struct {
+	event string
+	stage int
+	on    bool
 }
 
 type timedExit struct {
@@ -196,11 +223,16 @@ func reindexQuestEvents() {
 	questRooms = map[int]time.Time{}
 	exitGates = map[string][]exitGateRef{}
 	exitRedirects = map[string][]exitRedirectRef{}
+	roomFlags = map[string][]roomFlagRef{}
 	for _, name := range sortedEventNames() {
 		for n, stage := range questEvents[name].Stages {
 			for _, rd := range stage.Redirects {
 				key := gateKey(rd.Room, rd.Exit)
 				exitRedirects[key] = append(exitRedirects[key], exitRedirectRef{name, n, rd.To})
+			}
+			for _, rf := range stage.Flags {
+				key := gateKey(rf.Room, rf.Flag)
+				roomFlags[key] = append(roomFlags[key], roomFlagRef{name, n, rf.On})
 			}
 		}
 	}
@@ -602,6 +634,30 @@ func QuestExitTo(roomId int, exit string, c *Character) (int, bool) {
 		return 0, false
 	}
 	return to, true
+}
+
+// QuestRoomFlag reports whether a public event makes this room's flag read
+// as on or off right now. It is the latest stage reached of the first live
+// event, by name, that switches it. Without one, ok is false and the room's
+// own flag stands.
+func QuestRoomFlag(roomId int, flag string) (on bool, ok bool) {
+	now := time.Now()
+	questEventsMu.RLock()
+	defer questEventsMu.RUnlock()
+	event, stage := "", 0
+	for _, ref := range roomFlags[gateKey(roomId, flag)] {
+		e := questEvents[ref.event]
+		if e == nil || !e.livePublic(now) || ref.stage > e.Stage {
+			continue
+		}
+		if event != "" && ref.event != event {
+			break
+		}
+		if ref.stage > stage {
+			event, stage, on, ok = ref.event, ref.stage, ref.on, true
+		}
+	}
+	return on, ok
 }
 
 // RedirectExitFor makes an exit lead to another room for d, after which it
