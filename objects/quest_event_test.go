@@ -460,3 +460,29 @@ func TestLookHidesSealedExit(t *testing.T) {
 		t.Errorf("while running, players see: %q", got)
 	}
 }
+
+// A closed exit is the reverse of a gated one: shut to players only while
+// the event runs at its stage or later.
+func TestQuestExitClosed(t *testing.T) {
+	e := &QuestEvent{Name: "harvest", Expires: hour(1),
+		Stages: map[int]*Stage{2: {Closes: []ExitGate{{Room: 10, Exit: "the ship's deck."}}}}}
+	withQuestEvents(t, e)
+
+	steps := []struct {
+		label  string
+		set    func()
+		sealed bool
+	}{
+		{"before start", func() {}, false},
+		{"in preview", func() { e.Active, e.Preview, e.Stage = true, true, 2 }, false},
+		{"running, stage 1", func() { e.Preview, e.Stage = false, 1 }, false},
+		{"running, stage 2", func() { e.Stage = 2 }, true},
+		{"expired", func() { e.Expires = hour(-1) }, false},
+	}
+	for _, step := range steps {
+		step.set()
+		if got := QuestExitSealed(10, "THE SHIP'S DECK."); got != step.sealed {
+			t.Errorf("%s: sealed = %v, want %v", step.label, got, step.sealed)
+		}
+	}
+}

@@ -143,6 +143,18 @@ func CheckQuestEvent(name string) (QuestEventReport, error) {
 		}
 	}
 	for _, n := range e.stageNumbers() {
+		for _, gate := range e.Stages[n].Closes {
+			label := "stage " + strconv.Itoa(n) + " closes exit " + gate.Exit + " in room " + strconv.Itoa(gate.Room)
+			if room, ok := Rooms[gate.Room]; !ok {
+				problem(label + ", but that room no longer exists")
+			} else if _, ok := room.Exits[gate.Exit]; !ok {
+				problem(label + ", which has no such exit")
+			} else {
+				note(label + " until the event ends")
+			}
+		}
+	}
+	for _, n := range e.stageNumbers() {
 		for _, rd := range e.Stages[n].Redirects {
 			label := "stage " + strconv.Itoa(n) + " redirects exit " + rd.Exit + " in room " + strconv.Itoa(rd.Room)
 			if room, ok := Rooms[rd.Room]; !ok {

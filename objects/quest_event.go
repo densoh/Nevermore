@@ -37,6 +37,10 @@ import (
 // moment the event ends. Nothing about the exit itself is changed or saved,
 // so there is nothing to put back. A later stage can re-point the same exit.
 //
+// A stage can also close exits, the reverse of sealing them: a closed exit is
+// shut to players while the event is at that stage or later, and open again
+// the moment the event ends.
+//
 // In the same way a stage can switch a room's elemental flag (earth, fire,
 // water, air) on or off: the room reads as if the flag were so while the
 // event is at that stage or later, and as itself again the moment the event
@@ -72,6 +76,7 @@ type Stage struct {
 	Message string     // broadcast when reached; the login message from then on
 	Rooms   []int      // rooms that join quest mode from this stage
 	Exits   []ExitGate // exits sealed to players until this stage
+	Closes  []ExitGate // exits sealed to players from this stage while the event runs
 
 	Redirects []ExitRedirect // exits that lead elsewhere from this stage
 	Flags     []RoomFlag     // room flags that read differently from this stage
@@ -178,6 +183,9 @@ var (
 	questRooms = map[int]time.Time{}
 	// exitGates maps "room/exit" to the events and stages sealing it.
 	exitGates = map[string][]exitGateRef{}
+	// exitCloses maps "room/exit" to the events and stages closing it while
+	// they run - the reverse of exitGates.
+	exitCloses = map[string][]exitGateRef{}
 	// exitRedirects maps "room/exit" to the events and stages redirecting
 	// it, in event name order.
 	exitRedirects = map[string][]exitRedirectRef{}
@@ -222,6 +230,7 @@ func gateKey(room int, exit string) string {
 func reindexQuestEvents() {
 	questRooms = map[int]time.Time{}
 	exitGates = map[string][]exitGateRef{}
+	exitCloses = map[string][]exitGateRef{}
 	exitRedirects = map[string][]exitRedirectRef{}
 	roomFlags = map[string][]roomFlagRef{}
 	for _, name := range sortedEventNames() {
@@ -241,6 +250,10 @@ func reindexQuestEvents() {
 			for _, gate := range stage.Exits {
 				key := gateKey(gate.Room, gate.Exit)
 				exitGates[key] = append(exitGates[key], exitGateRef{name, n})
+			}
+			for _, gate := range stage.Closes {
+				key := gateKey(gate.Room, gate.Exit)
+				exitCloses[key] = append(exitCloses[key], exitGateRef{name, n})
 			}
 		}
 		if !e.Active || e.Preview {
@@ -582,16 +595,25 @@ func QuestEventRoom(roomId int) bool {
 	return ok && time.Now().Before(expires)
 }
 
-// QuestExitSealed reports whether an event keeps this exit shut to players:
-// it is sealed until its event is running for players and has reached its
-// stage, and sealed again once the event ends.
+// QuestExitSealed reports whether an event keeps this exit shut to players.
+// A gated exit is sealed until its event is running for players and has
+// reached its stage, and sealed again once the event ends. A closed exit is
+// the reverse: sealed while its event runs for players at its stage or
+// later, and open again once the event ends.
 func QuestExitSealed(roomId int, exit string) bool {
 	questEventsMu.RLock()
 	defer questEventsMu.RUnlock()
 	now := time.Now()
-	for _, gate := range exitGates[gateKey(roomId, exit)] {
+	key := gateKey(roomId, exit)
+	for _, gate := range exitGates[key] {
 		e := questEvents[gate.event]
 		if e == nil || !e.livePublic(now) || e.Stage < gate.stage {
+			return true
+		}
+	}
+	for _, gate := range exitCloses[key] {
+		e := questEvents[gate.event]
+		if e != nil && e.livePublic(now) && e.Stage >= gate.stage {
 			return true
 		}
 	}
