@@ -35,6 +35,7 @@ func init() {
 			"  event stage <name> <n> message <text>                 broadcast on reaching it; becomes the login message\n"+
 			"  event stage <name> <n> room add|remove <ids>          rooms join quest mode from stage n\n"+
 			"  event stage <name> <n> exit add|remove <room_id> <exit>   sealed to players until stage n\n"+
+			"  event stage <name> <n> close add|remove <room_id> <exit>  sealed to players from stage n until the event ends\n"+
 			"  event stage <name> <n> redirect add <room_id> <exit> <to_room_id>   exit leads elsewhere from stage n\n"+
 			"  event stage <name> <n> redirect remove <room_id> <exit>             (stage 1 = the whole event; back to normal when it ends)\n"+
 			"  event stage <name> <n> flag <room_ids> <flag> on|off    rooms read the flag so from stage n (earth, fire, water or air)\n"+
@@ -223,6 +224,9 @@ func eventShow(s *state, name string) {
 		for _, gate := range stage.Exits {
 			line += " unseals " + gate.Exit + " in room " + strconv.Itoa(gate.Room) + ";"
 		}
+		for _, gate := range stage.Closes {
+			line += " closes " + gate.Exit + " in room " + strconv.Itoa(gate.Room) + ";"
+		}
 		for _, rd := range stage.Redirects {
 			line += " sends " + rd.Exit + " in room " + strconv.Itoa(rd.Room) + " to room " + strconv.Itoa(rd.To) + ";"
 		}
@@ -362,7 +366,7 @@ func eventStage(name string, args, input []string) error {
 			stage.Rooms = editIds(stage.Rooms, ids, rest[0] == "ADD")
 			return nil
 		})
-	case "EXIT":
+	case "EXIT", "CLOSE":
 		if len(rest) < 3 || (rest[0] != "ADD" && rest[0] != "REMOVE") {
 			return errors.New("add or remove which room_id and exit?")
 		}
@@ -378,8 +382,12 @@ func eventStage(name string, args, input []string) error {
 		}
 		gate := objects.ExitGate{Room: roomId, Exit: exit}
 		return edit(func(stage *objects.Stage) error {
-			kept := stage.Exits[:0:0]
-			for _, g := range stage.Exits {
+			list := &stage.Exits
+			if op == "CLOSE" {
+				list = &stage.Closes
+			}
+			kept := (*list)[:0:0]
+			for _, g := range *list {
 				if g != gate {
 					kept = append(kept, g)
 				}
@@ -387,7 +395,7 @@ func eventStage(name string, args, input []string) error {
 			if rest[0] == "ADD" {
 				kept = append(kept, gate)
 			}
-			stage.Exits = kept
+			*list = kept
 			return nil
 		})
 	case "REDIRECT":
@@ -454,7 +462,7 @@ func eventStage(name string, args, input []string) error {
 			return nil
 		})
 	}
-	return errors.New("stages take at, message, room, exit, redirect, flag or delete")
+	return errors.New("stages take at, message, room, exit, close, redirect, flag or delete")
 }
 
 // splitFlagArgs reads "<room_ids> <flag> on|off" or "remove <room_ids>

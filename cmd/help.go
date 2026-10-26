@@ -232,6 +232,12 @@ func (help) process(s *state) {
 			return
 		}
 
+		if subject == "DM" && s.actor.Permission.HasAnyFlags(permissions.Dungeonmaster, permissions.Gamemaster, permissions.God) {
+			dmHelp(s, s.words[1:])
+			s.ok = true
+			return
+		}
+
 		// Search Spells:
 		if spell, ok := objects.Spells[strings.ToLower(subject)]; ok {
 			s.msg.Actor.SendGood("Spell: ", subject, "\n", spell.Description, "\n")
