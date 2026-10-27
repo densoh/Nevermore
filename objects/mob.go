@@ -1414,11 +1414,14 @@ func (m *Mob) CheckFlag(flagName string) bool {
 }
 
 func (m *Mob) ReceiveDamage(damage int) (int, int, int) {
-	resist := int(((float64(m.Armor) / 100) * config.MobArmorReduction) * float64(damage))
+	resist := min(int(((float64(m.Armor)/100)*config.MobArmorReduction)*float64(damage)), damage)
 	finalDamage := damage - resist
 	if m.CheckFlag("inertial-barrier") {
 		finalDamage -= int(math.Ceil(float64(damage) * config.InertialDamageIgnore))
 	}
+	// Armor of 200 or more resists the whole hit. A negative remainder would
+	// add stamina through Meter.Subtract, so a hit never does less than 0.
+	finalDamage = max(finalDamage, 0)
 	if m.Stam.Current < finalDamage {
 		finalDamage = m.Stam.Current
 	}
@@ -1431,7 +1434,8 @@ func (m *Mob) ReceiveDamage(damage int) (int, int, int) {
 }
 
 func (m *Mob) ReceiveDamageNoArmor(damage int) (int, int) {
-	finalDamage := int(math.Ceil(float64(damage)))
+	// Resistances over 100% hand in a negative amount; it must not heal.
+	finalDamage := max(damage, 0)
 	if m.Stam.Current < finalDamage {
 		finalDamage = m.Stam.Current
 	}

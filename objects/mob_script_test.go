@@ -153,6 +153,7 @@ func TestRunTickScripts(t *testing.T) {
 	m, _ := scriptBoss(t, -93, map[string]string{
 		"@HP75":   "$DAMAGE target 1 true",
 		"@HP25":   "$DAMAGE target 2 true",
+		"@HP10":   "$DAMAGE target 16 true",
 		"@AGGRO":  "$DAMAGE target 4 true",
 		"@COMBAT": "$DAMAGE target 8 true",
 	}, tank)
@@ -170,6 +171,10 @@ func TestRunTickScripts(t *testing.T) {
 	}
 	if m.runTickScripts(); lost() != 23 {
 		t.Errorf("tick after phases: lost %d, want only the combat script (23)", lost())
+	}
+	m.Stam.Current = 50 // 5%: the last phase
+	if m.runTickScripts(); lost() != 39 {
+		t.Errorf("10%% phase tick: lost %d, want the @HP10 script in place of combat (39)", lost())
 	}
 }
 
