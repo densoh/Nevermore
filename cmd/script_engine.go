@@ -33,6 +33,7 @@ type scriptEvent struct {
 
 	refused  bool // a step turned the event down; the triggering command stops
 	consumed bool // $CONSUME destroyed item; the triggering command must not touch it
+	counted  bool // $EVENTCOUNT counted the item; a later $WEAKEN lets it pass
 }
 
 // refuse stops the running event script and tells the actor why.

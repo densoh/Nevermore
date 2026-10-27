@@ -527,3 +527,30 @@ func TestQuestMobDrops(t *testing.T) {
 		}
 	}
 }
+
+// Offerings count toward a stage only while the event is short of it, the
+// target reaches it, and the tally starts over each time the event starts.
+func TestCountQuestEvent(t *testing.T) {
+	e := &QuestEvent{Name: "harvest", Expires: hour(1), Stages: map[int]*Stage{2: {}}}
+	withQuestEvents(t, e)
+
+	if _, _, err := CountQuestEvent("harvest", 2, 2, player); err == nil {
+		t.Fatal("counting should fail before the event starts")
+	}
+	if err := StartQuestEvent("harvest", false); err != nil {
+		t.Fatal(err)
+	}
+	if counted, tally, err := CountQuestEvent("harvest", 2, 2, player); err != nil || !counted || tally != 1 || e.Stage != 1 {
+		t.Fatalf("first: counted %v tally %d stage %d err %v, want counted 1 at stage 1", counted, tally, e.Stage, err)
+	}
+	if counted, tally, err := CountQuestEvent("harvest", 2, 2, player); err != nil || !counted || tally != 2 || e.Stage != 2 {
+		t.Fatalf("second: counted %v tally %d stage %d err %v, want counted 2 reaching stage 2", counted, tally, e.Stage, err)
+	}
+	if counted, _, err := CountQuestEvent("harvest", 2, 2, player); err != nil || counted || e.Tally != 2 {
+		t.Errorf("at stage 2: counted %v tally %d err %v, want nothing counted", counted, e.Tally, err)
+	}
+	e.Active = false
+	if err := StartQuestEvent("harvest", false); err != nil || e.Tally != 0 {
+		t.Errorf("restart: tally %d err %v, want 0", e.Tally, err)
+	}
+}
