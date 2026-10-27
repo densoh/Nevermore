@@ -22,7 +22,7 @@ import (
 //	@AGGRO   when it goes from no target to a target
 //	@COMBAT  every tick it has a target
 //	@IDLE    every tick it has none
-//	@HP75 @HP50 @HP25  once each, the first tick after its stamina drops
+//	@HP75 @HP50 @HP25 @HP10  once each, the first tick after its stamina drops
 //	         below that percentage - boss phases
 //	@HIT     whenever a player damages it (attacker is the striker)
 //
@@ -196,7 +196,7 @@ func init() {
 }
 
 // MobTriggers are the triggers that run as the mob.
-var MobTriggers = []string{"@SPAWN", "@AGGRO", "@COMBAT", "@IDLE", "@HP75", "@HP50", "@HP25", "@HIT"}
+var MobTriggers = []string{"@SPAWN", "@AGGRO", "@COMBAT", "@IDLE", "@HP75", "@HP50", "@HP25", "@HP10", "@HIT"}
 
 // ValidMobScript checks every step of a mob script starts with a mob verb
 // and returns the first one that doesn't.
@@ -293,7 +293,7 @@ func (m *Mob) runTickScripts() bool {
 	used := false
 	if m.Stam.Max > 0 {
 		pct := m.Stam.Current * 100 / m.Stam.Max
-		for _, threshold := range []int{75, 50, 25} {
+		for _, threshold := range []int{75, 50, 25, 10} {
 			if pct < threshold && !st.hpFired[threshold] {
 				st.hpFired[threshold] = true
 				used = m.RunScript("HP"+strconv.Itoa(threshold), nil) || used
