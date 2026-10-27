@@ -36,6 +36,7 @@ func init() {
 			"  event stage <name> <n> room add|remove <ids>          rooms join quest mode from stage n\n"+
 			"  event stage <name> <n> exit add|remove <room_id> <exit>   sealed to players until stage n\n"+
 			"  event stage <name> <n> close add|remove <room_id> <exit>  sealed to players from stage n until the event ends\n"+
+			"  event stage <name> <n> close add|remove <room_id> <exit>  sealed to players from stage n until the event ends\n"+
 			"  event stage <name> <n> redirect add <room_id> <exit> <to_room_id>   exit leads elsewhere from stage n\n"+
 			"  event stage <name> <n> redirect remove <room_id> <exit>             (stage 1 = the whole event; back to normal when it ends)\n"+
 			"  event stage <name> <n> flag <room_ids> <flag> on|off    rooms read the flag so from stage n (earth, fire, water or air)\n"+
