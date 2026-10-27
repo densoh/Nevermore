@@ -554,3 +554,37 @@ func TestCountQuestEvent(t *testing.T) {
 		t.Errorf("restart: tally %d err %v, want 0", e.Tally, err)
 	}
 }
+
+// A replacing spawn group pauses its rooms' own encounters only while the
+// event runs for players at the group's stage.
+func TestEncountersReplaced(t *testing.T) {
+	room := &Room{RoomId: -140}
+	other := &Room{RoomId: -141}
+	e := &QuestEvent{Name: "harvest", Expires: hour(1), Spawns: map[string]*SpawnGroup{
+		"crew": {Rooms: []int{-140}, Mobs: map[int]int{1: 1}, Rate: 50, Stage: 2, Replace: true},
+	}}
+	withQuestEvents(t, e)
+
+	steps := []struct {
+		label  string
+		set    func()
+		paused bool
+	}{
+		{"before start", func() {}, false},
+		{"preview at stage 2", func() { e.Active, e.Preview, e.Stage = true, true, 2 }, false},
+		{"running, stage 1", func() { e.Preview, e.Stage = false, 1 }, false},
+		{"running, stage 2", func() { e.Stage = 2 }, true},
+		{"replace off", func() { e.Spawns["crew"].Replace = false }, false},
+		{"expired", func() { e.Spawns["crew"].Replace, e.Expires = true, hour(-1) }, false},
+	}
+	for _, step := range steps {
+		step.set()
+		if got := room.EncountersReplaced(); got != step.paused {
+			t.Errorf("%s: replaced = %v, want %v", step.label, got, step.paused)
+		}
+	}
+	e.Expires = hour(1)
+	if other.EncountersReplaced() {
+		t.Error("a room outside the group should keep its encounters")
+	}
+}

@@ -125,6 +125,9 @@ type SpawnGroup struct {
 	Rate     int
 	Interval int
 	Stage    int
+	// Replace pauses its rooms' own encounters while the group is live, so
+	// the event's mobs take the place of the usual ones.
+	Replace bool
 }
 
 // DefaultSpawnInterval is the seconds between a spawn group's rolls in a
@@ -925,6 +928,26 @@ func (r *Room) eventSpawnRolls(now time.Time) []eventSpawn {
 		}
 	}
 	return spawns
+}
+
+// EncountersReplaced reports whether a running event's spawn group has
+// taken over this room's own encounters for now. Previews leave them be, as
+// players still need the room's usual mobs.
+func (r *Room) EncountersReplaced() bool {
+	now := time.Now()
+	questEventsMu.RLock()
+	defer questEventsMu.RUnlock()
+	for _, e := range questEvents {
+		if !e.livePublic(now) {
+			continue
+		}
+		for _, g := range e.Spawns {
+			if g.Replace && g.Stage <= e.Stage && utils.IntIn(r.RoomId, g.Rooms) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // pickEventMob picks a mob by weight from those out at this time of day.

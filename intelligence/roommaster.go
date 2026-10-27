@@ -54,7 +54,7 @@ func LoopRooms() {
 				objects.Rooms[r].CleanRoom()
 			}
 		} else {
-			if objects.Rooms[r].Flags["encounters_on"] {
+			if objects.Rooms[r].Flags["encounters_on"] && !objects.Rooms[r].EncountersReplaced() {
 				if time.Now().Sub(objects.Rooms[r].LastEncounterTime).Seconds() > float64(objects.Rooms[r].EncounterSpeed) {
 					// Apply jigger
 					if time.Now().Sub(objects.Rooms[r].LastEncounterTime).Seconds() > float64(objects.Rooms[r].EncounterSpeed+objects.Rooms[r].EncounterJigger) {
