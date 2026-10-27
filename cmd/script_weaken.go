@@ -16,7 +16,8 @@ import (
 // per_step, it takes that many offerings to make one step, counted on the
 // template (Mob.Offer). The change is saved, so it is permanent and every
 // later spawn has it. Copies of the mob standing in room_id pick it up
-// straight away. Refuses once max_steps have been reached.
+// straight away. Refuses once max_steps have been reached. An item
+// $EVENTCOUNT already counted passes without weakening.
 func init() {
 	addHandler(scriptWeaken{},
 		"",
@@ -34,6 +35,11 @@ func (scriptWeaken) process(s *state) {
 		}
 	}
 
+	// An item $EVENTCOUNT took for an earlier stage doesn't weaken anything.
+	if s.event != nil && s.event.counted {
+		s.ok = true
+		return
+	}
 	if len(s.words) < 4 {
 		refuse("needs room_id mob_id percent max_steps")
 		return

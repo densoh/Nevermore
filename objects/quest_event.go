@@ -62,6 +62,7 @@ type QuestEvent struct {
 	Active  bool // started and not yet ended; Running also checks Expires
 	Preview bool // running for staff only
 	Stage   int  // the stage reached while running
+	Tally   int  // offerings counted toward the next stage; see CountQuestEvent
 
 	Rooms  []int
 	Mobs   []int
@@ -462,7 +463,7 @@ func StartQuestEvent(name string, preview bool) error {
 		if !time.Now().Before(e.Expires) {
 			return errors.New("set an expiration date in the future first")
 		}
-		e.Active, e.Preview, e.Stage = true, preview, 1
+		e.Active, e.Preview, e.Stage, e.Tally = true, preview, 1, 0
 		if !preview {
 			e.Starts = time.Time{}
 		}
@@ -509,6 +510,29 @@ func AdvanceQuestEvent(name string, stage int, actor *Character, force bool) (bo
 	return changed, err
 }
 
+// CountQuestEvent counts one offering toward an event reaching stage, while
+// it is live for actor and short of that stage, and moves it there once
+// target have been counted. counted is false once the event is at stage or
+// past it, so the offering can go on to do something else. The tally starts
+// at 0 each time the event starts.
+func CountQuestEvent(name string, target, stage int, actor *Character) (counted bool, tally int, err error) {
+	err = EditQuestEvent(name, func(e *QuestEvent) error {
+		if !e.liveFor(actor, time.Now()) {
+			return errors.New("the event is not running")
+		}
+		if e.Stage >= stage {
+			return nil
+		}
+		e.Tally++
+		counted, tally = true, e.Tally
+		return nil
+	})
+	if err == nil && counted && tally >= target {
+		_, err = AdvanceQuestEvent(name, stage, actor, false)
+	}
+	return counted, tally, err
+}
+
 // EndQuestEvent switches an event off and removes its mobs and fixtures from
 // the world. It locks every room in turn, so call it without any room lock
 // held - from a command, run it on its own goroutine.
@@ -520,7 +544,7 @@ func EndQuestEvent(name string) error {
 			return errors.New("the event is not running")
 		}
 		preview = e.Preview
-		e.Active, e.Preview, e.Stage = false, false, 0
+		e.Active, e.Preview, e.Stage, e.Tally = false, false, 0, 0
 		mobIds = append(mobIds, e.Mobs...)
 		itemIds = append(itemIds, e.Items...)
 		for key := range eventSpawnRolls {

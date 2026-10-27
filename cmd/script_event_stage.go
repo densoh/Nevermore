@@ -18,6 +18,14 @@ import (
 // Moves a running event forward to stage, announcing what it unlocks. It
 // never moves an event back, and does nothing for players while the event
 // is only a preview.
+//
+// Syntax: $EVENTCOUNT event target stage
+//
+// Event scripts: while the running event is short of stage, counts the item
+// toward it and moves the event to stage once target have been counted. A
+// counted item skips any $WEAKEN after it, so an offering can do research
+// first and weaken a boss later. From stage on it does nothing and the
+// script carries on.
 func init() {
 	addHandler(scriptIfStage{},
 		"",
@@ -27,6 +35,10 @@ func init() {
 		"",
 		permissions.Anyone,
 		"$EVENTSTAGE")
+	addHandler(scriptEventCount{},
+		"",
+		permissions.Anyone,
+		"$EVENTCOUNT")
 }
 
 type scriptIfStage cmd
@@ -55,6 +67,39 @@ func (scriptEventStage) process(s *state) {
 	if _, err := objects.AdvanceQuestEvent(name, stage, s.actor, false); err != nil {
 		log.Println("$EVENTSTAGE " + name + ": " + err.Error())
 		return
+	}
+	s.ok = true
+}
+
+type scriptEventCount cmd
+
+func (scriptEventCount) process(s *state) {
+	refuse := func(why string) {
+		log.Println("$EVENTCOUNT " + why)
+		if s.event != nil {
+			s.event.refuse(s, "Nothing happens.")
+		}
+	}
+	if len(s.words) < 3 {
+		refuse("needs an event name, a target and a stage")
+		return
+	}
+	target, err1 := strconv.Atoi(s.words[1])
+	stage, err2 := strconv.Atoi(s.words[2])
+	if err1 != nil || err2 != nil || target < 1 || stage < 2 {
+		refuse("needs a target of 1 or more and a stage from 2")
+		return
+	}
+	counted, tally, err := objects.CountQuestEvent(s.words[0], target, stage, s.actor)
+	if err != nil {
+		refuse(s.words[0] + ": " + err.Error())
+		return
+	}
+	if counted {
+		if s.event != nil {
+			s.event.counted = true
+		}
+		s.msg.Actor.SendInfo("(" + strconv.Itoa(min(tally, target)) + " of " + strconv.Itoa(target) + ")")
 	}
 	s.ok = true
 }

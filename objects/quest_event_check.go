@@ -235,7 +235,7 @@ func CheckQuestEvent(name string) (QuestEventReport, error) {
 	return rep, nil
 }
 
-// eventScripts finds every $EVENTSTAGE and $IFSTAGE step naming the event
+// eventScripts finds every $EVENTSTAGE, $EVENTCOUNT and $IFSTAGE step naming the event
 // in the scripts on rooms, item templates and mob templates.
 func eventScripts(name string) []stageScript {
 	var found []stageScript
@@ -246,11 +246,19 @@ func eventScripts(name string) []stageScript {
 				if len(f) < 3 || strings.ToLower(f[1]) != name {
 					continue
 				}
-				verb := strings.ToUpper(f[0])
-				if verb != "$EVENTSTAGE" && verb != "$IFSTAGE" {
+				verb, stageAt := strings.ToUpper(f[0]), 2
+				switch verb {
+				case "$EVENTSTAGE", "$IFSTAGE":
+				case "$EVENTCOUNT":
+					// $EVENTCOUNT event target stage reaches stage like $EVENTSTAGE.
+					verb, stageAt = "$EVENTSTAGE", 3
+				default:
 					continue
 				}
-				if n, err := strconv.Atoi(f[2]); err == nil {
+				if len(f) <= stageAt {
+					continue
+				}
+				if n, err := strconv.Atoi(f[stageAt]); err == nil {
 					found = append(found, stageScript{verb, n, trigger + " on " + where})
 				}
 			}

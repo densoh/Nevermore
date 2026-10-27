@@ -163,11 +163,15 @@ func eventStatus(e objects.QuestEvent) string {
 	if !e.Expires.IsZero() {
 		expires = "expires " + e.Expires.Format(eventTimeFormat)
 	}
+	stage := strconv.Itoa(e.Stage)
+	if e.Tally > 0 {
+		stage += " (" + strconv.Itoa(e.Tally) + " counted toward the next)"
+	}
 	switch {
 	case e.Running(time.Now()) && e.Preview:
-		return "in staff preview at stage " + strconv.Itoa(e.Stage) + ", " + expires
+		return "in staff preview at stage " + stage + ", " + expires
 	case e.Running(time.Now()):
-		return "running at stage " + strconv.Itoa(e.Stage) + ", " + expires
+		return "running at stage " + stage + ", " + expires
 	case e.Active:
 		return "expired, ending shortly"
 	case !e.Starts.IsZero():

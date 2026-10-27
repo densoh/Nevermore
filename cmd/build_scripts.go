@@ -47,6 +47,7 @@ var ScriptList = map[string]string{
 	"$EXITTO":     "Usage: $EXITTO room_id exit to_room_id seconds, the exit leads to another room for that long, then back (0 = put it back now)",
 	"$IFSTAGE":    "Usage: $IFSTAGE event stage, stops the script unless the event is running and has reached stage",
 	"$EVENTSTAGE": "Usage: $EVENTSTAGE event stage, advances a running event to stage (never back)",
+	"$EVENTCOUNT": "Usage: $EVENTCOUNT event target stage, event scripts: until the event reaches stage, count the item and reach stage at target; a counted item skips $WEAKEN",
 	"$GIVEGOLD":   "Usage: $GIVEGOLD amount, gives the actor gold",
 	"$GIVEITEM":   "Usage: $GIVEITEM item_id, gives the actor a copy of an item (dropped at their feet if too heavy)",
 	"$WEAKEN":     "Usage: $WEAKEN room_id mob_id percent max_steps [per_step], permanently take percent% of a mob's armor/resists/hp/damage, up to max_steps times; per_step offerings make one step",
