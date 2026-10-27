@@ -28,6 +28,7 @@ func init() {
 			"  event spawn <name> <group> mob <mob_id> <weight>      weight 0 removes it\n"+
 			"  event spawn <name> <group> rate <percent> [seconds]   chance per roll, seconds between rolls (default 60)\n"+
 			"  event spawn <name> <group> stage <n>                  only rolls from stage n\n"+
+			"  event spawn <name> <group> replace on|off             pause the rooms' own encounters while it is live\n"+
 			"  event spawn <name> <group> delete\n"+
 			"  Stages (events start at stage 1; a stage is reached by time, DM, or script, whichever is first):\n"+
 			"  event advance <name> <n>                              move a running event to stage n\n"+
@@ -207,12 +208,16 @@ func eventShow(s *state, name string) {
 		for _, id := range sortedKeys(g.Mobs) {
 			mobs = append(mobs, namedIds("MOB", []int{id})+" x"+strconv.Itoa(g.Mobs[id]))
 		}
+		replaces := ""
+		if g.Replace {
+			replaces = "; replaces the rooms' own encounters"
+		}
 		from := ""
 		if g.Stage > 1 {
 			from = " from stage " + strconv.Itoa(g.Stage)
 		}
 		s.msg.Actor.SendInfo("Spawn group " + group + ": " + strconv.Itoa(g.Rate) + "% every " +
-			strconv.Itoa(interval) + "s" + from + " in rooms " + compactIds(g.Rooms) + "; mobs " + strings.Join(mobs, ", "))
+			strconv.Itoa(interval) + "s" + from + " in rooms " + compactIds(g.Rooms) + "; mobs " + strings.Join(mobs, ", ") + replaces)
 	}
 	numbers := make([]int, 0, len(e.Stages))
 	for n := range e.Stages {
@@ -614,6 +619,13 @@ func eventSpawn(name string, args []string) error {
 		return editSpawnGroup(name, group, func(g *objects.SpawnGroup) {
 			g.Stage = stage
 		})
+	case "REPLACE":
+		if len(rest) < 1 || (rest[0] != "ON" && rest[0] != "OFF") {
+			return errors.New("replace on or off?")
+		}
+		return editSpawnGroup(name, group, func(g *objects.SpawnGroup) {
+			g.Replace = rest[0] == "ON"
+		})
 	case "RATE":
 		if len(rest) < 1 {
 			return errors.New("what percent chance per roll?")
@@ -635,7 +647,7 @@ func eventSpawn(name string, args []string) error {
 			}
 		})
 	}
-	return errors.New("spawn groups take rooms, mob, rate, stage or delete")
+	return errors.New("spawn groups take rooms, mob, rate, stage, replace or delete")
 }
 
 // editSpawnGroup applies edit to a spawn group, creating it if need be.
