@@ -486,3 +486,44 @@ func TestQuestExitClosed(t *testing.T) {
 		}
 	}
 }
+
+// Event drops apply to mobs spawned while the event runs at the stage, with
+// a later stage's chance winning, and in preview only to the event's own
+// spawns.
+func TestQuestMobDrops(t *testing.T) {
+	e := &QuestEvent{Name: "harvest", Expires: hour(1), Stages: map[int]*Stage{
+		1: {Drops: []MobDrop{{Mob: 5, Item: 50, Chance: 40}}},
+		2: {Drops: []MobDrop{{Mob: 5, Item: 50, Chance: 90}, {Mob: 5, Item: 51, Chance: 10}}},
+	}}
+	withQuestEvents(t, e)
+	crew := &Mob{MobId: 5}
+	spawned := &Mob{MobId: 5, QuestEvent: "harvest"}
+
+	steps := []struct {
+		label string
+		set   func()
+		mob   *Mob
+		want  map[int]int
+	}{
+		{"before start", func() {}, crew, map[int]int{}},
+		{"preview, ordinary copy", func() { e.Active, e.Preview, e.Stage = true, true, 1 }, crew, map[int]int{}},
+		{"preview, event spawn", func() {}, spawned, map[int]int{50: 40}},
+		{"running, stage 1", func() { e.Preview = false }, crew, map[int]int{50: 40}},
+		{"running, stage 2", func() { e.Stage = 2 }, crew, map[int]int{50: 90, 51: 10}},
+		{"other mob", func() {}, &Mob{MobId: 6}, map[int]int{}},
+		{"expired", func() { e.Expires = hour(-1) }, crew, map[int]int{}},
+	}
+	for _, step := range steps {
+		step.set()
+		got := QuestMobDrops(step.mob)
+		if len(got) != len(step.want) {
+			t.Errorf("%s: drops = %v, want %v", step.label, got, step.want)
+			continue
+		}
+		for item, chance := range step.want {
+			if got[item] != chance {
+				t.Errorf("%s: drops = %v, want %v", step.label, got, step.want)
+			}
+		}
+	}
+}

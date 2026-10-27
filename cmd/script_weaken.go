@@ -9,13 +9,14 @@ import (
 	"github.com/ArcCS/Nevermore/utils"
 )
 
-// Syntax: $WEAKEN room_id mob_id percent max_steps
+// Syntax: $WEAKEN room_id mob_id percent max_steps [per_step]
 //
 // Takes percent% of a mob's original armor, resistances, max stamina and
-// damage off its template, up to max_steps times; see Mob.Weaken. The change
-// is saved, so it is permanent and every later spawn has it. Copies of the
-// mob standing in room_id pick it up straight away. Refuses once max_steps
-// have been reached.
+// damage off its template, up to max_steps times; see Mob.Weaken. With
+// per_step, it takes that many offerings to make one step, counted on the
+// template (Mob.Offer). The change is saved, so it is permanent and every
+// later spawn has it. Copies of the mob standing in room_id pick it up
+// straight away. Refuses once max_steps have been reached.
 func init() {
 	addHandler(scriptWeaken{},
 		"",
@@ -47,6 +48,15 @@ func (scriptWeaken) process(s *state) {
 		args[i] = v
 	}
 	roomId, mobId, pct, maxSteps := args[0], args[1], args[2], args[3]
+	perStep := 1
+	if len(s.words) > 4 {
+		v, err := strconv.Atoi(s.words[4])
+		if err != nil || v < 1 {
+			refuse("per_step " + s.words[4] + " is not a number of 1 or more")
+			return
+		}
+		perStep = v
+	}
 
 	room, ok := objects.Rooms[roomId]
 	if !ok {
@@ -70,7 +80,8 @@ func (scriptWeaken) process(s *state) {
 	}
 
 	// At the cap is the normal end of the quest, not an error.
-	if !template.Weaken(pct, maxSteps) {
+	accepted, stepped := template.Offer(pct, maxSteps, perStep)
+	if !accepted {
 		if s.event != nil {
 			s.event.refuse(s, "Nothing happens.")
 		}
@@ -78,9 +89,11 @@ func (scriptWeaken) process(s *state) {
 	}
 	template.Save()
 
-	for _, mob := range room.Mobs.Contents {
-		if mob.MobId == mobId {
-			mob.SyncWeakened(template)
+	if stepped {
+		for _, mob := range room.Mobs.Contents {
+			if mob.MobId == mobId {
+				mob.SyncWeakened(template)
+			}
 		}
 	}
 	s.ok = true

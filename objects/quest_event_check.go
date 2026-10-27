@@ -184,6 +184,19 @@ func CheckQuestEvent(name string) (QuestEventReport, error) {
 			}
 		}
 	}
+	for _, n := range e.stageNumbers() {
+		for _, d := range e.Stages[n].Drops {
+			label := "stage " + strconv.Itoa(n) + " gives " + mobLabel(d.Mob) + " a " + strconv.Itoa(d.Chance) + "% drop of " + itemLabel(d.Item)
+			switch {
+			case Mobs[d.Mob] == nil:
+				problem(label + ", but that mob no longer exists")
+			case Items[d.Item] == nil:
+				problem(label + ", but that item no longer exists")
+			default:
+				note(label + " while the event runs")
+			}
+		}
+	}
 	for _, sc := range scripts {
 		if sc.verb == "$IFSTAGE" && sc.stage > 1 && !reachable[sc.stage] {
 			note(sc.where + " waits for stage " + strconv.Itoa(sc.stage) + ", which only a DM can reach")

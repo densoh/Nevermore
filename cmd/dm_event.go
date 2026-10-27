@@ -40,6 +40,8 @@ func init() {
 			"  event stage <name> <n> redirect remove <room_id> <exit>             (stage 1 = the whole event; back to normal when it ends)\n"+
 			"  event stage <name> <n> flag <room_ids> <flag> on|off    rooms read the flag so from stage n (earth, fire, water or air)\n"+
 			"  event stage <name> <n> flag remove <room_ids> <flag>\n"+
+			"  event stage <name> <n> drop <mob_ids> <item_id> <chance>    mobs spawned from stage n roll chance% for the item\n"+
+			"  event stage <name> <n> drop remove <mob_ids> <item_id>\n"+
 			"  event stage <name> <n> delete\n"+
 			"  Scripts: $IFSTAGE <name> <n> stops a script below stage n; $EVENTSTAGE <name> <n> advances it.\n"+
 			"  ids: 100 101 or 100-120 or 100,105-110",
@@ -236,6 +238,9 @@ func eventShow(s *state, name string) {
 				state = "on"
 			}
 			line += " " + rf.Flag + " " + state + " in room " + strconv.Itoa(rf.Room) + ";"
+		}
+		for _, d := range stage.Drops {
+			line += " mob " + strconv.Itoa(d.Mob) + " drops item " + strconv.Itoa(d.Item) + " at " + strconv.Itoa(d.Chance) + "%;"
 		}
 		s.msg.Actor.SendInfo(line)
 		if stage.Message != "" {
@@ -461,8 +466,51 @@ func eventStage(name string, args, input []string) error {
 			stage.Flags = kept
 			return nil
 		})
+	case "DROP":
+		usage := errors.New("drop <mob_ids> <item_id> <chance>, or drop remove <mob_ids> <item_id>")
+		remove := len(rest) > 0 && rest[0] == "REMOVE"
+		idWords, itemWord, chance := rest, "", 0
+		switch {
+		case remove && len(rest) >= 3:
+			idWords, itemWord = rest[1:len(rest)-1], rest[len(rest)-1]
+		case !remove && len(rest) >= 3:
+			idWords, itemWord = rest[:len(rest)-2], rest[len(rest)-2]
+			c, err := strconv.Atoi(rest[len(rest)-1])
+			if err != nil || c < 1 || c > 100 {
+				return errors.New("the chance must be a percent from 1 to 100")
+			}
+			chance = c
+		default:
+			return usage
+		}
+		ids, err := parseIds(idWords, "MOB")
+		if err != nil {
+			return err
+		}
+		item, err := strconv.Atoi(itemWord)
+		if err != nil {
+			return usage
+		}
+		if _, ok := objects.Items[item]; !ok && !remove {
+			return errors.New("item " + itemWord + " doesn't exist")
+		}
+		return edit(func(stage *objects.Stage) error {
+			kept := stage.Drops[:0:0]
+			for _, d := range stage.Drops {
+				if d.Item != item || !utils.IntIn(d.Mob, ids) {
+					kept = append(kept, d)
+				}
+			}
+			if !remove {
+				for _, id := range ids {
+					kept = append(kept, objects.MobDrop{Mob: id, Item: item, Chance: chance})
+				}
+			}
+			stage.Drops = kept
+			return nil
+		})
 	}
-	return errors.New("stages take at, message, room, exit, close, redirect, flag or delete")
+	return errors.New("stages take at, message, room, exit, close, redirect, flag, drop or delete")
 }
 
 // splitFlagArgs reads "<room_ids> <flag> on|off" or "remove <room_ids>

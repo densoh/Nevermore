@@ -670,6 +670,7 @@ func mobSummon(r *mobRun, args []string) {
 		add.ItemList = map[int]int{}
 		add.Gold = 0
 		add.QuestEvent = r.m.QuestEvent
+		add.Summoned = true
 		add.Placement = r.m.Placement
 		r.room.Mobs.Add(&add, true)
 		add.StartTicking()

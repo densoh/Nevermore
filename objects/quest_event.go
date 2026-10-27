@@ -80,6 +80,7 @@ type Stage struct {
 
 	Redirects []ExitRedirect // exits that lead elsewhere from this stage
 	Flags     []RoomFlag     // room flags that read differently from this stage
+	Drops     []MobDrop      // extra drops mobs roll for from this stage
 }
 
 // An ExitRedirect sends one exit to a different room while it applies.
@@ -94,6 +95,14 @@ type RoomFlag struct {
 	Room int
 	Flag string
 	On   bool
+}
+
+// A MobDrop gives every copy of a mob that spawns while it applies an extra
+// Chance% roll for an item, on top of the mob's own drops.
+type MobDrop struct {
+	Mob    int
+	Item   int
+	Chance int
 }
 
 // QuestRoomFlagNames are the room flags an event stage can switch: the ones
@@ -192,6 +201,8 @@ var (
 	// roomFlags maps "room/flag" to the events and stages switching it, in
 	// event name order.
 	roomFlags = map[string][]roomFlagRef{}
+	// mobDrops maps a mob id to the events and stages giving it drops.
+	mobDrops = map[int][]mobDropRef{}
 	// timedExits maps "room/exit" to a destination a script gave it for a
 	// while. They live in memory only, so a reboot puts every exit back.
 	timedExits = map[string]timedExit{}
@@ -209,6 +220,13 @@ type roomFlagRef struct {
 	event string
 	stage int
 	on    bool
+}
+
+type mobDropRef struct {
+	event  string
+	stage  int
+	item   int
+	chance int
 }
 
 type timedExit struct {
@@ -233,6 +251,7 @@ func reindexQuestEvents() {
 	exitCloses = map[string][]exitGateRef{}
 	exitRedirects = map[string][]exitRedirectRef{}
 	roomFlags = map[string][]roomFlagRef{}
+	mobDrops = map[int][]mobDropRef{}
 	for _, name := range sortedEventNames() {
 		for n, stage := range questEvents[name].Stages {
 			for _, rd := range stage.Redirects {
@@ -242,6 +261,9 @@ func reindexQuestEvents() {
 			for _, rf := range stage.Flags {
 				key := gateKey(rf.Room, rf.Flag)
 				roomFlags[key] = append(roomFlags[key], roomFlagRef{name, n, rf.On})
+			}
+			for _, d := range stage.Drops {
+				mobDrops[d.Mob] = append(mobDrops[d.Mob], mobDropRef{name, n, d.Item, d.Chance})
 			}
 		}
 	}
@@ -680,6 +702,39 @@ func QuestRoomFlag(roomId int, flag string) (on bool, ok bool) {
 		}
 	}
 	return on, ok
+}
+
+// QuestMobDrops lists the extra drops, item id to chance, that running
+// events give m as it spawns. For each event and item the latest stage
+// reached sets the chance, so a later stage can change it or set it to 0. A
+// preview only gives drops to the copies its own spawn groups made, which
+// spawn only where staff stand.
+func QuestMobDrops(m *Mob) map[int]int {
+	now := time.Now()
+	questEventsMu.RLock()
+	defer questEventsMu.RUnlock()
+	type eventItem struct {
+		event string
+		item  int
+	}
+	latest := map[eventItem]mobDropRef{}
+	for _, ref := range mobDrops[m.MobId] {
+		e := questEvents[ref.event]
+		if e == nil || !e.Running(now) || ref.stage > e.Stage || (e.Preview && m.QuestEvent != e.Name) {
+			continue
+		}
+		key := eventItem{ref.event, ref.item}
+		if cur, ok := latest[key]; !ok || ref.stage > cur.stage {
+			latest[key] = ref
+		}
+	}
+	drops := map[int]int{}
+	for key, ref := range latest {
+		if ref.chance > drops[key.item] {
+			drops[key.item] = ref.chance
+		}
+	}
+	return drops
 }
 
 // RedirectExitFor makes an exit lead to another room for d, after which it

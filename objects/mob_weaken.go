@@ -50,6 +50,23 @@ func (m *Mob) Weaken(pct, maxSteps int) bool {
 	return true
 }
 
+// Offer counts one offering toward m's next Weaken step and takes the step
+// once perStep offerings have come in, so a long quest can ask for many
+// items without steps too small to survive rounding. accepted is false, and
+// nothing is counted, once maxSteps have been applied. A perStep of 1 or
+// less steps on every offering.
+func (m *Mob) Offer(pct, maxSteps, perStep int) (accepted, stepped bool) {
+	if !ValidWeaken(pct, maxSteps) || m.WeakenSteps >= maxSteps {
+		return false, false
+	}
+	m.WeakenOffered++
+	if m.WeakenOffered < perStep {
+		return true, false
+	}
+	m.WeakenOffered = 0
+	return true, m.Weaken(pct, maxSteps)
+}
+
 // SyncWeakened copies the stats Weaken changes from the template onto a live
 // instance. Current stamina keeps the same fraction of max it had, so a
 // wounded boss stays just as wounded.
@@ -66,4 +83,5 @@ func (m *Mob) SyncWeakened(template *Mob) {
 	m.SidesDice = template.SidesDice
 	m.PlusDice = template.PlusDice
 	m.WeakenSteps = template.WeakenSteps
+	m.WeakenOffered = template.WeakenOffered
 }
