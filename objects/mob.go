@@ -102,10 +102,16 @@ type Mob struct {
 	// template stats. It lives on the template so it survives death and
 	// reboots, see Mob.Weaken.
 	WeakenSteps int
+	// WeakenOffered counts offerings made toward the next step when a
+	// $WEAKEN asks for several per step, see Mob.Offer.
+	WeakenOffered int
 
 	// QuestEvent names the event whose spawn group made this copy, so it can
 	// be removed when the event ends. Empty for ordinary mobs.
 	QuestEvent string
+	// Summoned marks an add a script called in; it carries no loot, event
+	// drops included.
+	Summoned bool
 
 	// DamageBonusPct raises every hit by that percent, e.g. while a script
 	// has the mob enraged.
@@ -188,12 +194,17 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		nil,
 		time.Time{},
 		0,
+		0,
 		"",
+		false,
 		0,
 		nil,
 	}
 	if steps, ok := mobData["weaken_steps"].(int64); ok {
 		newMob.WeakenSteps = int(steps)
+	}
+	if offered, ok := mobData["weaken_offered"].(int64); ok {
+		newMob.WeakenOffered = int(offered)
 	}
 
 	for _, spellN := range strings.Split(mobData["spells"].(string), ",") {
@@ -1058,6 +1069,19 @@ func (m *Mob) CalculateInventory() {
 			}
 		}
 	}
+	if m.Summoned {
+		return
+	}
+	for k, v := range QuestMobDrops(m) {
+		if _, ok := Items[k]; ok && utils.Roll(100, 1, 0) <= v {
+			newItem := Item{}
+			if err := copier.CopyWithOption(&newItem, Items[k], copier.Option{DeepCopy: true}); err != nil {
+				log.Println("Error copying event drop:", err)
+				continue
+			}
+			m.Inventory.Add(&newItem)
+		}
+	}
 }
 
 func (m *Mob) ReturnState() string {
@@ -1574,6 +1598,7 @@ func (m *Mob) Save() {
 	mobData["immobile"] = utils.Btoi(m.Flags["immobile"])
 	mobData["commands"] = m.SerializeCommands()
 	mobData["weaken_steps"] = m.WeakenSteps
+	mobData["weaken_offered"] = m.WeakenOffered
 	data.UpdateMob(mobData)
 }
 

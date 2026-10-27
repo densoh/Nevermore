@@ -49,7 +49,7 @@ var ScriptList = map[string]string{
 	"$EVENTSTAGE": "Usage: $EVENTSTAGE event stage, advances a running event to stage (never back)",
 	"$GIVEGOLD":   "Usage: $GIVEGOLD amount, gives the actor gold",
 	"$GIVEITEM":   "Usage: $GIVEITEM item_id, gives the actor a copy of an item (dropped at their feet if too heavy)",
-	"$WEAKEN":     "Usage: $WEAKEN room_id mob_id percent max_steps, permanently take percent% of a mob's armor/resists/hp/damage, up to max_steps times",
+	"$WEAKEN":     "Usage: $WEAKEN room_id mob_id percent max_steps [per_step], permanently take percent% of a mob's armor/resists/hp/damage, up to max_steps times; per_step offerings make one step",
 }
 
 func (scripts) process(s *state) {

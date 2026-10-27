@@ -86,3 +86,29 @@ func TestSyncWeakenedKeepsWoundFraction(t *testing.T) {
 		t.Errorf("live copy not synced: armor %d steps %d", live.Armor, live.WeakenSteps)
 	}
 }
+
+// With several offerings per step, only every per-step-th one weakens, and
+// none are taken once the steps run out.
+func TestOfferCountsTowardSteps(t *testing.T) {
+	m := weakenBoss()
+	for i := 1; i <= 9; i++ {
+		if ok, stepped := m.Offer(5, 2, 10); !ok || stepped {
+			t.Fatalf("offering %d: accepted %v stepped %v, want accepted without a step", i, ok, stepped)
+		}
+	}
+	if m.Armor != 1000 || m.WeakenOffered != 9 {
+		t.Fatalf("after 9 offerings armor %d offered %d, want 1000 and 9", m.Armor, m.WeakenOffered)
+	}
+	if ok, stepped := m.Offer(5, 2, 10); !ok || !stepped {
+		t.Fatal("the 10th offering should take a step")
+	}
+	if m.Armor != 950 || m.WeakenSteps != 1 || m.WeakenOffered != 0 {
+		t.Errorf("after a step armor %d steps %d offered %d, want 950, 1, 0", m.Armor, m.WeakenSteps, m.WeakenOffered)
+	}
+	for i := 0; i < 10; i++ {
+		m.Offer(5, 2, 10)
+	}
+	if ok, _ := m.Offer(5, 2, 10); ok {
+		t.Error("offerings past the last step should be refused")
+	}
+}
