@@ -3,6 +3,7 @@ package cmd
 import (
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
@@ -26,6 +27,12 @@ import (
 // counted item skips any $WEAKEN after it, so an offering can do research
 // first and weaken a boss later. From stage on it does nothing and the
 // script carries on.
+//
+// Syntax: $ECHOSTAGE event stage text
+//
+// Sends text to the actor only while the event is running for them at
+// exactly stage, so one TALK can say something different at each stage.
+// It never stops the script.
 func init() {
 	addHandler(scriptIfStage{},
 		"",
@@ -39,6 +46,23 @@ func init() {
 		"",
 		permissions.Anyone,
 		"$EVENTCOUNT")
+	addHandler(scriptEchoStage{},
+		"",
+		permissions.Anyone,
+		"$ECHOSTAGE")
+}
+
+type scriptEchoStage cmd
+
+func (scriptEchoStage) process(s *state) {
+	s.ok = true
+	name, stage, ok := stageArgs(s, "$ECHOSTAGE")
+	if !ok || len(s.input) < 3 {
+		return
+	}
+	if current, live := objects.QuestEventStage(name, s.actor); live && current == stage {
+		s.msg.Actor.SendInfo(strings.Join(s.input[2:], " "))
+	}
 }
 
 type scriptIfStage cmd

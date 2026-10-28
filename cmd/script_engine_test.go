@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ArcCS/Nevermore/message"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	menu "github.com/ArcCS/Nevermore/prompt"
@@ -188,6 +190,29 @@ func TestIfStageGatesAndEventStageAdvances(t *testing.T) {
 	}
 	if stage, live := objects.QuestEventStage("offering", s.actor); !live || stage != 3 {
 		t.Errorf("after the offering the event is at stage %d (live %v), want 3", stage, live)
+	}
+}
+
+func TestEchoStageSaysOnlyTheCurrentStage(t *testing.T) {
+	startTestEvent(t, "talker")
+	talk := func() string {
+		s, _, _ := putState(t, "")
+		s.msg.Actor = &message.Buffer{}
+		s.input = strings.Fields("$ECHOSTAGE talker 1 Bring me Doubloons. ; $ECHOSTAGE talker 2 The door is open.")
+		scriptRun{}.process(s)
+		var out bytes.Buffer
+		s.msg.Actor.Deliver(&out)
+		return out.String()
+	}
+
+	if got := talk(); !strings.Contains(got, "Bring me Doubloons.") || strings.Contains(got, "door") {
+		t.Errorf("at stage 1 TALK said %q", got)
+	}
+	if _, err := objects.AdvanceQuestEvent("talker", 2, nil, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := talk(); !strings.Contains(got, "The door is open.") || strings.Contains(got, "Doubloons") {
+		t.Errorf("at stage 2 TALK said %q", got)
 	}
 }
 
