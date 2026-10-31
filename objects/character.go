@@ -205,7 +205,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 			make(chan bool),
 			make(chan []byte, 100),
 			nil,
-			make(chan bool),
+			make(chan bool, 1),
 			map[string]map[string]*Hook{
 				"act":      make(map[string]*Hook),
 				"combat":   make(map[string]*Hook),

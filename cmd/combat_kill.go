@@ -157,7 +157,17 @@ func performAttack(s *state, whatMob *objects.Mob) {
 	if s.actor.Permission.HasAnyFlags(permissions.Fighter) && s.actor.Equipment.Main.ItemType != 4 {
 		// mob lethal? A tier 15 expert executes wounded mobs more often.
 		execute := config.ExecuteMultiplier(s.actor.Tier, skillLevel, float64(whatMob.Stam.Current)/float64(whatMob.Stam.Max))
-		if config.RollLethalScaled(skillLevel, execute) {
+		lethal := config.RollLethalScaled(skillLevel, execute)
+		if lethal && whatMob.CheckFlag("no_instakill") {
+			// Too strong to fell in one blow: the lethal takes half of what is
+			// left, and the swing still lands as usual below.
+			damage, _ := whatMob.ReceiveDamageNoArmor(whatMob.Stam.Current / 2)
+			s.msg.Actor.SendInfo("You landed a lethal blow, but " + whatMob.Name + " endures, torn for " + strconv.Itoa(damage) + " damage.")
+			s.msg.Observers.SendInfo(s.actor.Name + " landed a lethal blow on " + whatMob.Name + ", and it reels.")
+			data.StoreCombatMetric("lethal_halved", 0, 0, damage, 0, damage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+			whatMob.AddThreatDamage(damage, s.actor)
+			s.actor.AdvanceSkillExp(float64(damage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience()))
+		} else if lethal {
 			// Sure did.  Kill this fool and bail.
 			s.msg.Actor.SendInfo("You landed a lethal blow on the " + whatMob.Name)
 			s.msg.Observers.SendInfo(s.actor.Name + " landed a lethal blow on " + whatMob.Name)

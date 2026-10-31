@@ -321,9 +321,7 @@ func (s *state) AcquireLockPriority() {
 					objects.Rooms[l].LockPriority = ""
 				}
 			}
-			r := rand.Int()
-			t, _ := time.ParseDuration(string(rune(r)) + "ms")
-			time.Sleep(t)
+			time.Sleep(time.Duration(1+rand.Intn(10)) * time.Millisecond)
 		}
 	}
 }

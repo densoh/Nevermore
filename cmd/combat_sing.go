@@ -88,8 +88,14 @@ func (sing) process(s *state) {
 			s.actor.SingSong(song, tickRate)
 		},
 		func() {
+			// This runs with the room locked (death, sing stop). The song goroutine
+			// may be waiting on that same lock for its tick, so a blocking send here
+			// deadlocks both; leave the signal in the buffer for it to pick up.
+			select {
+			case s.actor.SongTickerUnload <- true:
+			default:
+			}
 			// Damage Instrument
-			s.actor.SongTickerUnload <- true
 			weapMsg := s.actor.Equipment.DamageWeapon("off", 1)
 			if weapMsg != "" {
 				s.msg.Actor.SendInfo(weapMsg)
