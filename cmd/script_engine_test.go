@@ -229,6 +229,49 @@ func TestTypedEchoDropsPlayerWords(t *testing.T) {
 	}
 }
 
+// $ONFAIL runs only after a refusal, in place of its message, and the
+// script ends there; alone it fails quietly.
+func TestOnFail(t *testing.T) {
+	cases := []struct {
+		label, script string
+		kept          bool // the gem stays with the player
+		want, not     []string
+	}{
+		{"refused", "$REQUIRE ITEM 1 ; $ONFAIL $ECHO The altar is still. ; $ECHO yum",
+			true, []string{"The altar is still."}, []string{"can't put", "yum"}},
+		{"quiet", "$REQUIRE ITEM 1 ; $ONFAIL ; $ECHO yum",
+			true, nil, []string{"can't put", "yum"}},
+		{"accepted", "$REQUIRE ITEM 4290 ; $ONFAIL $ECHO The altar is still. ; $CONSUME ; $ECHO yum",
+			false, []string{"yum"}, []string{"still"}},
+		{"no onfail", "$REQUIRE ITEM 1 ; $ECHO yum",
+			true, []string{"can't put"}, []string{"yum"}},
+	}
+	for _, c := range cases {
+		s, gem, _ := putState(t, c.script)
+		put{}.process(s)
+		if kept := s.actor.Inventory.Search("gem", 1) == gem; kept != c.kept {
+			t.Errorf("%s: gem kept %v, want %v", c.label, kept, c.kept)
+		}
+		out := actorText(s)
+		for _, w := range c.want {
+			if !strings.Contains(out, w) {
+				t.Errorf("%s: output %q is missing %q", c.label, out, w)
+			}
+		}
+		for _, n := range c.not {
+			if strings.Contains(out, n) {
+				t.Errorf("%s: output %q should not contain %q", c.label, out, n)
+			}
+		}
+	}
+	if _, ok := validScript("$WEAKEN 1 2 5 18 ; $ONFAIL $ECHO hi ; $ONFAIL"); !ok {
+		t.Error("validScript rejected $ONFAIL steps")
+	}
+	if bad, ok := validScript("$ECHO hi ; $ONFAIL LOOK"); ok || bad != "LOOK" {
+		t.Errorf("validScript let an $ONFAIL run %q", bad)
+	}
+}
+
 func TestRunScriptStopsOnRefusal(t *testing.T) {
 	s, _, _ := putState(t, "")
 	s.input = strings.Fields("$IFSTAGE nosuchevent 1 ; $GIVEGOLD 500")

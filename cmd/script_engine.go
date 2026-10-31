@@ -17,7 +17,8 @@ import (
 //
 // Steps run in order through the normal dispatcher with scripting set. A
 // step that refuses (see scriptEvent) stops the rest from running, so checks
-// go before anything with side effects.
+// go before anything with side effects. "$ONFAIL step" straight after a step
+// runs only if that step refused, in place of its message (see runSteps).
 //
 // A script is attached under a trigger. A plain word fires when a player
 // types it. A word starting with "@" is an event the game fires itself:
@@ -31,15 +32,65 @@ type scriptEvent struct {
 	item  *objects.Item // the item the event is about, e.g. the one being PUT
 	owner string        // name of what the script is attached to, for messages
 
-	refused  bool // a step turned the event down; the triggering command stops
-	consumed bool // $CONSUME destroyed item; the triggering command must not touch it
-	counted  bool // $EVENTCOUNT counted the item; a later $WEAKEN lets it pass
+	refused  bool   // a step turned the event down; the triggering command stops
+	refusal  string // why, told to the actor unless an $ONFAIL step says something else
+	consumed bool   // $CONSUME destroyed item; the triggering command must not touch it
+	counted  bool   // $EVENTCOUNT counted the item; a later $WEAKEN lets it pass
 }
 
-// refuse stops the running event script and tells the actor why.
+// refuse stops the running event script. The actor is told why once the
+// step is over, unless $ONFAIL steps follow it.
 func (ev *scriptEvent) refuse(s *state, msg string) {
 	ev.refused = true
-	s.msg.Actor.SendBad(msg)
+	ev.refusal = msg
+}
+
+// tellRefusal sends the actor the refusal still waiting to be told.
+func (ev *scriptEvent) tellRefusal(s *state) {
+	if ev.refusal != "" {
+		s.msg.Actor.SendBad(ev.refusal)
+		ev.refusal = ""
+	}
+}
+
+// onFailBody returns what an $ONFAIL step runs, which may be nothing.
+func onFailBody(step string) (string, bool) {
+	fields := strings.Fields(step)
+	if !strings.EqualFold(fields[0], "$ONFAIL") {
+		return "", false
+	}
+	return strings.TrimSpace(step[len(fields[0]):]), true
+}
+
+// runSteps runs steps in order with run until one refuses. $ONFAIL steps are
+// skipped unless they come straight after the step that refused: then they
+// run instead of the refusal message, and the script ends. An $ONFAIL with
+// nothing after it just fails quietly.
+func (s *state) runSteps(ev *scriptEvent, steps []string, run func(string)) {
+	for i := 0; i < len(steps); i++ {
+		if _, onFail := onFailBody(steps[i]); onFail {
+			continue
+		}
+		run(steps[i])
+		if !ev.refused {
+			continue
+		}
+		for i++; i < len(steps); i++ {
+			body, onFail := onFailBody(steps[i])
+			if !onFail {
+				break
+			}
+			ev.refusal = ""
+			if body != "" {
+				run(body)
+			}
+			if ev.refusal != "" {
+				break
+			}
+		}
+		ev.tellRefusal(s)
+		return
+	}
 }
 
 // scriptRoomArg lists the verbs whose first argument is a room they act in.
@@ -78,6 +129,12 @@ func validScript(script string) (string, bool) {
 		return script, false
 	}
 	for _, step := range steps {
+		if body, onFail := onFailBody(step); onFail {
+			if body == "" {
+				continue
+			}
+			step = body
+		}
 		verb := strings.ToUpper(strings.Fields(step)[0])
 		if _, ok := handlers[verb]; !ok || verb[0] != '$' {
 			return verb, false
@@ -128,12 +185,9 @@ func (s *state) runTrigger(actorOnly bool, script string, extra ...string) {
 		s.event = ev
 		defer func() { s.event = nil }()
 	}
-	for _, step := range steps {
+	s.runSteps(ev, steps, func(step string) {
 		s.script(true, !actorOnly, !actorOnly, step)
-		if ev.refused {
-			break
-		}
-	}
+	})
 }
 
 // runEvent runs the @event script in cmds, if there is one, against ev. It
@@ -154,11 +208,6 @@ func (s *state) runEvent(cmds map[string]menu.MenuItem, event string, ev *script
 	s.event = ev
 	defer func() { s.event = prev }()
 
-	for _, step := range steps {
-		s.scriptAll(step)
-		if ev.refused {
-			break
-		}
-	}
+	s.runSteps(ev, steps, func(step string) { s.scriptAll(step) })
 	return true
 }
