@@ -64,6 +64,10 @@ func (turn) process(s *state) {
 			s.msg.Actor.SendBad("Your target isn't undead!")
 			return
 		}
+		if whatMob.CheckFlag("no_turn") {
+			s.msg.Actor.SendBad(whatMob.Name + " is bound too strongly to be turned.")
+			return
+		}
 
 		if s.actor.Class == 6 && (s.actor.Placement != whatMob.Placement) {
 			s.msg.Actor.SendBad("You are too far away to turn them.")
@@ -79,8 +83,8 @@ func (turn) process(s *state) {
 
 		// One d1000: the bottom of the success band disintegrates, the rest of it turns.
 		turnRoll := utils.Roll(1000, 1, 0)
-		turned := curChance >= 100 || turnRoll <= curChance*10
-		if turnRoll <= config.TurnDisintegratePerMille(curChance) {
+		disintegrates, turned := turnOutcome(turnRoll, curChance, whatMob.CheckFlag("no_instakill"))
+		if disintegrates {
 			s.msg.Actor.SendInfo("Your faith overwhelms the " + whatMob.Name + " and utterly demolishes them.")
 			s.msg.Observers.SendInfo(s.actor.Name + " disintegrates " + whatMob.Name)
 			whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
@@ -123,4 +127,16 @@ func (turn) process(s *state) {
 
 	s.msg.Actor.SendInfo("Attack what?")
 	s.ok = true
+}
+
+// turnOutcome reads a turn's d1000 roll against its success chance. A mob
+// flagged no_instakill is too strong to destroy outright, so a roll in the
+// disintegrate band lands as an ordinary turn instead.
+func turnOutcome(roll, chance int, noInstakill bool) (disintegrates, turned bool) {
+	turned = chance >= 100 || roll <= chance*10
+	disintegrates = roll <= config.TurnDisintegratePerMille(chance)
+	if disintegrates && noInstakill {
+		return false, true
+	}
+	return disintegrates, turned
 }

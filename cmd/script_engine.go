@@ -51,6 +51,14 @@ var scriptRoomArg = map[string]bool{
 	"$WEAKEN":     true,
 }
 
+// scriptEchoes lists the verbs that print their arguments, so a typed
+// trigger's own words must not be passed on to them.
+var scriptEchoes = map[string]bool{
+	"$ECHO":      true,
+	"$ECHOALL":   true,
+	"$ECHOSTAGE": true,
+}
+
 // scriptSteps splits a stored script into its steps.
 func scriptSteps(script string) []string {
 	var steps []string
@@ -102,10 +110,10 @@ func (s *state) lockScriptRooms(steps []string) bool {
 
 // runTrigger runs a script fired by a typed trigger, or by $RUN. extra is
 // the player's own arguments, passed on to a single-step script the way it
-// always was.
+// always was, except to the echo verbs, which would print them.
 func (s *state) runTrigger(actorOnly bool, script string, extra ...string) {
 	steps := scriptSteps(script)
-	if len(steps) == 1 {
+	if len(steps) == 1 && !scriptEchoes[strings.ToUpper(strings.Fields(steps[0])[0])] {
 		steps[0] = strings.Join(append([]string{steps[0]}, extra...), " ")
 	}
 	if !s.lockScriptRooms(steps) {

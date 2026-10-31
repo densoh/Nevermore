@@ -1598,6 +1598,8 @@ func (m *Mob) Save() {
 	mobData["blinds"] = utils.Btoi(m.Flags["blinds"])
 	mobData["no_specials"] = utils.Btoi(m.Flags["no_specials"])
 	mobData["no_touch"] = utils.Btoi(m.Flags["no_touch"])
+	mobData["no_turn"] = utils.Btoi(m.Flags["no_turn"])
+	mobData["no_instakill"] = utils.Btoi(m.Flags["no_instakill"])
 	mobData["placement"] = m.Placement
 	mobData["immobile"] = utils.Btoi(m.Flags["immobile"])
 	mobData["commands"] = m.SerializeCommands()
@@ -1650,6 +1652,12 @@ func (m *Mob) Eval() string {
 	}
 	if m.CheckFlag("no_touch") {
 		descriptions = append(descriptions, "Its life force cannot be touched.")
+	}
+	if m.CheckFlag("no_turn") {
+		descriptions = append(descriptions, "It is bound too strongly to be turned.")
+	}
+	if m.CheckFlag("no_instakill") {
+		descriptions = append(descriptions, "It cannot be felled in a single blow.")
 	}
 	if m.CheckFlag("diseases") {
 		descriptions = append(descriptions, "It can spread diseases.")

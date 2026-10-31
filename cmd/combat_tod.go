@@ -125,7 +125,11 @@ func (tod) process(s *state) {
 	s.actor.SetTimer("combat", config.CombatCooldown)
 
 	killChance := config.TodKillChance(s.actor.Tier, commitment, remaining)
-	if utils.Roll(100, 1, 0) <= int(math.Round(killChance*100)) {
+	killed := utils.Roll(100, 1, 0) <= int(math.Round(killChance*100))
+	// A mob too strong to kill outright takes the touch below instead, at no
+	// less than half of what it has left.
+	halved := killed && whatMob.CheckFlag("no_instakill")
+	if killed && !halved {
 		whatMob.AddThreatDamage(whatMob.Stam.Current, s.actor)
 		// Skill is credited the same way as a fighter's lethal: the share of
 		// the mob that was still standing, never less than the floor.
@@ -147,6 +151,9 @@ func (tod) process(s *state) {
 	for i := 0; i < config.TodFailHits; i++ {
 		damage += s.actor.InflictDamage()
 	}
+	if halved {
+		damage = max(damage, whatMob.Stam.Current/2)
+	}
 	actualDamage, _ := whatMob.ReceiveDamageNoArmor(damage)
 	resisted := 0
 	whatMob.AddThreatDamage(actualDamage, s.actor)
@@ -163,6 +170,10 @@ func (tod) process(s *state) {
 		// Lethal all the same; count it as a full touch.
 		data.StoreCombatMetric("tod_whole", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		todKillMessage(s, whatMob)
+	} else if halved {
+		data.StoreCombatMetric("tod_halved", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+		s.msg.Actor.SendInfo("Your touch finds its mark, but " + whatMob.Name + " endures, torn for " + strconv.Itoa(actualDamage) + " damage.")
+		s.msg.Observers.SendInfo(s.actor.Name + " touches " + whatMob.Name + ", and it reels.")
 	} else {
 		data.StoreCombatMetric("tod_partial", 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		s.msg.Actor.SendInfo("Your touch lands imperfectly, wounding " + whatMob.Name + " for " + strconv.Itoa(actualDamage) + " damage.")

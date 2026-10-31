@@ -122,6 +122,8 @@ func (examine) process(s *state) {
 				{"V", "placement", strconv.Itoa(mobRef.Placement), "Mob spawn location"},
 				{"T", "no_specials", strconv.FormatBool(mobRef.Flags["no_specials"]), "Whether the mob crits/doubles or not"},
 				{"T", "no_touch", strconv.FormatBool(mobRef.Flags["no_touch"]), "Immune to touch of death"},
+				{"T", "no_turn", strconv.FormatBool(mobRef.Flags["no_turn"]), "Undead that cannot be turned"},
+				{"T", "no_instakill", strconv.FormatBool(mobRef.Flags["no_instakill"]), "Lethal, disintegrate and touch kill take half its HP instead"},
 				{"T", "fast_moving", strconv.FormatBool(mobRef.Flags["fast_moving"]), "Mob is moves quickly"},
 				{"T", "guard_treasure", strconv.FormatBool(mobRef.Flags["guard_treasure"]), "Mob guards treasure."},
 				{"T", "take_treasure", strconv.FormatBool(mobRef.Flags["take_treasure"]), "Mob takes treasure."},

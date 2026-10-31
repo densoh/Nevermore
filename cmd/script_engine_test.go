@@ -216,6 +216,19 @@ func TestEchoStageSaysOnlyTheCurrentStage(t *testing.T) {
 	}
 }
 
+// A one-step TALK is handed the rest of the typed line, but an echo must not
+// print it: "talk clerg" says the text, not the text and "clerg".
+func TestTypedEchoDropsPlayerWords(t *testing.T) {
+	s, _, _ := putState(t, "")
+	s.msg.Actor = &message.Buffer{}
+	s.runTrigger(true, "$ECHO The researcher looks up.", "clerg")
+	var out bytes.Buffer
+	s.msg.Actor.Deliver(&out)
+	if got := out.String(); !strings.Contains(got, "The researcher looks up.") || strings.Contains(got, "clerg") {
+		t.Errorf("talk clerg said %q", got)
+	}
+}
+
 func TestRunScriptStopsOnRefusal(t *testing.T) {
 	s, _, _ := putState(t, "")
 	s.input = strings.Fields("$IFSTAGE nosuchevent 1 ; $GIVEGOLD 500")
