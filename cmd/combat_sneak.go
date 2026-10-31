@@ -124,6 +124,11 @@ func (sneak) process(s *state) {
 					return
 				}
 
+				if objects.QuestExitSealed(from.RoomId, toE.Name) {
+					s.msg.Actor.SendBad("The way is sealed.")
+					return
+				}
+
 				if toE.Flags["day_only"] && !objects.DayTime {
 					s.msg.Actor.SendBad("You can only go there at night.")
 					return

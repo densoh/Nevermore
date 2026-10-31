@@ -49,6 +49,7 @@ var ScriptList = map[string]string{
 	"$EVENTSTAGE": "Usage: $EVENTSTAGE event stage, advances a running event to stage (never back)",
 	"$EVENTCOUNT": "Usage: $EVENTCOUNT event target stage, event scripts: until the event reaches stage, count the item and reach stage at target; a counted item skips $WEAKEN",
 	"$ECHOSTAGE":  "Usage: $ECHOSTAGE event stage text, sends the actor text only while the event is at exactly that stage",
+	"$ONFAIL":     "Usage: $ONFAIL [step], runs step only if the step before it refused, instead of its message, then ends the script; alone it fails quietly",
 	"$GIVEGOLD":   "Usage: $GIVEGOLD amount, gives the actor gold",
 	"$GIVEITEM":   "Usage: $GIVEITEM item_id, gives the actor a copy of an item (dropped at their feet if too heavy)",
 	"$WEAKEN":     "Usage: $WEAKEN room_id mob_id percent max_steps [per_step], permanently take percent% of a mob's armor/resists/hp/damage, up to max_steps times; per_step offerings make one step",

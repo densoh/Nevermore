@@ -25,7 +25,8 @@ import (
 const (
 	termColumns = 160
 	termLines   = 24
-	inputBuffer = 1024
+	inputBuffer = 4096 // longest line staff may type, e.g. a long addCommand script
+	playerInput = 1024 // longest line anyone else may type
 )
 
 // client contains state information about a client connection. The err field
@@ -181,6 +182,18 @@ func (c *client) process() {
 					log.Println("Error writing to player: ", werr)
 				}
 				continue
+			}
+
+			if len(in) > playerInput {
+				char := c.frontend.GetCharacter()
+				if char == (*objects.Character)(nil) ||
+					!char.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+					frontend.Zero(in)
+					if _, werr := c.Write([]byte(text.Bad + "\nYou type too much.\n" + text.Prompt + ">")); werr != nil {
+						log.Println("Error writing to player: ", werr)
+					}
+					continue
+				}
 			}
 
 			//log.Println(&in)
