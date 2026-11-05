@@ -203,6 +203,14 @@ func (edit) process(s *state) {
 					value, _ := strconv.Atoi(s.words[3])
 					item.ArmorClass = value
 					s.msg.Actor.SendGood("Changed armor class")
+				case "charge_type":
+					value, ok := config.ParseChargeType(s.input[3])
+					if !ok {
+						s.msg.Actor.SendBad("Charge type must be default, liquid, food or plural.")
+						return
+					}
+					item.ChargeType = value
+					s.msg.Actor.SendGood("Changed charge type to " + config.ChargeTypes[value])
 				/*case "placement":
 				intKey, _ :=  strconv.Atoi(s.words[3])
 				if intKey >= 1 && intKey <= 5 {
