@@ -944,7 +944,9 @@ func (m *Mob) FollowChar(target *Character, from *Room, to *Room) bool {
 		return false
 	}
 
-	if !m.CheckFlag("follows") || m.CheckFlag("curious_canticle") || m.CheckFlag("run_away") {
+	// Run-run-away only keeps a mob from blocking the exit (see godir); it is
+	// curious-canticle that stops one following.
+	if !m.CheckFlag("follows") || m.CheckFlag("curious_canticle") {
 		return false
 	}
 
