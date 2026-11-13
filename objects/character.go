@@ -905,7 +905,14 @@ func (c *Character) Save() {
 }
 
 func (c *Character) TickSaveWrapper() {
-	Rooms[c.ParentId].LockRoom(c.Name+":SaveWrap", false)
+	// Look the room up once. The lock can be a wait - a death script holding the
+	// room they died in, say - and by the time it is ours that script may have
+	// moved them on. Unlocking Rooms[c.ParentId] afterwards would then release
+	// the room they were moved to, which this never locked: either a fatal
+	// "unlock of unlocked mutex" here, or it silently frees whatever command is
+	// holding that room, and that command's own unlock is the one that crashes.
+	room := Rooms[c.ParentId]
+	room.LockRoom(c.Name+":SaveWrap", false)
 	if _, err := c.Write([]byte(text.Info + "Saving...." + text.Reset)); err != nil {
 		log.Println("Error writing to player: ", err)
 	}
@@ -913,7 +920,7 @@ func (c *Character) TickSaveWrapper() {
 	if _, err := c.Write([]byte(text.Info + "Saved!" + text.Reset)); err != nil {
 		log.Println("Error writing to player: ", err)
 	}
-	Rooms[c.ParentId].UnlockRoom(c.Name+":SaveWrap", false)
+	room.UnlockRoom(c.Name+":SaveWrap", false)
 }
 
 func (c *Character) SetPromptStyle(new PromptStyle) (old PromptStyle) {
