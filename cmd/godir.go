@@ -112,13 +112,15 @@ func (godir) process(s *state) {
 						return
 					}
 
-					moveChar(s.actor, from, to, evasive)
-
-					// Broadcast leaving and arrival notifications
-					if s.actor.Flags["invisible"] == false {
-						s.msg.Observers[from.RoomId].SendInfo("You see ", s.actor.Name, " go to the ", strings.ToLower(toE.Name), ".")
-						s.msg.Observers[to.RoomId].SendInfo(s.actor.Name, " just arrived.")
-					}
+					// Everything about this move is written as it happens, in
+					// the order it happens, rather than part buffered for the end
+					// of the command and part written straight out: the mob
+					// follow lines and parting strikes are written straight out
+					// deep in objects, so buffering the rest is what scrambled
+					// it. Whoever is already in the room hears each arrival;
+					// whoever arrives sees the room as it is when they get there.
+					arriveChar(s.actor, from, to, toE, evasive, "")
+					s.lookNow(to)
 
 					// The actor is out of the room, so anything hunting them can
 					// come along. This is done here, inline, because this state
@@ -142,7 +144,7 @@ func (godir) process(s *state) {
 						vitalSpent = landed
 						if died {
 							// The death script has them now, so there is no one
-							// left here to lead the party or be shown the room.
+							// left here to lead the party.
 							s.ok = true
 							return
 						}
@@ -152,7 +154,6 @@ func (godir) process(s *state) {
 					// lock - a state of their own would deadlock on the rooms this
 					// one is holding. Each follower is judged on their own merits,
 					// so one who cannot come along does not strand the rest.
-					var arrived []*objects.Character
 					for _, peo := range s.actor.PartyFollowers {
 						follChar := from.Chars.SearchAll(peo)
 						if follChar == nil {
@@ -169,16 +170,11 @@ func (godir) process(s *state) {
 							continue
 						}
 
-						moveChar(follChar, from, to, follEvasive)
-
-						// Broadcast leaving and arrival notifications
-						if follChar.Flags["invisible"] == false {
-							s.msg.Observers[from.RoomId].SendInfo("You see ", follChar.Name, " follow "+s.actor.Name+" to the ", strings.ToLower(toE.Name), ".")
-							s.msg.Observers[to.RoomId].SendInfo(follChar.Name, " just arrived.")
-						}
+						arriveChar(follChar, from, to, toE, follEvasive, s.actor.Name)
+						showRoom(follChar, to)
 
 						// MOB-CHASE-SWITCH: delete this loop to stop mobs following party followers between rooms.
-						follVitalSpent, follDied := false, false
+						follVitalSpent := false
 						for _, mob := range follChasers {
 							if !mob.FollowChar(follChar, from, to) {
 								continue
@@ -189,39 +185,20 @@ func (godir) process(s *state) {
 							landed, died := followVital(followerMover(follChar), mob)
 							follVitalSpent = landed
 							if died {
-								// The death script has them; there is no one to show the room to.
-								follDied = true
+								// The death script has them; no one is left to chase.
 								break
 							}
 						}
-						if !follDied {
-							arrived = append(arrived, follChar)
-						}
 					}
 
-					// Show the room to everyone who made it, once the whole
-					// party is in it, so a follower sees the same thing their
-					// leader does: the room, and everyone standing in it.
-					for _, follChar := range arrived {
-						showRoom(follChar, to)
-					}
-
-					s.scriptActor("LOOK")
 					s.ok = true
 					return
 				} else {
 					// Builders and staff walk through everything unchecked.
 					// SetTimer is a no-op for them, so the evade timer here
 					// costs them nothing.
-					moveChar(s.actor, from, to, 0)
-
-					// Broadcast leaving and arrival notifications
-					if s.actor.Flags["invisible"] == false {
-						s.msg.Observers[from.RoomId].SendInfo("You see ", s.actor.Name, " go to the ", strings.ToLower(toE.Name), ".")
-						s.msg.Observers[to.RoomId].SendInfo(s.actor.Name, " just arrived.")
-					}
-
-					s.scriptActor("LOOK")
+					arriveChar(s.actor, from, to, toE, 0, "")
+					s.lookNow(to)
 					s.ok = true
 					return
 				}
@@ -274,6 +251,43 @@ func showRoom(char *objects.Character, room *objects.Room) {
 	lookRoom(char, room, b)
 	b.Deliver(char)
 	message.ReleaseBuffer(b)
+}
+
+// arriveChar moves a character through toE and tells both rooms at once: the
+// room they left sees them go, and everyone already standing in the room they
+// entered sees them arrive. Party members who got there first are among the
+// latter, so each hears only the ones who come in after them, and someone
+// still waiting to follow sees the leader leave before they do. leader names
+// who they followed, or is empty for someone walking on their own.
+func arriveChar(char *objects.Character, from *objects.Room, to *objects.Room, toE *objects.Exit, evasive int, leader string) {
+	if !char.Flags["invisible"] {
+		leave := "You see " + char.Name + " go to the " + strings.ToLower(toE.Name) + "."
+		if leader != "" {
+			leave = "You see " + char.Name + " follow " + leader + " to the " + strings.ToLower(toE.Name) + "."
+		}
+		tellRoom(from, char, leave)
+		tellRoom(to, char, char.Name+" just arrived.")
+	}
+	moveChar(char, from, to, evasive)
+}
+
+// tellRoom writes an info line straight to everyone in the room but one.
+func tellRoom(room *objects.Room, except *objects.Character, msg string) {
+	for _, c := range room.Chars.Contents {
+		if c != except {
+			writeTo(c, text.Info+msg+text.Reset)
+		}
+	}
+}
+
+// lookNow shows the actor the room they are standing in and delivers it
+// straight away, with everything already buffered for them ahead of it, so
+// that it lands before whatever is written to them next - a party member
+// arriving, a mob following them in.
+func (s *state) lookNow(room *objects.Room) {
+	lookRoom(s.actor, room, s.msg.Actor)
+	s.msg.Actor.Deliver(s.actor)
+	s.actorDelivered = true
 }
 
 // writeTo sends text straight to a character, for output that cannot go

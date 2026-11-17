@@ -61,7 +61,9 @@ type Mob struct {
 	AirResistance   int
 	FireResistance  int
 	EarthResistance int
-	BreathWeapon    string
+	// PoisonResistance is percent off poison damage; 0 when the node has none.
+	PoisonResistance int
+	BreathWeapon     string
 
 	//Threat table attacker -> damage
 	TotalThreatDamage int
@@ -177,6 +179,7 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		int(mobData["air_resistance"].(int64)),
 		int(mobData["fire_resistance"].(int64)),
 		int(mobData["earth_resistance"].(int64)),
+		0, // PoisonResistance: set below, since older nodes don't have it
 		mobData["breathes"].(string),
 		0,
 		nil,
@@ -203,6 +206,9 @@ func LoadMob(mobData map[string]interface{}) (*Mob, bool) {
 		false,
 		0,
 		nil,
+	}
+	if resist, ok := mobData["poison_resistance"].(int64); ok {
+		newMob.PoisonResistance = int(resist)
 	}
 	if steps, ok := mobData["weaken_steps"].(int64); ok {
 		newMob.WeakenSteps = int(steps)
@@ -475,6 +481,19 @@ func (m *Mob) Tick() {
 							m.DeathCheck(t)
 						}
 						t.DeathCheck("was slain by a " + m.Name + ".")
+					} else if m.BreathWeapon == "poison" {
+						// Poison gas: breath damage that only resist-poison
+						// reduces (not magic, so no reflection), then the
+						// poison effect if they survive.
+						t.RunHook("attacked")
+						breathDamage := int(math.Ceil(float64(damageTotal) * m.rollMonkBreathDodge(t)))
+						stamDam, vitDam, resisted := t.ReceivePoisonDamage(breathDamage)
+						if _, err := t.Write([]byte(text.Bad + m.Name + "'s poisonous breath struck you for " + strconv.Itoa(stamDam) + " stamina and " + strconv.Itoa(vitDam) + " vitality. You resisted " + strconv.Itoa(resisted) + " damage." + text.Reset + "\n")); err != nil {
+							log.Println("Error writing to player:", err)
+						}
+						if !t.DeathCheckBool("was slain by a " + m.Name + ".") {
+							Effects["poison"](m, t, m.Level)
+						}
 					} else if m.BreathWeapon == "paralytic" {
 						if _, err := t.Write([]byte(text.Gray + m.Name + " breathes paralytic gas on to you.\n")); err != nil {
 							log.Println("Error writing to player:", err)
@@ -772,11 +791,11 @@ func (m *Mob) DeathCheck(target *Character) bool {
 						log.Println("Error writing to player:", err)
 					}
 				} else {
-					go func() {
-						if _, err := charClean.Write([]byte(buildActorString + "\n" + text.Reset)); err != nil {
-							log.Println("Error writing to player:", err)
-						}
-					}()
+					// Written in place, not from a goroutine, so it cannot
+					// overtake the "X killed Y" line MessageAll just sent.
+					if _, err := charClean.Write([]byte(buildActorString + "\n" + text.Reset)); err != nil {
+						log.Println("Error writing to player:", err)
+					}
 				}
 				if charClean.Victim == m {
 					charClean.Victim = nil
@@ -1556,6 +1575,14 @@ func (m *Mob) ReceiveMagicDamage(damage int, element string) (int, int, int) {
 	return stamDam, vitDam, resisted
 }
 
+// ReceivePoisonDamage takes poison damage: armor and resist-magic don't apply,
+// only PoisonResistance (negative means extra damage). Over 100% blocks it all.
+func (m *Mob) ReceivePoisonDamage(damage int) (int, int, int) {
+	resisted := min(int(math.Ceil(float64(damage)*float64(m.PoisonResistance)/100)), damage)
+	stamDam, vitDam := m.ReceiveDamageNoArmor(damage - resisted)
+	return stamDam, vitDam, resisted
+}
+
 func (m *Mob) ReceiveVitalDamage(damage int) (int, int) {
 	damageMod, _, resisted := m.ReceiveDamage(damage)
 	return damageMod, resisted
@@ -1646,6 +1673,7 @@ func (m *Mob) Save() {
 	mobData["fire_resistance"] = m.FireResistance
 	mobData["earth_resistance"] = m.EarthResistance
 	mobData["water_resistance"] = m.WaterResistance
+	mobData["poison_resistance"] = m.PoisonResistance
 	mobData["hide_encounter"] = utils.Btoi(m.Flags["hide_encounter"])
 	mobData["invisible"] = utils.Btoi(m.Flags["invisible"])
 	mobData["permanent"] = utils.Btoi(m.Flags["permanent"])

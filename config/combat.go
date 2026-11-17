@@ -245,12 +245,15 @@ var (
 	BaseCarryWeight = 40
 	StatDamageMod   = .01 // Per Point
 
-	ReduceSickCon     = 1
-	SickConBonus      = 2
-	ConBonusHealthDiv = 5
-	ConHealRegenMod   = .10
-	ConFallDamageMod  = 1
-	ConArmorMod       = .005
+	ReduceSickCon = 1
+	SickConBonus  = 2
+	// Each disease landing while already diseased adds a stack, up to the cap.
+	DiseaseMaxStacks        = 5
+	DiseaseExtraStackDamage = .5 // Each stack past the first adds this share of the base tick damage
+	ConBonusHealthDiv       = 5
+	ConHealRegenMod         = .10
+	ConFallDamageMod        = 1
+	ConArmorMod             = .005
 
 	HitPerDex        = 1
 	MissPerDex       = 1
@@ -262,6 +265,11 @@ var (
 	// A resist-fire/air/earth/water spell takes this share off magic damage of
 	// its element, for players and mobs alike. (2026-10-13: was 25%.)
 	ElementResistPercent = 20
+
+	// resist-poison takes PoisonResistBase percent plus 1 percent per
+	// PoisonResistConPerPoint con off poison damage.
+	PoisonResistBase        = 15
+	PoisonResistConPerPoint = 2
 
 	// Every point of int above IntResistMagicBase blocks IntResistMagicPerPoint
 	// magic damage, times max(1, spell tier/IntResistMagicTierDiv); see
@@ -570,6 +578,13 @@ func RollLethalScaled(skill int, multiplier float64) bool {
 		}
 	}
 	return false
+}
+
+// PoisonResistPercent is the share of poison damage resist-poison blocks for a
+// character with the given con. Gas isn't magic, so this is the only resist
+// poison damage gets.
+func PoisonResistPercent(con int) int {
+	return max(0, PoisonResistBase+con/PoisonResistConPerPoint)
 }
 
 func BreatheDamage(level int) int {

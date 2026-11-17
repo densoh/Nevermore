@@ -750,7 +750,14 @@ func (c *Character) SerialRestoreEffects(effectsBlob string) {
 	for name, properties := range obj {
 		if !strings.Contains(name, "_song") && !strings.Contains(name, "sing") {
 			Effects[name](c, c, int(properties["magnitude"].(float64)))
-			c.Effects[name].AlterTime(properties["timeRemaining"].(float64))
+			effect, ok := c.Effects[name]
+			if !ok {
+				continue
+			}
+			effect.AlterTime(properties["timeRemaining"].(float64))
+			if stacks, ok := properties["stacks"].(float64); ok && int(stacks) > 1 {
+				effect.stacks = int(stacks)
+			}
 		}
 	}
 }
@@ -1495,6 +1502,18 @@ func (c *Character) ReceiveMagicDamage(damage int, element string, tier int) (in
 		}
 	}
 	stamDam, vitDam := c.ReceiveDamageNoArmor(damage)
+	return stamDam, vitDam, resisted
+}
+
+// ReceivePoisonDamage takes poison damage, such as poison breath. Poison isn't
+// magic: dodge, int resist, resist-magic and the chi ward don't touch it, and
+// armor doesn't either. Only resist-poison reduces it, scaled by con.
+func (c *Character) ReceivePoisonDamage(damage int) (int, int, int) {
+	resisted := 0
+	if c.CheckFlag("resist-poison") {
+		resisted = int(math.Ceil(float64(damage) * float64(config.PoisonResistPercent(c.GetStat("con"))) / 100))
+	}
+	stamDam, vitDam := c.ReceiveDamageNoArmor(damage - resisted)
 	return stamDam, vitDam, resisted
 }
 
