@@ -48,7 +48,7 @@ func TestPoisonStrikeDice(t *testing.T) {
 
 func TestDeviousFromSpell(t *testing.T) {
 	cases := map[string]string{
-		"devious-poison":          DeviousPoison,
+		"devious-apply-poison":    DeviousPoison,
 		"devious-expose-weakness": DeviousExpose,
 	}
 	for spell, want := range cases {
@@ -59,7 +59,7 @@ func TestDeviousFromSpell(t *testing.T) {
 			t.Errorf("DeviousSpell(%q) = %q, want %q", want, DeviousSpell(want), spell)
 		}
 	}
-	for _, spell := range []string{"poison", "devious-silence", "fireball", ""} {
+	for _, spell := range []string{"poison", "devious-poison", "devious-silence", "fireball", ""} {
 		if _, ok := DeviousFromSpell(spell); ok {
 			t.Errorf("%q read as a devious strike", spell)
 		}

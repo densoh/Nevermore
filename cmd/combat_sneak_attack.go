@@ -63,7 +63,7 @@ func deviousFor(actor *objects.Character, whatMob *objects.Mob) string {
 
 // deviousCallbacks maps each strike to its hit callback.
 var deviousCallbacks = map[string]string{
-	config.DeviousPoison: "devious-poison",
+	config.DeviousPoison: "devious-apply-poison",
 	config.DeviousExpose: "devious-expose",
 }
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/ArcCS/Nevermore/config"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/permissions"
 	"sort"
@@ -35,7 +36,7 @@ func (help) process(s *state) {
 
 			// Ommit empty handler if installed and special commands starting with '#'
 			// and scripting commands starting with '$'
-			if len(cmd) == 0 || cmd[0] == '#' || cmd[0] == '$' || !s.actor.Permission.HasFlag(handlerPermission[strings.ToUpper(cmd)]) {
+			if len(cmd) == 0 || cmd[0] == '#' || cmd[0] == '$' || !canSeeHelp(s, cmd) {
 				ommit++
 				continue
 			}
@@ -256,13 +257,28 @@ func (help) process(s *state) {
 			return
 		}
 
+		if strike := strings.ToLower(subject); config.DeviousStrikeHelp[strike] != "" && canSeeHelp(s, "devious") {
+			s.msg.Actor.SendGood("Devious strike: ", strike, "\n\n", config.DeviousStrikeHelp[strike], "\n\n",
+				"Thieves learn it from a scroll, from tier ", strconv.Itoa(config.DeviousStrikeTiers[strike]),
+				". Ready it with: devious ", strike)
+			return
+		}
+
 		if _, ok := reverseLookup[strings.ToUpper(subject)]; ok {
 			subject = reverseLookup[strings.ToUpper(subject)]
 		}
-		if s.actor.Permission.HasFlag(handlerPermission[strings.ToUpper(subject)]) {
+		if _, exists := helpText[subject]; exists && canSeeHelp(s, subject) {
 			s.msg.Actor.SendGood("Command: ", subject, "\n\n", helpText[subject].helpText, "\n\n", "Aliases:", helpText[subject].aliases)
 		} else {
 			s.msg.Actor.SendBad("Not a command available to you.")
 		}
 	}
+}
+
+// canSeeHelp reports whether the actor may read a command's help. It matches
+// dispatchHandler: Dungeon Masters and Game Masters can run every command, so
+// they see every command's help too, class-only ones included.
+func canSeeHelp(s *state, cmd string) bool {
+	return s.actor.Permission.HasFlag(handlerPermission[strings.ToUpper(cmd)]) ||
+		s.actor.Permission.HasAnyFlags(permissions.Dungeonmaster, permissions.Gamemaster)
 }

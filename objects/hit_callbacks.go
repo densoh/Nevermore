@@ -39,8 +39,8 @@ type OnHit struct {
 var HitCallbacks = map[string]HitCallback{
 	"ignite": applyDoT(burn),
 	// Thief devious strikes, fired by a sneak attack hit.
-	"devious-poison": applyDoT(poisonStrike),
-	"devious-expose": func(_ *HitContext, target *Mob) { target.Expose() },
+	"devious-apply-poison": applyDoT(poisonStrike),
+	"devious-expose":       func(_ *HitContext, target *Mob) { target.Expose() },
 }
 
 // TriggerOnHit rolls each callback's chance and runs the ones that fire.

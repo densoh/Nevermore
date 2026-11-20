@@ -36,7 +36,7 @@ func SneakAttackChance(otherAttackers int) int {
 // one is queued at a time; it waits through target switches and is dropped
 // when no mob left in the room has the thief on its threat table.
 const (
-	DeviousPoison = "poison"
+	DeviousPoison = "apply-poison"
 	DeviousExpose = "expose-weakness"
 )
 
@@ -54,8 +54,21 @@ const DeviousCooldown = 1
 // DeviousStrikeOrder lists the strikes for help and status output.
 var DeviousStrikeOrder = []string{DeviousPoison, DeviousExpose}
 
+// DeviousStrikeHelp is each strike's "help <strike>" text. Player facing, so
+// it stays qualitative: no dice, ticks or armor numbers.
+var DeviousStrikeHelp = map[string]string{
+	DeviousPoison: "Slip poison into the wound your sneak attack opens. The poison keeps\n" +
+		"hurting the enemy for a short while after the hit, growing stronger with\n" +
+		"your stealth and experience. Poisoning an enemy that is already poisoned\n" +
+		"starts the poison over as your own. Some creatures shrug off poison.",
+	DeviousExpose: "Use your sneak attack to open a gap in the enemy's armor, so every\n" +
+		"weapon fighting it bites deeper for the rest of the fight. The weakness lasts\n" +
+		"until the enemy dies and doesn't stack: against an enemy that is already\n" +
+		"exposed, the strike stays readied and that hit sneak attacks as usual.",
+}
+
 // A devious strike is learned from a scroll whose spell is DeviousSpellPrefix
-// plus the strike's name ("devious-poison"); the thief keeps it in their
+// plus the strike's name ("devious-apply-poison"); the thief keeps it in their
 // spell list under that name, the way bards keep songs.
 const DeviousSpellPrefix = "devious-"
 

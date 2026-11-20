@@ -11,12 +11,22 @@ import (
 
 func TestMatchDevious(t *testing.T) {
 	cases := map[string]string{
+		"apply-poison":    config.DeviousPoison,
+		"app-p":           config.DeviousPoison,
+		"apply":           config.DeviousPoison,
+		"a":               config.DeviousPoison,
 		"poison":          config.DeviousPoison,
 		"poi":             config.DeviousPoison,
 		"expose":          config.DeviousExpose,
 		"expose-weakness": config.DeviousExpose,
+		"weak":            config.DeviousExpose,
+		"e":               config.DeviousExpose,
+		"poison-apply":    "", // out of order
+		"apply-weakness":  "",
+		"exp-weak":        config.DeviousExpose,
 		"silence":         "",
 		"":                "",
+		"-":               "",
 	}
 	for word, want := range cases {
 		if got := matchDevious(word); got != want {
