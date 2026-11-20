@@ -656,7 +656,10 @@ func applyItemEdit(item *objects.Item, property string, args []string) (string, 
 		if arg != "" {
 			_, isSpell := objects.Spells[arg]
 			_, isSong := objects.Songs[arg]
-			if !isSpell && !isSong {
+			// A devious strike scroll carries "devious-<strike>", which
+			// lives in config rather than the spell table.
+			_, isDevious := config.DeviousFromSpell(arg)
+			if !isSpell && !isSong && !isDevious {
 				return "Spell not found.", false
 			}
 		}

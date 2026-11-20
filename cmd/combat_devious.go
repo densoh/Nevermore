@@ -21,9 +21,10 @@ func init() {
 			"  devious clear       let your readied strike go\n\n"+
 			"Devious strikes are learned from scrolls.\n\n"+
 			"Strikes:\n"+
-			"  poison           poison seeps into the wound and keeps hurting it\n"+
+			"  apply-poison     poison seeps into the wound and keeps hurting it\n"+
 			"  expose-weakness  open a hole in the enemy's armor for everyone to\n"+
-			"                   strike at, until it dies; it doesn't stack",
+			"                   strike at, until it dies; it doesn't stack\n\n"+
+			"Type help <strike> for more on each one.",
 		permissions.Thief,
 		"devious")
 }
@@ -62,6 +63,8 @@ func (devious) process(s *state) {
 		return
 	}
 
+	// Only the first word names the strike; later words are left free for
+	// strikes that may take a parameter.
 	word := strings.ToLower(s.words[0])
 	if word == "clear" || word == "none" || word == "cancel" {
 		if s.actor.DeviousStrike == "" {
@@ -100,15 +103,19 @@ func (devious) process(s *state) {
 	}
 }
 
-// matchDevious finds the strike a word names: the full name, or a prefix
-// only one strike starts with ("expose", "poi").
+// matchDevious finds the strike a word names. Its hyphenated parts may each be
+// cut short, as long as they run in order through the strike's name from any
+// of its parts: "apply-poison", "app-poi", "apply", "poison" and "poi" all
+// name apply-poison. A match shared by two
+// strikes names neither.
 func matchDevious(word string) string {
-	if _, ok := config.DeviousStrikeTiers[word]; ok {
-		return word
+	typed := deviousWords(word)
+	if len(typed) == 0 {
+		return ""
 	}
 	found := ""
 	for _, name := range config.DeviousStrikeOrder {
-		if strings.HasPrefix(name, word) {
+		if deviousNameMatches(deviousWords(name), typed) {
 			if found != "" {
 				return ""
 			}
@@ -116,6 +123,32 @@ func matchDevious(word string) string {
 		}
 	}
 	return found
+}
+
+// deviousWords splits a strike name or typed word into its lowercase
+// hyphenated parts.
+func deviousWords(text string) []string {
+	return strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return r == '-'
+	})
+}
+
+// deviousNameMatches reports whether typed prefixes a run of name's parts,
+// in order, starting at any part.
+func deviousNameMatches(name, typed []string) bool {
+	for start := 0; start+len(typed) <= len(name); start++ {
+		matched := true
+		for i, t := range typed {
+			if !strings.HasPrefix(name[start+i], t) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }
 
 // knowsDevious reports whether the actor has learned the strike from a scroll.

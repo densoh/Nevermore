@@ -121,6 +121,21 @@ func TestApplyItemEditRejectsBadValues(t *testing.T) {
 	}
 }
 
+// A devious strike scroll's spell isn't in the spell table but must be accepted.
+func TestApplyItemEditAcceptsDeviousStrikes(t *testing.T) {
+	for _, strike := range config.DeviousStrikeOrder {
+		item := &objects.Item{ItemType: 7}
+		spell := config.DeviousSpell(strike)
+		if _, ok := applyItemEdit(item, "spell", []string{spell}); !ok || item.Spell != spell {
+			t.Errorf("spell %q: ok=%v spell=%q", spell, ok, item.Spell)
+		}
+	}
+	item := &objects.Item{ItemType: 7}
+	if _, ok := applyItemEdit(item, "spell", []string{"devious-not-a-strike"}); ok {
+		t.Error("unknown devious strike accepted")
+	}
+}
+
 // An edit moves only the named field between a worn copy and its template.
 func TestApplyItemEditLeavesTheCopysStateOutOfTheTemplate(t *testing.T) {
 	template := &objects.Item{MaxUses: 20, Adjustment: 0, Armor: 100}
