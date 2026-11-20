@@ -334,6 +334,7 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 	crushing := false
 	shatterRisk := false
 	totalReflect := 0
+	devious := ""
 	for hit := 0; hit < result.hits; hit++ {
 		mult := attacks[hit]
 		action := metric
@@ -358,10 +359,29 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 			}
 		}
 
-		actualDamage, _, resisted := whatMob.ReceiveDamage(int(math.Ceil(float64(s.actor.InflictDamage()) * mult)))
+		rawDamage := int(math.Ceil(float64(s.actor.InflictDamage()) * mult))
+		// Sneak attack rides on the first landed hit, after the multiplier
+		// (crits don't multiply it) and before armor. A queued devious strike
+		// takes its place.
+		sneak := 0
+		if hit == 0 && sneakAttackLands(s, whatMob) {
+			if strike := deviousFor(s.actor, whatMob); strike != "" {
+				devious = strike
+			} else if sneak = sneakAttackDamage(s); sneak > 0 {
+				s.msg.Actor.SendGood("You sneak up on the enemy!")
+				data.StoreCombatMetric(metric+"-sneak", 0, 0, sneak, 0, sneak, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+			}
+		}
+		actualDamage, _, resisted := whatMob.ReceiveDamage(rawDamage + sneak)
 		data.StoreCombatMetric(action, 0, 0, actualDamage+resisted, resisted, actualDamage, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 		whatMob.AddThreatDamage(actualDamage, s.actor)
-		s.actor.AdvanceSkillExp((float64(actualDamage) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
+		// The sneak share of what landed trains stealth; the rest trains the weapon.
+		sneakLanded := 0
+		if sneak > 0 && rawDamage+sneak > 0 {
+			sneakLanded = actualDamage * sneak / (rawDamage + sneak)
+			s.actor.AdvanceStealthExp(int(float64(sneakLanded) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
+		}
+		s.actor.AdvanceSkillExp((float64(actualDamage-sneakLanded) / float64(whatMob.Stam.Max) * float64(whatMob.Experience())))
 		result.totalDamage += actualDamage
 		if whatMob.CheckFlag("reflection") {
 			reflectDamage := int(float64(actualDamage) * config.ReflectDamageFromMob)
@@ -374,6 +394,9 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " for " + strconv.Itoa(result.totalDamage) + " damage!" + text.Reset)
 	} else {
 		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " " + strconv.Itoa(result.hits) + " times for " + strconv.Itoa(result.totalDamage) + " damage!" + text.Reset)
+	}
+	if devious != "" {
+		fireDevious(s, whatMob, devious)
 	}
 	if crushing {
 		whatMob.StunBy(config.CrushingStuns, "crushing-stun", s.actor)
@@ -461,11 +484,14 @@ func DeathCheck(s *state, m *objects.Mob) {
 					buildActorString += text.Green + m.DropInventory() + "\n"
 					s.msg.Actor.Send(buildActorString)
 				} else {
-					go func() {
-						if _, err := charClean.Write([]byte(buildActorString + "\n" + text.Reset)); err != nil {
+					// Queued until after delivery so the reward follows the
+					// "X killed Y" line this member gets as an observer.
+					reward := buildActorString + "\n" + text.Reset
+					s.afterDelivery = append(s.afterDelivery, func() {
+						if _, err := charClean.Write([]byte(reward)); err != nil {
 							log.Println("Error writing to player: ", err)
 						}
-					}()
+					})
 				}
 				if charClean.Victim == m {
 					charClean.Victim = nil

@@ -86,6 +86,39 @@ func (i *MobInventory) Remove(o *Mob) {
 		i.Contents = nil
 		i.Contents = make([]*Mob, 0, 10)
 	}
+	i.dropFinishedDevious(o)
+}
+
+// dropFinishedDevious runs as gone leaves the room. Each thief gone was
+// fighting (on its threat table) drops their queued devious strike if no mob
+// left has them on its threat table: their fight is over. A thief who queued
+// before the pull keeps theirs.
+func (i *MobInventory) dropFinishedDevious(gone *Mob) {
+	room, ok := Rooms[i.ParentId]
+	if !ok || room.Chars == nil {
+		return
+	}
+	for _, c := range room.Chars.Contents {
+		if c.DeviousStrike == "" {
+			continue
+		}
+		if _, fought := gone.ThreatTable[c.Name]; !fought {
+			continue
+		}
+		engaged := false
+		for _, m := range i.Contents {
+			if _, on := m.ThreatTable[c.Name]; on && m.Stam.Current > 0 {
+				engaged = true
+				break
+			}
+		}
+		if !engaged {
+			c.DeviousStrike = ""
+			if _, err := c.Write([]byte(text.Info + "The fight is over; you let your devious strike go." + text.Reset + "\n")); err != nil {
+				log.Println("Error writing to player: ", err)
+			}
+		}
+	}
 }
 
 // RemoveNonPerms Clear all non-permanent

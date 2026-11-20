@@ -106,3 +106,30 @@ func TestThunkMultiplier(t *testing.T) {
 		}
 	}
 }
+
+func TestUnarmoredSlotArmor(t *testing.T) {
+	// Tier 12 body cap 90; 20 + 25/2 + 18/2 = 41.5% of it.
+	if got := UnarmoredSlotArmor(5, 12, 25, 18); got < 37.35-1e-9 || got > 37.35+1e-9 {
+		t.Errorf("UnarmoredSlotArmor(body, t12, con 25, dex 18) = %.3f, want 37.35", got)
+	}
+	// Tier 25 uses the top band.
+	if got := UnarmoredSlotArmor(5, 25, 0, 0); got != 26 {
+		t.Errorf("UnarmoredSlotArmor(body, t25, 0, 0) = %.3f, want 26", got)
+	}
+}
+
+func TestUnarmoredMiss(t *testing.T) {
+	if got := UnarmoredMiss([]int{5, 19, 20, 21, 22, 25, 26}); got != 8 {
+		t.Errorf("all seven slots empty = %d, want 8", got)
+	}
+	// Rings and shields never count.
+	if got := UnarmoredMiss([]int{23, 24}); got != 0 {
+		t.Errorf("ring + shield = %d, want 0", got)
+	}
+}
+
+func TestConArmorModFor(t *testing.T) {
+	if ConArmorModFor(BARBARIAN) != .0075 || ConArmorModFor(FIGHTER) != ConArmorMod {
+		t.Errorf("con armor mod: barbarian %.4f, fighter %.4f", ConArmorModFor(BARBARIAN), ConArmorModFor(FIGHTER))
+	}
+}

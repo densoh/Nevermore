@@ -208,9 +208,32 @@ func disease(caller interface{}, target interface{}, magnitude int) string {
 			return ""
 		}
 		if !target.CheckFlag("resist-disease") {
+			// A new infection while diseased adds a stack and restarts the
+			// duration, keeping the tick count so the opening delay isn't
+			// replayed. The strongest infection's level sets the base damage.
+			if existing, ok := target.Effects["disease"]; ok {
+				before := existing.Stacks()
+				stacks := existing.AddStack(config.DiseaseMaxStacks)
+				if magnitude > existing.magnitude {
+					existing.magnitude = magnitude
+				}
+				if existing.magnitude*4 > int(existing.TimeRemaining()) {
+					existing.Refresh(strconv.Itoa(existing.magnitude * 4))
+				}
+				if stacks > before {
+					if _, err := target.Write([]byte(text.Red + "The disease takes a firmer hold on you!\n")); err != nil {
+						log.Println("Error writing to player:", err)
+					}
+				}
+				return ""
+			}
 			target.ApplyEffect("disease", strconv.Itoa(magnitude*4), 8, magnitude,
 				func(triggers int) {
-					damage := magnitude
+					effect, ok := target.Effects["disease"]
+					if !ok {
+						return
+					}
+					damage := effect.magnitude
 					switch {
 					case triggers <= 1:
 						return
@@ -219,6 +242,7 @@ func disease(caller interface{}, target interface{}, magnitude int) string {
 					default:
 						damage *= 2
 					}
+					damage = int(float64(damage) * (1 + config.DiseaseExtraStackDamage*float64(effect.Stacks()-1)))
 					// Reduce Damage by Con
 					damage -= (target.GetStat("con") / config.SickConBonus) * config.ReduceSickCon
 					if damage >= 1 {

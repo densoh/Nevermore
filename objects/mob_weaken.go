@@ -43,6 +43,7 @@ func (m *Mob) Weaken(pct, maxSteps int) bool {
 	m.AirResistance = scaleResist(m.AirResistance)
 	m.FireResistance = scaleResist(m.FireResistance)
 	m.EarthResistance = scaleResist(m.EarthResistance)
+	m.PoisonResistance = scaleResist(m.PoisonResistance)
 	m.Stam.Max = max(scale(m.Stam.Max), 1)
 	m.Stam.Current = m.Stam.Max
 	m.SidesDice = max(scale(m.SidesDice), 1)
@@ -80,6 +81,7 @@ func (m *Mob) SyncWeakened(template *Mob) {
 	m.AirResistance = template.AirResistance
 	m.FireResistance = template.FireResistance
 	m.EarthResistance = template.EarthResistance
+	m.PoisonResistance = template.PoisonResistance
 	m.SidesDice = template.SidesDice
 	m.PlusDice = template.PlusDice
 	m.WeakenSteps = template.WeakenSteps

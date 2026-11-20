@@ -61,8 +61,9 @@ func TestVitalStrikeRespectsInertialBarrier(t *testing.T) {
 	c.Vit.Current, c.Vit.Max = 1000, 1000
 	c.Equipment = &Equipment{}
 	// No armor, so only the barrier applies: 1000 - ceil(1000 * .1595)
-	if got, _ := c.ReceiveVitalDamage(1000); got != 840 {
-		t.Errorf("vital damage through barrier = %d, want 840", got)
+	// and the barrier's 160 shows up as resisted.
+	if got, resist := c.ReceiveVitalDamage(1000); got != 840 || resist != 160 {
+		t.Errorf("vital damage through barrier = %d taken, %d resisted; want 840, 160", got, resist)
 	}
 }
 
@@ -79,5 +80,50 @@ func TestCheckEquipmentReturnsDisallowedGear(t *testing.T) {
 	}
 	if len(returned) != 1 || returned[0] != helm {
 		t.Errorf("helm not returned to inventory: %v", returned)
+	}
+}
+
+// A mob's barrier cuts the hit before armor, so the two multiply: 100 less
+// 15% is 85, and 50 armor resists a quarter of that (21), leaving 64. The
+// resisted total counts the barrier's 15 too.
+func TestMobInertialBarrierMultipliesWithArmor(t *testing.T) {
+	m := &Mob{Armor: 50, Stam: Meter{Max: 1000, Current: 1000}, Flags: map[string]bool{"inertial-barrier": true}}
+	got, _, resist := m.ReceiveDamage(100)
+	if got != 64 || resist != 36 {
+		t.Errorf("mob barrier + 50 armor on 100 = %d taken, %d resisted; want 64, 36", got, resist)
+	}
+}
+
+// A naked tier 12 barbarian (con 25, dex 18) gets 41.5% of the seven slot
+// caps (340, rings and shield excluded) = 141.1, times the 1.1875 con bonus.
+func TestBarbarianUnarmoredArmor(t *testing.T) {
+	c := &Character{Class: config.BARBARIAN, Tier: 12, Modifiers: map[string]int{}, Equipment: &Equipment{}}
+	c.Con.Current, c.Dex.Current = 25, 18
+	if got := c.GetStat("armor"); got != 167 {
+		t.Errorf("naked barbarian armor = %d, want 167", got)
+	}
+	if got := config.UnarmoredMiss(c.Equipment.EmptyUnarmoredSlots()); got != 8 {
+		t.Errorf("naked barbarian mob to-hit cut = %d, want 8", got)
+	}
+	// Wearing body armor removes that slot's share and its 2 points.
+	c.Equipment.Chest = &Item{ItemType: 5, Armor: 76}
+	c.Equipment.Armor = 76
+	if got := config.UnarmoredMiss(c.Equipment.EmptyUnarmoredSlots()); got != 6 {
+		t.Errorf("barbarian in body armor to-hit cut = %d, want 6", got)
+	}
+	// (76 + 41.5% of 250) * 1.1875 = 213.45
+	if got := c.GetStat("armor"); got != 213 {
+		t.Errorf("barbarian in body armor = %d, want 213", got)
+	}
+	// A worn piece with no armor still counts as empty.
+	c.Equipment.Head = &Item{ItemType: 25, Armor: 0}
+	if got := config.UnarmoredMiss(c.Equipment.EmptyUnarmoredSlots()); got != 6 {
+		t.Errorf("barbarian in body armor and a 0-armor hat to-hit cut = %d, want 6", got)
+	}
+	// Other classes get nothing for empty slots.
+	f := &Character{Class: config.FIGHTER, Tier: 12, Modifiers: map[string]int{}, Equipment: &Equipment{}}
+	f.Con.Current, f.Dex.Current = 25, 18
+	if got := f.GetStat("armor"); got != 0 {
+		t.Errorf("naked fighter armor = %d, want 0", got)
 	}
 }

@@ -15,6 +15,7 @@ type Effect struct {
 	effect      func(triggers int)
 	effectOff   func()
 	magnitude   int
+	stacks      int
 }
 
 func (e *Effect) AlterTime(duration float64) {
@@ -52,7 +53,8 @@ func NewEffect(length string, interval int, magnitude int, effect func(triggers 
 		0,
 		effect,
 		effectOff,
-		magnitude}
+		magnitude,
+		1}
 }
 
 func (e *Effect) RunEffect() {
@@ -67,6 +69,27 @@ func (e *Effect) Reset(t string) {
 	e.startTime = time.Now()
 	e.length = parseLength
 	e.triggers = 0
+}
+
+// Refresh restarts the effect's duration without resetting its trigger count,
+// so a stacking effect keeps ticking on schedule.
+func (e *Effect) Refresh(t string) {
+	lengthTime, _ := strconv.Atoi(t)
+	e.startTime = time.Now()
+	e.length = time.Duration(lengthTime) * time.Second
+}
+
+// AddStack raises the stack count by one up to maxStacks and returns the new
+// count.
+func (e *Effect) AddStack(maxStacks int) int {
+	if e.stacks < maxStacks {
+		e.stacks++
+	}
+	return e.stacks
+}
+
+func (e *Effect) Stacks() int {
+	return e.stacks
 }
 
 func (e *Effect) TimeRemaining() float64 {
@@ -85,6 +108,7 @@ func (e *Effect) ReturnEffectProps() map[string]interface{} {
 	serialList := map[string]interface{}{
 		"timeRemaining": e.TimeRemaining(),
 		"magnitude":     e.magnitude,
+		"stacks":        e.stacks,
 	}
 	return serialList
 }

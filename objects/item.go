@@ -372,6 +372,9 @@ func (i *Item) Eval() string {
 		stringOut += "It is a " + config.ItemTypes[i.ItemType] + ". \n" +
 			"It is charged with " + i.Spell + ".\n" +
 			"It has " + strconv.Itoa(i.MaxUses) + " uses remaining. \n"
+	} else if strike, devious := config.DeviousFromSpell(i.Spell); i.ItemType == 7 && devious {
+		stringOut += "It is a scroll. \n" +
+			"It teaches the devious strike " + strike + ".\n"
 	} else if i.ItemType == 7 {
 		stringOut += "It is a scroll. \n" +
 			"It contains " + i.Spell + ".\n"

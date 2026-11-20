@@ -44,6 +44,16 @@ type state struct {
 
 	// msg contains the message buffers for sending data to different recipients
 	msg message.Msg
+
+	// afterDelivery runs once the buffered messages have been delivered, for
+	// writes that must land after them - a party member's kill reward has to
+	// follow the "X killed Y" line that reaches them through Observers.
+	afterDelivery []func()
+
+	// actorDelivered is set when the command has already delivered the actor's
+	// output mid-command, so messenger does not send them a second, empty
+	// prompt unless something more was buffered for them since.
+	actorDelivered bool
 }
 
 // Parse initiates processing of the input string for the specified Thing. The
@@ -240,7 +250,7 @@ func (s *state) scriptActor(input ...string) {
 // prompt even if they just hit enter.
 func (s *state) messenger() {
 
-	if s.actor != nil {
+	if s.actor != nil && (!s.actorDelivered || s.msg.Actor.Len() > 0) {
 		s.msg.Actor.Deliver(s.actor)
 	}
 
@@ -260,6 +270,11 @@ func (s *state) messenger() {
 		}
 		buffer.Deliver(players...)
 	}
+
+	for _, f := range s.afterDelivery {
+		f()
+	}
+	s.afterDelivery = nil
 
 	s.msg.Deallocate()
 }

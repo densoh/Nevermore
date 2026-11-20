@@ -34,6 +34,10 @@ func (list) process(s *state) {
 				t.AppendRows([]table.Row{
 					{item.DisplayName(), item.StorePrice, config.ItemTypes[item.ItemType]},
 				})
+			} else if strike, devious := config.DeviousFromSpell(item.Spell); item.ItemType == 7 && devious {
+				t.AppendRows([]table.Row{
+					{item.Name, item.StorePrice, "(D) " + strike},
+				})
 			} else if item.ItemType == 7 {
 				t.AppendRows([]table.Row{
 					{item.Name, item.StorePrice, "(S) " + objects.Spells[item.Spell].Name},

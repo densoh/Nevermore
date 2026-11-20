@@ -609,7 +609,7 @@ func editIntProperty(target string, property string) bool {
 	case "mob":
 		return utils.StringIn(property, []string{"level", "gold", "con", "int", "str", "dex", "pie", "mana",
 			"stam", "ndice", "armor", "pdice", "sdice", "chancecast", "numwander", "wimpyvalue",
-			"air_resistance", "earth_resistance", "fire_resistance", "water_resistance", "placement"})
+			"air_resistance", "earth_resistance", "fire_resistance", "water_resistance", "poison_resistance", "placement"})
 	case "char":
 		return !utils.StringIn(property, []string{"toggle", "description", "name", "title"})
 	}
@@ -792,6 +792,9 @@ func applyMobEdit(mob *objects.Mob, property string, args []string) (string, boo
 	case "water_resistance":
 		mob.WaterResistance = value
 		return "Changed water resistance", true
+	case "poison_resistance":
+		mob.PoisonResistance = value
+		return "Changed poison resistance", true
 	case "spells":
 		spellName := strings.ToLower(arg)
 		if _, ok := objects.Spells[spellName]; !ok {
@@ -812,7 +815,7 @@ func applyMobEdit(mob *objects.Mob, property string, args []string) (string, boo
 			mob.BreathWeapon = ""
 			return "Mob BreathWeapon unset", true
 		}
-		if !utils.StringIn(spellName, []string{"air", "fire", "water", "earth", "paralytic", "pestilence"}) {
+		if !utils.StringIn(spellName, []string{"air", "fire", "water", "earth", "poison", "paralytic", "pestilence"}) {
 			return "Not a valid BreathWeapon.", false
 		}
 		mob.BreathWeapon = spellName

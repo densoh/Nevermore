@@ -132,6 +132,9 @@ type Character struct {
 	// as Champion's Anthem. It is rolled when the song starts or is mixed in,
 	// so everyone the song reaches gets the same bonus.
 	AnthemBonus int
+	// DeviousStrike is the thief's queued devious strike ("" for none). It
+	// fires in place of their next sneak attack. Never persisted.
+	DeviousStrike string
 }
 
 func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Character, bool) {
@@ -252,6 +255,7 @@ func LoadCharacter(charName string, writer io.Writer, disconnect func()) (*Chara
 			"",
 			0,
 			0,
+			"",
 		}
 
 		// The pool formula may have changed since the character was last
@@ -750,7 +754,14 @@ func (c *Character) SerialRestoreEffects(effectsBlob string) {
 	for name, properties := range obj {
 		if !strings.Contains(name, "_song") && !strings.Contains(name, "sing") {
 			Effects[name](c, c, int(properties["magnitude"].(float64)))
-			c.Effects[name].AlterTime(properties["timeRemaining"].(float64))
+			effect, ok := c.Effects[name]
+			if !ok {
+				continue
+			}
+			effect.AlterTime(properties["timeRemaining"].(float64))
+			if stacks, ok := properties["stacks"].(float64); ok && int(stacks) > 1 {
+				effect.stacks = int(stacks)
+			}
 		}
 	}
 }
@@ -839,7 +850,13 @@ func (c *Character) GetStat(stat string) int {
 		if c.Class == config.MONK {
 			return c.Modifiers["armor"] + config.MonkNaturalArmor(c.Tier, c.GetStat("con"))
 		}
-		return c.Equipment.Armor + c.Modifiers["armor"] + int(float64(c.Con.Current)*config.ConArmorMod*float64(c.Equipment.Armor))
+		gear := float64(c.Equipment.Armor)
+		if c.Class == config.BARBARIAN {
+			for _, t := range c.Equipment.EmptyUnarmoredSlots() {
+				gear += config.UnarmoredSlotArmor(t, c.Tier, c.Con.Current, c.Dex.Current)
+			}
+		}
+		return c.Modifiers["armor"] + int(gear*(1+float64(c.Con.Current)*config.ConArmorModFor(c.Class)))
 	default:
 		return 0
 	}
@@ -1172,6 +1189,9 @@ func (c *Character) CanEquip(item *Item) (bool, string) {
 			return false, "This armor would disrupt the flow of your chi"
 		}
 	}
+	if c.Class == config.MAGE && !config.MageCanWear(item.ItemType, item.ArmorClass) {
+		return false, "Mages can only wear robes, cloaks and rings."
+	}
 	if utils.IntIn(item.ItemType, []int{5, 19, 20, 21, 22, 23, 24, 25, 26}) {
 		if !utils.IntIn(item.ArmorClass, config.ArmorRestrictions[c.Class]) {
 			return false, "You cannot equip armor of this class."
@@ -1332,14 +1352,16 @@ func (c *Character) ReceiveDamage(damage int) (int, int, int) {
 	if c.CheckFlag("surge") {
 		damage += int(math.Ceil(float64(damage) * config.SurgeExtraDamage))
 	}
+	barrier := 0
 	if c.CheckFlag("inertial-barrier") {
-		damage -= int(math.Ceil(float64(damage) * config.InertialBarrierIgnore(c.Tier, c.Int.Current)))
+		barrier = int(math.Ceil(float64(damage) * config.InertialBarrierIgnore(c.Tier, c.Int.Current)))
+		damage -= barrier
 	}
 	stamDamage, vitalDamage := 0, 0
 	mitigation := float64(config.ArmorReductionConstant) / (float64(config.ArmorReductionConstant) + float64(c.GetStat("armor")))
 
 	finalDamage := int(math.Ceil(float64(damage) * mitigation))
-	resist := damage - finalDamage
+	resist := damage - finalDamage + barrier // the barrier counts as mitigation in logs
 	msg := c.Equipment.DamageRandomArmor()
 	if msg != "" {
 		if _, err := c.Write([]byte(text.Info + msg + "\n" + text.Reset)); err != nil {
@@ -1392,8 +1414,10 @@ func (c *Character) ReceiveDamageNoArmor(damage int) (int, int) {
 }
 
 func (c *Character) ReceiveVitalDamage(damage int) (int, int) {
+	barrier := 0
 	if c.CheckFlag("inertial-barrier") {
-		damage -= int(math.Ceil(float64(damage) * config.InertialBarrierIgnore(c.Tier, c.Int.Current)))
+		barrier = int(math.Ceil(float64(damage) * config.InertialBarrierIgnore(c.Tier, c.Int.Current)))
+		damage -= barrier
 	}
 	msg := c.Equipment.DamageRandomArmor()
 	if msg != "" {
@@ -1404,7 +1428,7 @@ func (c *Character) ReceiveVitalDamage(damage int) (int, int) {
 	mitigation := float64(config.ArmorReductionConstant) / (float64(config.ArmorReductionConstant) + float64(c.GetStat("armor")))
 
 	finalDamage := int(math.Ceil(float64(damage) * mitigation))
-	resist := damage - finalDamage
+	resist := damage - finalDamage + barrier // the barrier counts as mitigation in logs
 	if finalDamage < 0 {
 		finalDamage = 0
 	}
@@ -1495,6 +1519,18 @@ func (c *Character) ReceiveMagicDamage(damage int, element string, tier int) (in
 		}
 	}
 	stamDam, vitDam := c.ReceiveDamageNoArmor(damage)
+	return stamDam, vitDam, resisted
+}
+
+// ReceivePoisonDamage takes poison damage, such as poison breath. Poison isn't
+// magic: dodge, int resist, resist-magic and the chi ward don't touch it, and
+// armor doesn't either. Only resist-poison reduces it, scaled by con.
+func (c *Character) ReceivePoisonDamage(damage int) (int, int, int) {
+	resisted := 0
+	if c.CheckFlag("resist-poison") {
+		resisted = int(math.Ceil(float64(damage) * float64(config.PoisonResistPercent(c.GetStat("con"))) / 100))
+	}
+	stamDam, vitDam := c.ReceiveDamageNoArmor(damage - resisted)
 	return stamDam, vitDam, resisted
 }
 

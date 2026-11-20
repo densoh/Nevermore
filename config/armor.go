@@ -20,6 +20,16 @@ var ArmorClass = map[int]string{
 	4: "Robe",
 }
 
+// ArmorCap is the most armor an item of this type may have at the tier.
+func ArmorCap(aType, tier int) int {
+	for _, band := range []int{4, 9, 14, 19} {
+		if tier <= band {
+			return MaxArmor[band][aType]
+		}
+	}
+	return MaxArmor[25][aType]
+}
+
 func CheckArmor(aType, tier, val int) bool {
 	switch {
 	case tier <= 4:
@@ -46,16 +56,45 @@ func CheckArmor(aType, tier, val int) bool {
 	return false
 }
 
+// ArmorRestrictions are the armor classes each character class may wear.
+// Every class can wear robes (4).
 var ArmorRestrictions = map[int][]int{
-	0: {0, 1, 2, 3},
-	1: {0, 1, 2, 3},
-	2: {0, 1, 2},
-	3: {0, 1, 2},
-	4: {0, 4},
-	5: {0, 4},
-	6: {0, 1, 2, 3},
-	7: {0, 1},
-	8: {0},
+	FIGHTER:   {0, 1, 2, 3, 4},
+	BARBARIAN: {0, 1, 2, 3, 4},
+	THIEF:     {0, 1, 2, 4},
+	RANGER:    {0, 1, 2, 4},
+	MAGE:      {0, 4},
+	CLERIC:    {0, 4},
+	PALADIN:   {0, 1, 2, 3, 4},
+	BARD:      {0, 1, 4},
+	MONK:      {0, 4},
+}
+
+// MageArmorTypes are the only armor slots a mage can fill: body (robes only),
+// neck (cloaks) and rings. Non-armor off hand items are fine; shields are not.
+var MageArmorTypes = []int{5, 22, 24}
+
+// MageCanWear reports whether a mage may equip an item of this type and
+// armor class. Items that aren't armor are always fine.
+func MageCanWear(itemType int, armorClass int) bool {
+	isArmor := false
+	for _, t := range ArmorTypes {
+		if t == itemType {
+			isArmor = true
+		}
+	}
+	if !isArmor {
+		return true
+	}
+	if itemType == 5 {
+		return armorClass == 4
+	}
+	for _, t := range MageArmorTypes {
+		if t == itemType {
+			return true
+		}
+	}
+	return false
 }
 
 // ArmorDescription names a piece of armor for players: "heavy body armor",
