@@ -250,6 +250,8 @@ func (m *Mob) Rest() {
 	if m.StoppedAt.IsZero() {
 		return
 	}
+	// A room reset wipes a thief's expose weakness off its permanent mobs.
+	delete(m.Flags, "exposed")
 	m.CurrentTarget = ""
 	st := m.scriptState()
 	st.windup = nil
@@ -1506,11 +1508,16 @@ func (m *Mob) CheckFlag(flagName string) bool {
 }
 
 func (m *Mob) ReceiveDamage(damage int) (int, int, int) {
-	resist := min(int(((float64(m.Armor)/100)*config.MobArmorReduction)*float64(damage)), damage)
-	finalDamage := damage - resist
+	// The barrier cuts the hit before armor, as it does for players, so the
+	// two multiply rather than add.
+	barrier := 0
 	if m.CheckFlag("inertial-barrier") {
-		finalDamage -= int(math.Ceil(float64(damage) * config.InertialDamageIgnore))
+		barrier = int(math.Ceil(float64(damage) * config.InertialDamageIgnore))
+		damage -= barrier
 	}
+	resist := min(int(((float64(m.EffectiveArmor())/100)*config.MobArmorReduction)*float64(damage)), damage)
+	finalDamage := damage - resist
+	resist += barrier // the barrier counts as mitigation in logs
 	// Armor of 200 or more resists the whole hit. A negative remainder would
 	// add stamina through Meter.Subtract, so a hit never does less than 0.
 	finalDamage = max(finalDamage, 0)
@@ -1577,6 +1584,27 @@ func (m *Mob) ReceiveMagicDamage(damage int, element string) (int, int, int) {
 
 // ReceivePoisonDamage takes poison damage: armor and resist-magic don't apply,
 // only PoisonResistance (negative means extra damage). Over 100% blocks it all.
+// EffectiveArmor is the mob's armor less a thief's expose weakness.
+func (m *Mob) EffectiveArmor() int {
+	if m.CheckFlag("exposed") {
+		return m.Armor - config.ExposeWeaknessArmor
+	}
+	return m.Armor
+}
+
+// Expose applies expose weakness. It reports false, changing nothing, when the
+// mob is already exposed: it doesn't stack.
+func (m *Mob) Expose() bool {
+	if m.CheckFlag("exposed") {
+		return false
+	}
+	if m.Flags == nil {
+		m.Flags = map[string]bool{}
+	}
+	m.Flags["exposed"] = true
+	return true
+}
+
 func (m *Mob) ReceivePoisonDamage(damage int) (int, int, int) {
 	resisted := min(int(math.Ceil(float64(damage)*float64(m.PoisonResistance)/100)), damage)
 	stamDam, vitDam := m.ReceiveDamageNoArmor(damage - resisted)

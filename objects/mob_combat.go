@@ -94,6 +94,9 @@ func (m *Mob) RollMiss(target *Character, metricPrefix string) bool {
 		missChance += lvlDiff * config.MissPerLevel
 	}
 	missChance += target.GetStat("dex") * config.HitPerDex
+	if target.Class == config.BARBARIAN {
+		missChance += config.UnarmoredMiss(target.Equipment.EmptyUnarmoredSlots())
+	}
 	if utils.Roll(100, 1, 0) > missChance {
 		return m.rollMonkDodge(target, metricPrefix)
 	}

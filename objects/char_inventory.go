@@ -35,6 +35,8 @@ func (i *CharInventory) Add(o *Character) {
 }
 
 func (i *CharInventory) Remove(o *Character) {
+	// Leaving the room lets a readied devious strike go.
+	o.DeviousStrike = ""
 	for c, p := range i.Contents {
 		if p == o {
 			copy(i.Contents[c:], i.Contents[c+1:])

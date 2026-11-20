@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/ArcCS/Nevermore/config"
+	"github.com/ArcCS/Nevermore/data"
 	"github.com/ArcCS/Nevermore/objects"
 	"github.com/ArcCS/Nevermore/utils"
 )
@@ -34,16 +35,59 @@ func sneakAttackOdds(actor *objects.Character, whatMob *objects.Mob) (bool, int)
 	return chance > 0, chance
 }
 
-// rollSneakAttack returns the sneak attack damage for this hit, or 0 when it
-// doesn't apply or misses its chance.
-func rollSneakAttack(s *state, whatMob *objects.Mob) int {
+// sneakAttackLands rolls whether this hit is a sneak attack.
+func sneakAttackLands(s *state, whatMob *objects.Mob) bool {
 	ok, chance := sneakAttackOdds(s.actor, whatMob)
-	if !ok || (chance < 100 && utils.Roll(100, 1, 0) > chance) {
-		return 0
-	}
+	return ok && (chance >= 100 || utils.Roll(100, 1, 0) <= chance)
+}
+
+// sneakAttackDamage rolls the sneak attack dice for the actor.
+func sneakAttackDamage(s *state) int {
 	dice := config.SneakAttackDice(s.actor.Tier, config.StealthLevel(s.actor.Skills[11].Value))
 	if dice <= 0 {
 		return 0
 	}
 	return utils.Roll(config.SneakAttackSides, dice, 0)
+}
+
+// deviousFor picks what a sneak attack hit on whatMob delivers: the queued
+// devious strike, or "" for the sneak attack dice. A queued expose weakness
+// on a mob that's already exposed waits for the next mob, and this hit
+// sneak attacks instead.
+func deviousFor(actor *objects.Character, whatMob *objects.Mob) string {
+	if actor.DeviousStrike == config.DeviousExpose && whatMob.CheckFlag("exposed") {
+		return ""
+	}
+	return actor.DeviousStrike
+}
+
+// deviousCallbacks maps each strike to its hit callback.
+var deviousCallbacks = map[string]string{
+	config.DeviousPoison: "devious-poison",
+	config.DeviousExpose: "devious-expose",
+}
+
+// fireDevious delivers a devious strike that rode in on a hit, once the hit's
+// damage is in, through its hit callback. It clears the queue only when the
+// strike landed: a mob the hit killed takes nothing, and the strike stays
+// queued.
+func fireDevious(s *state, whatMob *objects.Mob, strike string) {
+	callback, ok := deviousCallbacks[strike]
+	if !ok || whatMob.Stam.Current <= 0 {
+		return
+	}
+	if strike == config.DeviousExpose && whatMob.CheckFlag("exposed") {
+		return
+	}
+	objects.DeviousHit(s.actor, callback, whatMob)
+	switch strike {
+	case config.DeviousPoison:
+		s.msg.Actor.SendGood("You slip poison into the " + whatMob.Name + "'s wound!")
+		s.msg.Observers.SendInfo(s.actor.Name + " poisons the " + whatMob.Name + "!")
+	case config.DeviousExpose:
+		s.msg.Actor.SendGood("You expose a weakness in the " + whatMob.Name + "'s defenses!")
+		s.msg.Observers.SendInfo(s.actor.Name + " exposes a weakness in the " + whatMob.Name + "'s defenses!")
+	}
+	data.StoreCombatMetric("devious-"+strike, 0, 0, 0, 0, 0, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
+	s.actor.DeviousStrike = ""
 }

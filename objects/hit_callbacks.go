@@ -23,6 +23,8 @@ type HitContext struct {
 	Tier       int
 	Bonus      float64 // the caster's spell damage multiplier when it fired
 	Element    string
+	// StealthRank is the thief's stealth rank when a devious strike fired.
+	StealthRank int
 }
 
 type HitCallback func(ctx *HitContext, target *Mob)
@@ -36,6 +38,9 @@ type OnHit struct {
 
 var HitCallbacks = map[string]HitCallback{
 	"ignite": applyDoT(burn),
+	// Thief devious strikes, fired by a sneak attack hit.
+	"devious-poison": applyDoT(poisonStrike),
+	"devious-expose": func(_ *HitContext, target *Mob) { target.Expose() },
 }
 
 // TriggerOnHit rolls each callback's chance and runs the ones that fire.
@@ -85,6 +90,9 @@ type DoT struct {
 	OnMsg    string
 	TickVerb string // "<mob> <verb> for N <element> damage."
 	OffMsg   string
+	// Poison DoTs go through ReceivePoisonDamage and train stealth; the rest
+	// are magic of the hit's element and train that element.
+	Poison bool
 }
 
 // burn is combust's ignite: 2d(caster tier/2 + 1)+2 fire damage a tick.
@@ -96,6 +104,37 @@ var burn = DoT{
 	OnMsg:    "%s bursts into flame!",
 	TickVerb: "burns",
 	OffMsg:   "The flames on %s die out.",
+}
+
+// poisonStrike is the thief's devious poison: PoisonStrikeDice d
+// PoisonStrikeSides poison damage a tick, sized by whoever applied it last.
+var poisonStrike = DoT{
+	Effect:   "poison",
+	Ticks:    config.PoisonStrikeTicks,
+	Interval: config.PoisonStrikeInterval,
+	Damage: func(ctx *HitContext) int {
+		return utils.Roll(config.PoisonStrikeSides, config.PoisonStrikeDice(ctx.Tier, ctx.StealthRank), 0)
+	},
+	// The poison strike's opening line is sent by the attack round, in order
+	// with the hit's own messages.
+	OnMsg:    "",
+	TickVerb: "writhes",
+	OffMsg:   "The poison in %s runs its course.",
+	Poison:   true,
+}
+
+// DeviousHit fires a thief's devious strike callback (callback is its name in
+// HitCallbacks) on the mob. A poison strike on a mob already poisoned
+// restarts the ticks and hands it to this thief, at their tier and stealth
+// rank.
+func DeviousHit(thief *Character, callback string, target *Mob) {
+	TriggerOnHit([]OnHit{{Name: callback, Chance: 100}}, &HitContext{
+		CasterName:  thief.Name,
+		Tier:        thief.Tier,
+		Bonus:       1,
+		Element:     "poison",
+		StealthRank: config.StealthLevel(thief.Skills[11].Value),
+	}, target)
 }
 
 // applyDoT makes a hit callback that puts dot on the mob.
@@ -112,7 +151,9 @@ func applyDoT(dot DoT) HitCallback {
 			func() {
 				room.MessageAll(text.Info + fmt.Sprintf(dot.OffMsg, target.Name) + "\n" + text.Reset)
 			})
-		room.MessageAll(text.Red + fmt.Sprintf(dot.OnMsg, target.Name) + "\n" + text.Reset)
+		if dot.OnMsg != "" {
+			room.MessageAll(text.Red + fmt.Sprintf(dot.OnMsg, target.Name) + "\n" + text.Reset)
+		}
 	}
 }
 
@@ -133,11 +174,20 @@ func dotTick(dot DoT, ctx *HitContext, target *Mob, triggers int) {
 		return
 	}
 
-	damage, _, resisted := target.ReceiveMagicDamage(dot.Damage(ctx), ctx.Element)
-	data.StoreCombatMetric(ctx.Element+"spell_"+dot.Effect, 0, 2, damage+resisted, resisted, damage, 0, credit.CharId, credit.Tier, 1, target.MobId)
+	var damage, resisted int
+	if dot.Poison {
+		damage, _, resisted = target.ReceivePoisonDamage(dot.Damage(ctx))
+		data.StoreCombatMetric("devious_"+dot.Effect, 0, 0, damage+resisted, resisted, damage, 0, credit.CharId, credit.Tier, 1, target.MobId)
+	} else {
+		damage, _, resisted = target.ReceiveMagicDamage(dot.Damage(ctx), ctx.Element)
+		data.StoreCombatMetric(ctx.Element+"spell_"+dot.Effect, 0, 2, damage+resisted, resisted, damage, 0, credit.CharId, credit.Tier, 1, target.MobId)
+	}
 	target.AddThreatDamage(damage, credit)
-	if _, elemental := magicSkillMap[ctx.Element]; elemental && credit.Name == ctx.CasterName {
-		credit.AdvanceElementalExp(int(float64(damage)/float64(target.Stam.Max)*float64(target.Experience())), ctx.Element, credit.Class)
+	exp := int(float64(damage) / float64(target.Stam.Max) * float64(target.Experience()))
+	if dot.Poison && credit.Name == ctx.CasterName {
+		credit.AdvanceStealthExp(exp)
+	} else if _, elemental := magicSkillMap[ctx.Element]; elemental && credit.Name == ctx.CasterName {
+		credit.AdvanceElementalExp(exp, ctx.Element, credit.Class)
 	}
 	room.MessageAll(text.Red + target.Name + " " + dot.TickVerb + " for " + strconv.Itoa(damage) + " " + ctx.Element + " damage.\n" + text.Reset)
 	target.DeathCheck(credit)

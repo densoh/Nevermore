@@ -41,6 +41,10 @@ func (read) process(s *state) {
 				s.msg.Actor.SendBad("You study the scroll but find that it contains no spell.")
 				return
 			}
+			if strike, ok := config.DeviousFromSpell(what.Spell); ok {
+				learnDevious(s, what, strike)
+				return
+			}
 			spellInstance, ok := objects.Spells[what.Spell]
 			if !ok {
 				s.msg.Actor.SendBad("The spell contained does not exist in this world.")
@@ -73,4 +77,33 @@ func (read) process(s *state) {
 			s.msg.Actor.SendBad("That's not a scroll.")
 		}
 	}
+}
+
+// learnDevious teaches a thief the devious strike on a scroll. Only thieves
+// can make sense of one, and only from the strike's tier; staff skip both.
+func learnDevious(s *state, what *objects.Item, strike string) {
+	if !s.actor.Permission.HasAnyFlags(permissions.Builder, permissions.Dungeonmaster, permissions.Gamemaster) {
+		if s.actor.Class != config.THIEF {
+			s.msg.Actor.SendBad("The scroll describes a dirty trick you can't make sense of.")
+			return
+		}
+		if s.actor.Tier < config.DeviousStrikeTiers[strike] {
+			s.msg.Actor.SendBad("You are not high enough level to learn this devious strike.")
+			return
+		}
+	}
+	spell := config.DeviousSpell(strike)
+	if utils.StringIn(spell, s.actor.Spells) {
+		s.msg.Actor.SendBad("You already know this devious strike.")
+		return
+	}
+	s.msg.Actor.SendGood("You study ", what.Name, " and learn the devious strike "+strike)
+	s.actor.Spells = append(s.actor.Spells, spell)
+	s.msg.Observers.SendInfo("You see ", s.actor.Name, " study a ", what.Name, ".")
+	if err := s.actor.Inventory.Remove(what); err != nil {
+		s.msg.Actor.SendBad("You can't seem to remove the ", what.Name, " from your inventory.")
+		log.Println("Error removing item from inventory: ", err)
+		return
+	}
+	s.msg.Actor.SendInfo("The " + what.Name + " disintegrates.")
 }

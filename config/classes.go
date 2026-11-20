@@ -101,7 +101,7 @@ var Classes = map[string]classDef{
 		Desc:              "A master of the magic arts, the mage will gain the power to unleash incredible amounts of damage by means of spells, but magic alone cannot overcome all enemies. A mage can teach low level spells to other players, once the mage has learned them. In addition, the mage is the only class that is able to enchant things.",
 		Skills:            "Teach, Enchant",
 		Stats:             "Intelligence, Piety",
-		Armor:             "Robes",
+		Armor:             "Robes, cloaks and rings",
 		Races:             "Human, Elf, Half - Elf",
 		Health:            8,
 		Stamina:           10,

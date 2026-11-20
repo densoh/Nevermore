@@ -334,6 +334,7 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 	crushing := false
 	shatterRisk := false
 	totalReflect := 0
+	devious := ""
 	for hit := 0; hit < result.hits; hit++ {
 		mult := attacks[hit]
 		action := metric
@@ -360,11 +361,13 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 
 		rawDamage := int(math.Ceil(float64(s.actor.InflictDamage()) * mult))
 		// Sneak attack rides on the first landed hit, after the multiplier
-		// (crits don't multiply it) and before armor.
+		// (crits don't multiply it) and before armor. A queued devious strike
+		// takes its place.
 		sneak := 0
-		if hit == 0 {
-			sneak = rollSneakAttack(s, whatMob)
-			if sneak > 0 {
+		if hit == 0 && sneakAttackLands(s, whatMob) {
+			if strike := deviousFor(s.actor, whatMob); strike != "" {
+				devious = strike
+			} else if sneak = sneakAttackDamage(s); sneak > 0 {
 				s.msg.Actor.SendGood("You sneak up on the enemy!")
 				data.StoreCombatMetric(metric+"-sneak", 0, 0, sneak, 0, sneak, 0, s.actor.CharId, s.actor.Tier, 1, whatMob.MobId)
 			}
@@ -391,6 +394,9 @@ func resolveHits(s *state, whatMob *objects.Mob, attacks []float64, skillLevel i
 		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " for " + strconv.Itoa(result.totalDamage) + " damage!" + text.Reset)
 	} else {
 		s.msg.Actor.SendInfo("You hit the " + whatMob.Name + " " + strconv.Itoa(result.hits) + " times for " + strconv.Itoa(result.totalDamage) + " damage!" + text.Reset)
+	}
+	if devious != "" {
+		fireDevious(s, whatMob, devious)
 	}
 	if crushing {
 		whatMob.StunBy(config.CrushingStuns, "crushing-stun", s.actor)

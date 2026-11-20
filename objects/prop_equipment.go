@@ -954,6 +954,26 @@ func RestoreEquipment(jsonString string, charClass int) (*Equipment, []Item) {
 	return NewEquipment, ErroredEquipment
 }
 
+// EmptyUnarmoredSlots lists the item types of the empty armor slots that
+// count for barbarian unarmored fighting: everything but rings and shields.
+// A worn piece with no armor (a cosmetic hat) leaves the slot empty.
+func (e *Equipment) EmptyUnarmoredSlots() []int {
+	slots := []struct {
+		item     *Item
+		itemType int
+	}{
+		{e.Chest, 5}, {e.Feet, 19}, {e.Legs, 20}, {e.Arms, 21},
+		{e.Neck, 22}, {e.Head, 25}, {e.Hands, 26},
+	}
+	var empty []int
+	for _, s := range slots {
+		if s.item == (*Item)(nil) || s.item.Armor <= 0 {
+			empty = append(empty, s.itemType)
+		}
+	}
+	return empty
+}
+
 func (e *Equipment) CheckEquipment() {
 	// Gear the wearer can no longer use (class rules, tier caps) goes back
 	// into the pack rather than vanishing.

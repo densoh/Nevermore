@@ -104,7 +104,8 @@ func (aura) process(s *state) {
 	}
 	objects.Effects["seal-"+which](s.actor, s.actor, 0)
 	s.msg.Observers.SendInfo(s.actor.Name + " invokes the seal of " + which + ".")
+	// The swap needs the attack round ready but doesn't spend it, so a seal
+	// can be invoked and acted on (rescue, turn, an attack) in the same round.
 	s.actor.SetTimer("combat_seal", config.SealTimer)
-	s.actor.SetTimer("combat", 3)
 	s.ok = true
 }

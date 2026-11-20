@@ -94,3 +94,47 @@ func BerserkMaxDurationFor(tier int) int {
 func BerserkDamageBonus(str int, tier int) int {
 	return str*BerserkDamagePerStr + tier*BerserkDamagePerTier
 }
+
+// Barbarian armor (2026-11-16). Con adds BarbarianConArmorMod of gear armor
+// per point, half again the usual ConArmorMod. A barbarian may also leave an
+// armor slot empty (rings and shields don't count): each empty slot gives
+// UnarmoredBaseShare percent of that slot's armor cap for the barbarian's
+// tier, plus 1% per UnarmoredStatDiv points of con and of dex, and the con
+// bonus multiplies it like worn gear. Mobs also lose to-hit per empty slot,
+// UnarmoredSlotMiss points each (2 for body, 1 for the rest, 8 in all). Tuned
+// so armor is the default and going fully unarmored only pays off at very
+// high dex (around 35).
+const (
+	BarbarianConArmorMod = .0075
+	UnarmoredBaseShare   = 20.0
+	UnarmoredStatDiv     = 2.0
+)
+
+// UnarmoredSlotMiss is the to-hit a mob loses for each empty barbarian armor
+// slot, keyed by item type. Only these slots count.
+var UnarmoredSlotMiss = map[int]int{5: 2, 19: 1, 20: 1, 21: 1, 22: 1, 25: 1, 26: 1}
+
+// ConArmorModFor is the share of gear armor each point of con adds.
+func ConArmorModFor(class int) float64 {
+	if class == BARBARIAN {
+		return BarbarianConArmorMod
+	}
+	return ConArmorMod
+}
+
+// UnarmoredSlotArmor is the armor an empty slot of this item type gives a
+// barbarian, before the con bonus.
+func UnarmoredSlotArmor(itemType, tier, con, dex int) float64 {
+	share := UnarmoredBaseShare + float64(con)/UnarmoredStatDiv + float64(dex)/UnarmoredStatDiv
+	return float64(ArmorCap(itemType, tier)) * share / 100
+}
+
+// UnarmoredMiss is the to-hit mobs lose against a barbarian with these empty
+// slots (item types).
+func UnarmoredMiss(emptyTypes []int) int {
+	total := 0
+	for _, t := range emptyTypes {
+		total += UnarmoredSlotMiss[t]
+	}
+	return total
+}
